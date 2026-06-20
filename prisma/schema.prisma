@@ -1,0 +1,587 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ==========================================
+// ENUMS & CONSTANTS
+// ==========================================
+
+enum PlatformRole {
+  SUPER_ADMIN
+  ADMIN
+  SUPPORT
+  BILLING
+}
+
+enum VendorStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  CANCELLED
+}
+
+enum VendorUserRole {
+  OWNER
+  ADMIN
+  MANAGER
+  STAFF
+  ACCOUNTANT
+}
+
+enum UserStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  DEACTIVATED
+}
+
+enum ProductStatus {
+  DRAFT
+  ACTIVE
+  OUT_OF_STOCK
+  ARCHIVED
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  PARTIALLY_REFUNDED
+  REFUNDED
+  FAILED
+}
+
+enum SubOrderStatus {
+  PENDING
+  PROCESSING
+  READY_FOR_PICKUP
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  PENDING
+  AUTHORIZED
+  COMPLETED
+  FAILED
+  REVERSED
+}
+
+enum PayoutStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum LedgerTransactionType {
+  SALE_REVENUE
+  PLATFORM_COMMISSION
+  SUBSCRIPTION_PAYMENT
+  VENDOR_PAYOUT
+  REFUND_DEDUCTION
+}
+
+enum BillingCycle {
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+enum SubscriptionStatus {
+  TRIAL
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+  EXPIRED
+}
+
+enum PaymentGateway {
+  PESAPAL
+  STRIPE
+  MTN_MOMO
+  AIRTEL_MONEY
+  CASH_ON_DELIVERY
+}
+
+enum WebhookProcessStatus {
+  UNPROCESSED
+  PROCESSED
+  FAILED
+  SKIPPED
+}
+
+enum NotificationType {
+  INFO
+  SUCCESS
+  WARNING
+  ERROR
+  ORDER_PLACED
+  LOW_STOCK
+  PAYMENT_RECEIVED
+  SYSTEM
+}
+
+enum DocumentType {
+  NATIONAL_ID
+  PASSPORT
+  BUSINESS_REGISTRATION
+  TAX_CERTIFICATE
+  TRADING_LICENSE
+  OTHER
+}
+
+// ==========================================
+// USER & CORE AUTHENTICATION SECURITY
+// ==========================================
+
+model User {
+  id              String        @id @default(uuid())
+  name            String
+  email           String        @unique
+  phone           String?
+  passwordHash    String?
+  avatarUrl       String?
+  status          UserStatus    @default(PENDING)
+  platformRole    PlatformRole? // Nullable if the user is a customer or a vendor member
+
+  emailVerifiedAt DateTime?
+  lastLoginAt     DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  deletedAt       DateTime?
+
+  // Vendor Membership (An individual can be an employee of a specific vendor)
+  vendorId        String?
+  vendorRole      VendorUserRole?
+  vendorProfile   VendorProfile? @relation("VendorEmployees", fields: [vendorId], references: [id], onDelete: SetNull)
+
+  // System Relations
+  ownedVendor     VendorProfile? @relation("VendorOwner") // 1-to-1 link if they are the primary creator
+  customerOrders  Order[]        @relation("CustomerOrders")
+  reviewsWritten  ProductReview[]
+  auditLogs       AuditLog[]
+  notifications   Notification[]
+
+  @@index([status])
+  @@index([vendorId])
+  @@index([platformRole])
+}
+
+// ==========================================
+// VENDOR / TENANT PROFILE (THE SHOPS)
+// ==========================================
+
+model VendorProfile {
+  id                 String       @id @default(uuid())
+  ownerId            String       @unique
+  owner              User         @relation("VendorOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  
+  storeName          String
+  slug               String       @unique
+  registrationNumber String?
+  email              String?
+  phone              String?
+  website            String?
+  logoUrl            String?
+  bannerUrl          String?
+  description        String?
+  address            String?
+  city               String?      @default("Kampala")
+  country            String?      @default("Uganda")
+  currency           String       @default("UGX")
+  timezone           String       @default("Africa/Kampala")
+  status             VendorStatus @default(PENDING)
+
+  // Escrow & Split Payout Bank/Mobile Money Configurations
+  momoMerchantCode   String?      // For MTN/Airtel localized commercial routing
+  bankAccountName    String?
+  bankAccountNumber  String?
+  bankName           String?
+
+  trialEndsAt        DateTime?
+  activatedAt        DateTime?
+  suspendedAt        DateTime?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+  deletedAt          DateTime?
+
+  // Relations
+  employees          User[]                  @relation("VendorEmployees")
+  products           Product[]
+  subOrders          SubOrder[]
+  ledgerEntries      FinancialLedger[]
+  payouts            VendorPayout[]
+  subscriptions      VendorSubscription[]
+  notifications      Notification[]
+  auditLogs          AuditLog[]
+  documents          Document[]
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+// ==========================================
+// COMMERCE E-COMMERCE ENGINE (CATALOG)
+// ==========================================
+
+model ProductCategory {
+  id          String   @id @default(uuid())
+  name        String
+  slug        String   @unique
+  description String?
+  parentId    String?
+  parent      ProductCategory?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children    ProductCategory[] @relation("CategoryHierarchy")
+  products    Product[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Product {
+  id             String          @id @default(uuid())
+  vendorId       String
+  vendor         VendorProfile   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  categoryId     String?
+  category       ProductCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  name           String
+  slug           String
+  description    String?
+  basePrice      Decimal         @db.Decimal(18, 2)
+  compareAtPrice Decimal?        @db.Decimal(18, 2) // For sales and discounts
+  status         ProductStatus   @default(DRAFT)
+  sku            String?
+  
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  deletedAt      DateTime?
+
+  // Relations
+  images         ProductImage[]
+  variants       ProductVariant[]
+  orderItems     OrderItem[]
+  reviews        ProductReview[]
+
+  @@unique([vendorId, slug])
+  @@index([vendorId])
+  @@index([categoryId])
+  @@index([status])
+}
+
+model ProductImage {
+  id         String   @id @default(uuid())
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url        String
+  isFeatured Boolean  @default(false)
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+}
+
+model ProductVariant {
+  id             String      @id @default(uuid())
+  productId      String
+  product        Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  sku            String      @unique
+  name           String      // e.g., "XL / Blue"
+  price          Decimal     @db.Decimal(18, 2)
+  inventoryCount Int         @default(0)
+  options        Json        // Mapped values e.g., {"size": "XL", "color": "Blue"}
+  
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  orderItems     OrderItem[]
+
+  @@index([productId])
+}
+
+// ==========================================
+// THREE-TIER MULTI-VENDOR ORDER ENGINE
+// ==========================================
+
+// Tier 1: The Global Master Order (The Customer Checkout Instance)
+model Order {
+  id                String         @id @default(uuid())
+  customerId        String
+  customer          User           @relation("CustomerOrders", fields: [customerId], references: [id])
+  
+  orderNumber       String         @unique // Customer-facing reference e.g., SD-2026-X
+  totalAmount       Decimal        @db.Decimal(18, 2) // Gross total across all vendors
+  subTotal          Decimal        @db.Decimal(18, 2)
+  totalShipping     Decimal        @db.Decimal(18, 2)
+  taxAmount         Decimal        @default(0.00) @db.Decimal(18, 2)
+  
+  status            OrderStatus    @default(PENDING)
+  paymentGateway    PaymentGateway
+  paymentStatus     PaymentStatus  @default(PENDING)
+  
+  // Third-party transaction hooks
+  gatewayReference  String?        @unique // Pesapal tracking ID or Stripe intent ID
+  shippingAddress   String
+  shippingPhone     String
+  shippingEmail     String
+  notes             String?
+
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  // Children Breakdowns
+  subOrders         SubOrder[]
+  orderItems        OrderItem[]
+
+  @@index([customerId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// Tier 2: The Sub-Order Partition (Segregated per-vendor bucket)
+model SubOrder {
+  id                String         @id @default(uuid())
+  orderId           String
+  order             Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  vendorId          String
+  vendor            VendorProfile  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  subOrderNumber    String         @unique // e.g., SD-2026-X-V1
+  vendorSubTotal    Decimal        @db.Decimal(18, 2)
+  vendorShipping    Decimal        @db.Decimal(18, 2) // Shipping fee computed specifically for this vendor's node
+  vendorTotal       Decimal        @db.Decimal(18, 2)
+  platformCommission Decimal       @db.Decimal(18, 2) // Computed commission cut retained by the super admin
+
+  status            SubOrderStatus @default(PENDING)
+  notes             String?
+  
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  // Children Item nodes
+  items             OrderItem[]
+
+  @@index([orderId])
+  @@index([vendorId])
+  @@index([status])
+}
+
+// Tier 3: The Individual Product Item Line Node
+model OrderItem {
+  id              String          @id @default(uuid())
+  orderId         String
+  order           Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  subOrderId      String
+  subOrder        SubOrder        @relation(fields: [subOrderId], references: [id], onDelete: Cascade)
+  productId       String
+  product         Product         @relation(fields: [productId], references: [id])
+  variantId       String?
+  variant         ProductVariant? @relation(fields: [variantId], references: [id])
+
+  quantity        Int             @default(1)
+  priceAtPurchase Decimal         @db.Decimal(18, 2)
+  totalPrice      Decimal         @db.Decimal(18, 2)
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([orderId])
+  @@index([subOrderId])
+  @@index([productId])
+}
+
+// ==========================================
+// VENDOR EARNINGS & ESCROW LEDGERS
+// ==========================================
+
+model FinancialLedger {
+  id              String                @id @default(uuid())
+  vendorId        String
+  vendor          VendorProfile         @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  
+  type            LedgerTransactionType
+  amount          Decimal               @db.Decimal(18, 2)
+  reference       String?               // Related OrderNumber, SubOrderNumber or Payout ID
+  description     String?
+  
+  createdAt       DateTime              @default(now())
+
+  @@index([vendorId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+model VendorPayout {
+  id              String        @id @default(uuid())
+  vendorId        String
+  vendor          VendorProfile @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  
+  amount          Decimal       @db.Decimal(18, 2)
+  gateway         PaymentGateway
+  reference       String?       // Mobile money transmission code or bank advice reference
+  status          PayoutStatus  @default(PENDING)
+  errorMessage    String?
+  
+  processedAt     DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([vendorId])
+  @@index([status])
+}
+
+// ==========================================
+// PLATFORM VENDOR SUBSCRIPTIONS
+// ==========================================
+
+model SubscriptionPlan {
+  id                 String             @id @default(uuid())
+  name               String             @unique
+  slug               String             @unique
+  description        String?
+  price              Decimal            @db.Decimal(18, 2)
+  currency           String             @default("UGX")
+  billingCycle       BillingCycle       @default(MONTHLY)
+
+  maxProducts        Int?               // Guard thresholds per tier
+  commissionRate     Decimal            @db.Decimal(5, 2) // Platform commission percentage fee (e.g., 5.50%)
+  hasPremiumThemes   Boolean            @default(false)
+  hasAdvancedCharts  Boolean            @default(false)
+  isActive           Boolean            @default(true)
+
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  subscriptions      VendorSubscription[]
+}
+
+model VendorSubscription {
+  id                 String             @id @default(uuid())
+  vendorId           String
+  vendor             VendorProfile      @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  planId             String
+  plan               SubscriptionPlan   @relation(fields: [planId], references: [id])
+  
+  status             SubscriptionStatus @default(TRIAL)
+  startedAt          DateTime           @default(now())
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime?
+  cancelledAt        DateTime?
+  gracePeriodEndsAt  DateTime?
+
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  @@index([vendorId])
+  @@index([status])
+}
+
+// ==========================================
+// SYSTEM ENGINE, AUDIT LOGS, INTEGRATIONS
+// ==========================================
+
+model ProductReview {
+  id          String   @id @default(uuid())
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  customerId  String
+  customer    User     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  
+  rating      Int      @default(5) // Scale 1 - 5
+  comment     String?
+  reply       String?  // Vendor feedback loop channel response
+  replyAt     DateTime?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([productId, customerId])
+  @@index([productId])
+}
+
+model Notification {
+  id              String           @id @default(uuid())
+  vendorId        String?          // Null if system wide or direct customer
+  vendor          VendorProfile?   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  userId          String?
+  user            User?            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type            NotificationType @default(INFO)
+  title           String
+  message         String
+  readAt          DateTime?
+  createdAt       DateTime         @default(now())
+
+  @@index([vendorId])
+  @@index([userId])
+  @@index([readAt])
+}
+
+model Document {
+  id              String       @id @default(uuid())
+  vendorId        String
+  vendor          VendorProfile @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  type            DocumentType @default(OTHER)
+  name            String
+  url             String
+  mimeType        String?
+  size            Int?
+  createdAt       DateTime     @default(now())
+
+  @@index([vendorId])
+}
+
+model AuditLog {
+  id              String         @id @default(uuid())
+  vendorId        String?
+  vendor          VendorProfile? @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  userId          String?
+  user            User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  action          String         // e.g., "PRODUCT_PRICE_UPDATED", "PAYOUT_APPROVED"
+  entity          String         // e.g., "Product", "VendorPayout"
+  entityId        String?
+  oldValues       Json?
+  newValues       Json?
+  ipAddress       String?
+  userAgent       String?
+  createdAt       DateTime       @default(now())
+
+  @@index([vendorId])
+  @@index([userId])
+  @@index([entity])
+  @@index([createdAt])
+}
+
+model PesapalIpnRegistry {
+  id          String   @id @default(uuid())
+  ipnId       String   @unique
+  url         String
+  environment String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([ipnId])
+}
+
+model PaymentGatewayWebhookLog {
+  id              String               @id @default(uuid())
+  gateway         PaymentGateway
+  trackingId      String               // Tracking ID from Pesapal or Stripe
+  reference       String               // Local Master Order Number
+  eventType       String?
+  payload         Json
+  status          WebhookProcessStatus @default(UNPROCESSED)
+  errorMessage    String?
+  createdAt       DateTime             @default(now())
+
+  @@index([trackingId])
+  @@index([reference])
+  @@index([status])
+}
