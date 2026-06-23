@@ -92,7 +92,7 @@ export default function CollectionDetailPage({ params }: PageProps) {
   const visibleTiles = slides.slice(tileOffset, tileOffset + TILES_TO_SHOW);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-10 selection:bg-emerald-500/10 selection:text-emerald-700">
+    <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-10 selection:bg-emerald-500/10 selection:text-emerald-700">
       
       {/* 1. STRUCTURAL CONTROLS HEADER */}
       <div className="flex items-center justify-between gap-4 border-b border-border/60 pb-4">

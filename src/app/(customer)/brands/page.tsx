@@ -35,7 +35,7 @@ export default function BrandsPage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-12 selection:bg-emerald-500/10 selection:text-emerald-700">
+    <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-12 selection:bg-emerald-500/10 selection:text-emerald-700">
       
       {/* 1. Synchronized Page Header Architecture */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/60 pb-6">
@@ -55,7 +55,7 @@ export default function BrandsPage() {
 
       {/* 2. Re-engineered Merchant Stores Layout Grid */}
       <section className="space-y-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-5 sm:gap-6">
           {activeMerchantStores.map((store: Store) => {
             // Compute dynamic item counts and category references on the fly
             const stats = getStoreStats(store.id);

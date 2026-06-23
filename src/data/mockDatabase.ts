@@ -1,5 +1,5 @@
-// Add Order and OrderItem types to your types import if they aren't imported globally
 import {
+  Category,
   Collection,
   Coupon,
   FAQItem,
@@ -9,6 +9,8 @@ import {
   PromoCampaign,
   Store,
 } from "@/types/marketplace";
+
+
 
 export const CURRENT_USER_ID = "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d";
 export const SETTINGS_PROFILE_ID = "a4c28c82-3f14-4a61-bc9d-c58ee1e185e3";
@@ -118,38 +120,44 @@ export const mockDatabase = {
     },
   ] as FAQItem[],
 
+  // 2. Strongly Typed Categories Array containing dynamic high-res image references
   categories: [
     {
       id: SEED_CAT_FOOTWEAR,
       name: "Footwear & Sportswear",
       slug: "footwear-sportswear",
       icon: "Sparkles",
+      image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=600&q=80",
     },
     {
       id: SEED_CAT_ELECTRONICS,
       name: "Electronics & Audio",
       slug: "electronics-audio",
       icon: "Zap",
+      image: "https://images.unsplash.com/photo-1546868871-7041f2a55e12?auto=format&fit=crop&w=600&q=80",
     },
     {
       id: SEED_CAT_ACCESSORIES,
       name: "Luxury Eyewear & Accessories",
       slug: "luxury-eyewear-accessories",
       icon: "Glasses",
+      image: "https://images.unsplash.com/photo-1524592094714-0f0654e20314?auto=format&fit=crop&w=600&q=80",
     },
     {
       id: SEED_CAT_APPLIANCES,
       name: "Home Utilities & Appliances",
       slug: "home-utilities-appliances",
       icon: "ChefHat",
+      image: "https://images.unsplash.com/photo-1621972750749-0fbb1abb7736?auto=format&fit=crop&w=600&q=80",
     },
     {
       id: SEED_CAT_APPAREL,
       name: "Apparel & Designer Fashion",
       slug: "apparel-designer-fashion",
       icon: "Shirt",
+      image: "https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&w=600&q=80",
     },
-  ],
+  ] as Category[],
 
   stores: [
     {

@@ -62,7 +62,7 @@ export default function StoreProfilePage({ params }: PageProps) {
   const storeDescription = `Discover authentic premium product lines managed directly by ${store.name}. Enjoy local Kampala speed-delivery and fully safe mobile money escrow support.`;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-8 selection:bg-emerald-500/10 selection:text-emerald-700">
+    <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-8 selection:bg-emerald-500/10 selection:text-emerald-700">
 
       {/* 1. BREADCRUMB & CONTROL ROW */}
       <div className="flex items-center gap-4 border-b border-border/60 pb-4">

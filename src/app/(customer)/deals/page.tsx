@@ -11,7 +11,7 @@ export default function DealsPage() {
   );
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-12 selection:bg-emerald-500/10 selection:text-emerald-700">
+    <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-12 selection:bg-emerald-500/10 selection:text-emerald-700">
       
       {/* 1. Primary Live Campaign Header Framework */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/60 pb-6">
@@ -37,7 +37,7 @@ export default function DealsPage() {
             <p className="text-sm text-zinc-400 dark:text-zinc-500 font-medium">No active markdown offers live right now.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 sm:gap-6">
             {flashDealsProducts.map((product) => {
               const discountPercentage = product.originalPrice 
                 ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)

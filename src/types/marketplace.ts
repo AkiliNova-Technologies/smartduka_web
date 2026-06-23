@@ -82,7 +82,7 @@ export interface Coupon {
 // COMMERCE CATALOG & CLASSIFICATIONS
 // ==========================================
 
-export interface ProductCategory {
+export interface Category {
   id: string; 
   name: string; 
   slug: string; 
@@ -198,7 +198,7 @@ export interface MockDatabaseSchema {
   currentUser: UserProfile;
   settingsProfiles: Record<string, UserSettingsProfile>;
   faqs: FAQItem[];
-  categories: ProductCategory[];
+  categories: Category[];
   stores: Store[];
   products: Product[];
   productCampaigns: ProductCampaign[];

@@ -43,7 +43,7 @@ export default function NewArrivalsPage() {
 
       {/* 2. Responsive Catalog Card Streams Grid */}
       <section className="space-y-6">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 sm:gap-6">
           {freshArrivalsProducts.map((product) => {
             const discountPercentage = product.originalPrice
               ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)

@@ -1,7 +1,6 @@
-import React from "react";
-import { CustomerSidebar } from "@/components/layout/CustomerSidebar"; // This maps your AppSidebar
+import React, { Suspense } from "react";
+import { CustomerSidebar } from "@/components/layout/CustomerSidebar"; 
 import { Header } from "@/components/layout/Header";
-import { RightSidebar } from "@/components/home/RightSidebar";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 
 export default function CustomerLayout({
@@ -10,21 +9,24 @@ export default function CustomerLayout({
   children: React.ReactNode;
 }) {
   return (
-    <SidebarProvider defaultOpen={true}>
-      <div className="min-h-screen flex w-full bg-zinc-50/50 dark:bg-zinc-950 selection:bg-emerald-500/10 selection:text-emerald-700">
+    <SidebarProvider defaultOpen={false}>
+      <div className="min-h-screen flex w-full bg-background selection:bg-emerald-500/10 selection:text-emerald-700 antialiased overflow-x-hidden">
         
-        <CustomerSidebar variant="floating"/>
+        <CustomerSidebar variant="floating" />
 
-        <SidebarInset className="min-h-screen flex flex-col bg-transparent transition-all duration-300">
-          {/* Top Header Bar */}
-          <Header />
+        <SidebarInset className="min-h-screen flex flex-col bg-transparent transition-all duration-300 w-full min-w-0">
+          
+          <Suspense fallback={<div className="h-20 w-full bg-muted/20 rounded-full animate-pulse mt-2" />}>
+            <Header />
+          </Suspense>
 
-          <main className="flex-1 flex flex-col lg:flex-row px-6 md:px-10 py-8 gap-12 max-w-8xl w-full mx-auto">
-            <div className="flex-1 min-w-0 relative">
+          <main className="flex-1 flex flex-col lg:flex-row px-4 sm:px-6 lg:px-8 py-6 lg:py-10 gap-6 lg:gap-12 max-w-8xl w-full mx-auto min-w-0">
+            
+            {/* Main Stage Child Router Viewport */}
+            <div className="flex-1 min-w-0 w-full relative">
               {children}
             </div>
 
-            <RightSidebar />
           </main>
         </SidebarInset>
       </div>

@@ -58,7 +58,7 @@ export default function SettingsPage() {
   const [momoNetwork, setMomoNetwork] = useState(userProfile.momoNetwork);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-10 space-y-10 text-foreground antialiased selection:bg-emerald-500/10 selection:text-emerald-700">
+    <div className="max-w-8xl mx-auto px-4 py-10 space-y-10 text-foreground antialiased selection:bg-emerald-500/10 selection:text-emerald-700">
       
       {/* Header Section */}
       <div className="border-b border-border/60 pb-6">

@@ -59,7 +59,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     : 0;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 lg:px-8 py-8 space-y-12 text-foreground antialiased selection:bg-emerald-500/10 selection:text-emerald-700">
+    <div className="max-w-8xl mx-auto px-4 lg:px-8 py-8 space-y-12 text-foreground antialiased selection:bg-emerald-500/10 selection:text-emerald-700">
 
       {/* 1. BREADCRUMB HEADER PLATFORM CONTROLS */}
       <div className="flex items-center justify-between gap-4 border-b border-border/60 pb-4">

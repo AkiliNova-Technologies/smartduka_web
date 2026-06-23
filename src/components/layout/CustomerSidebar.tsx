@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { 
   ShoppingBag, Home, LayoutGrid, Tag, Sparkles, 
-  Store, Layers, Heart, Ticket, 
+  Store, Heart, Ticket, 
   Settings, Headphones, Moon, Sun 
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -25,12 +25,11 @@ import {
 } from "@/components/ui/sidebar";
 
 const discoverItems = [
-  { name: "Home", href: "/products", icon: Home },
+  { name: "Home", href: "/", icon: Home },
   { name: "Categories", href: "/categories", icon: LayoutGrid },
   { name: "Deals", href: "/deals", icon: Tag },
   { name: "New Arrivals", href: "/new-arrivals", icon: Sparkles },
   { name: "Brands", href: "/brands", icon: Store },
-  { name: "Collections", href: "/collections", icon: Layers },
 ];
 
 const workspaceItems = [
@@ -40,26 +39,34 @@ const workspaceItems = [
   { name: "Settings", href: "/settings", icon: Settings },
 ];
 
+const emptySubscribe = () => () => {};
+
 export function CustomerSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname();
   const { state } = useSidebar();
   
   const { isDark, toggleTheme } = useTheme();
+  
+  const mounted = React.useSyncExternalStore(
+    emptySubscribe,
+    () => true,  
+    () => false 
+  );
 
   return (
     <Sidebar 
       collapsible="icon" 
-      className="dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 transition-all duration-300"
+      className="border-r border-border/60 bg-card text-card-foreground transition-all duration-300"
       {...props}
     >
       {/* BRAND IDENTITY HEADER */}
-      <SidebarHeader className="p-4 flex flex-row items-center gap-3 select-none overflow-hidden h-20 border-b border-zinc-100/60 dark:border-zinc-900">
-        <div className="w-9 h-9 bg-emerald-700 dark:bg-emerald-600 rounded-xl flex items-center justify-center text-white shadow-sm shrink-0 transition-transform duration-300 hover:rotate-6">
+      <SidebarHeader className="p-4 flex flex-row items-center gap-3 select-none overflow-hidden h-18 border-b border-border/40">
+        <div className="w-9 h-9 bg-primary text-primary-foreground rounded-xl flex items-center justify-center shadow-xs shrink-0 transition-transform duration-300 hover:rotate-6">
           <ShoppingBag className="w-4 h-4 stroke-[2.5]" />
         </div>
         {state === "expanded" && (
           <h1 className="font-bold text-lg tracking-tight text-zinc-900 dark:text-zinc-50 transition-fadeIn">
-            Smart<span className="text-emerald-700 dark:text-emerald-500">Duka</span>
+            Smart<span className="text-primary">Duka</span>
           </h1>
         )}
       </SidebarHeader>
@@ -69,7 +76,7 @@ export function CustomerSidebar({ ...props }: React.ComponentProps<typeof Sideba
         
         {/* DISCOVER SECTION */}
         <SidebarGroup>
-          <SidebarGroupLabel className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 tracking-widest uppercase mb-1">
+          <SidebarGroupLabel className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 tracking-widest uppercase mb-2 px-3">
             Discover
           </SidebarGroupLabel>
           <SidebarGroupContent>
@@ -83,10 +90,10 @@ export function CustomerSidebar({ ...props }: React.ComponentProps<typeof Sideba
                       isActive={isActive}
                       tooltip={item.name}
                       className={cn(
-                        "w-full px-3 py-2.5 rounded-full text-xs font-semibold tracking-tight transition-all duration-200",
+                        "w-full px-4 py-2.5 rounded-full text-xs font-bold tracking-tight transition-all duration-200 cursor-pointer",
                         isActive 
-                          ? "bg-emerald-700 text-white dark:bg-emerald-600 dark:text-white shadow-xs" 
-                          : "text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-900 hover:text-zinc-900 dark:hover:text-zinc-100"
+                          ? "bg-primary text-primary-foreground shadow-xs" 
+                          : "text-zinc-500 dark:text-zinc-400 hover:bg-muted hover:text-foreground"
                       )}
                     >
                       <Link href={item.href}>
@@ -103,7 +110,7 @@ export function CustomerSidebar({ ...props }: React.ComponentProps<typeof Sideba
 
         {/* WORKSPACE SECTION */}
         <SidebarGroup>
-          <SidebarGroupLabel className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 tracking-widest uppercase mb-1">
+          <SidebarGroupLabel className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 tracking-widest uppercase mb-2 px-3">
             Workspace
           </SidebarGroupLabel>
           <SidebarGroupContent>
@@ -117,10 +124,10 @@ export function CustomerSidebar({ ...props }: React.ComponentProps<typeof Sideba
                       isActive={isActive}
                       tooltip={item.name}
                       className={cn(
-                        "w-full px-3 py-2.5 rounded-full text-xs font-semibold tracking-tight transition-all duration-200",
+                        "w-full px-4 py-2.5 rounded-full text-xs font-bold tracking-tight transition-all duration-200 cursor-pointer",
                         isActive 
-                          ? "bg-emerald-700 text-white dark:bg-emerald-600 dark:text-white shadow-xs" 
-                          : "text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-900 hover:text-zinc-900 dark:hover:text-zinc-100"
+                          ? "bg-primary text-primary-foreground shadow-xs" 
+                          : "text-zinc-500 dark:text-zinc-400 hover:bg-muted hover:text-foreground"
                       )}
                     >
                       <Link href={item.href}>
@@ -138,7 +145,7 @@ export function CustomerSidebar({ ...props }: React.ComponentProps<typeof Sideba
       </SidebarContent>
 
       {/* SYSTEM PREFERENCES UTILITY FOOTER */}
-      <SidebarFooter className="p-3 border-t border-zinc-100/60 dark:border-zinc-900 space-y-1">
+      <SidebarFooter className="p-3 border-t border-border/40 space-y-1">
         <SidebarMenu>
           
           {/* HELP HUB TRIGGER */}
@@ -148,10 +155,10 @@ export function CustomerSidebar({ ...props }: React.ComponentProps<typeof Sideba
               isActive={pathname === "/help"}
               tooltip="Help Center"
               className={cn(
-                "w-full px-3 py-2.5 rounded-full text-xs font-semibold tracking-tight transition-all",
+                "w-full px-4 py-2.5 rounded-full text-xs font-bold tracking-tight transition-all cursor-pointer",
                 pathname === "/help"
-                  ? "bg-emerald-700 text-white dark:bg-emerald-600 shadow-xs"
-                  : "text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-900 hover:text-zinc-900 dark:hover:text-zinc-100"
+                  ? "bg-primary text-primary-foreground shadow-xs"
+                  : "text-zinc-500 dark:text-zinc-400 hover:bg-muted hover:text-foreground"
               )}
             >
               <Link href="/help">
@@ -165,17 +172,23 @@ export function CustomerSidebar({ ...props }: React.ComponentProps<typeof Sideba
           <SidebarMenuItem>
             <SidebarMenuButton 
               onClick={toggleTheme}
-              tooltip={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
-              className="w-full px-3 py-2.5 rounded-full text-xs font-semibold tracking-tight text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-900 hover:text-zinc-900 dark:hover:text-zinc-100"
+              tooltip={!mounted ? "Loading Theme" : isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
+              className="w-full px-4 py-2.5 rounded-full text-xs font-bold tracking-tight text-zinc-500 dark:text-zinc-400 hover:bg-muted hover:text-foreground cursor-pointer"
             >
-              {isDark ? (
+              {/* Check mount status before evaluating dynamic theme variables */}
+              {!mounted ? (
                 <>
-                  <Sun className="w-4 h-4 text-amber-500 shrink-0" />
+                  <div className="w-4 h-4 rounded-full border border-zinc-300 dark:border-zinc-700 animate-pulse shrink-0" />
+                  <span className="text-muted-foreground/60">Loading Theme...</span>
+                </>
+              ) : isDark ? (
+                <>
+                  <Sun className="w-4 h-4 text-amber-500 shrink-0 animate-in fade-in zoom-in-75 duration-200" />
                   <span>Light Mode</span>
                 </>
               ) : (
                 <>
-                  <Moon className="w-4 h-4 text-zinc-400 shrink-0" />
+                  <Moon className="w-4 h-4 text-zinc-400 shrink-0 animate-in fade-in zoom-in-75 duration-200" />
                   <span>Dark Mode</span>
                 </>
               )}

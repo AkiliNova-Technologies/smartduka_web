@@ -13,10 +13,10 @@ function ProductCard({ product }: { product: Product }) {
     : 0;
 
   return (
-    <div className="group relative bg-card text-card-foreground rounded-[24px] p-0 border border-border/60 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.03)] dark:border-zinc-800/80 dark:shadow-none flex flex-col justify-between cursor-pointer transition-all duration-300 hover:shadow-[0_32px_64px_-8px_rgba(0,0,0,0.06)]">
+    <div className="group relative bg-card text-card-foreground rounded-[24px] p-0 border border-border/60 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.02)] dark:border-zinc-800/80 dark:shadow-none flex flex-col justify-between cursor-pointer transition-all duration-300 hover:shadow-[0_32px_64px_-8px_rgba(0,0,0,0.06)]">
       
       {/* Wishlist Trigger Button (Theme aligned with active dark mode variants) */}
-      <button className="absolute top-4 right-4 z-20 w-9 h-9 rounded-full bg-white dark:bg-zinc-800 flex items-center justify-center text-zinc-400 dark:text-zinc-500 border border-border/40 dark:border-zinc-700 shadow-xs transition-colors hover:text-rose-500 dark:hover:text-rose-400 hover:bg-zinc-50 dark:hover:bg-zinc-700 active:scale-90">
+      <button className="absolute top-4 right-4 z-20 w-9 h-9 rounded-full bg-white dark:bg-zinc-800 flex items-center justify-center text-zinc-400 dark:text-zinc-500 border border-border/40 dark:border-zinc-700 shadow-xs transition-colors hover:text-rose-500 dark:hover:text-rose-400 hover:bg-zinc-50 dark:hover:bg-zinc-700 active:scale-90 cursor-pointer">
         <Heart className="w-4 h-4" />
       </button>
 
@@ -63,7 +63,7 @@ function ProductCard({ product }: { product: Product }) {
       <div className="flex justify-between items-center mt-4 pt-1 px-4 pb-4 relative z-10">
         <div className="flex flex-col">
           {product.originalPrice && (
-            <span className="text-[11px] text-zinc-400 dark:text-zinc-500 line-through font-medium leading-none mb-0.5">
+            <span className="text-[11px] text-zinc-400 dark:text-zinc-500 line-through font-semibold leading-none mb-0.5">
               UGX {product.originalPrice.toLocaleString()}
             </span>
           )}
@@ -73,7 +73,7 @@ function ProductCard({ product }: { product: Product }) {
         </div>
         
         {/* Shopping Cart Button utilizing our active platform primary background token */}
-        <button className="w-9 h-9 bg-zinc-900 dark:bg-zinc-50 text-white dark:text-zinc-900 rounded-xl flex items-center justify-center shadow-xs transition-all duration-200 active:scale-95 hover:bg-primary dark:hover:bg-primary dark:hover:text-white">
+        <button className="w-9 h-9 bg-zinc-900 dark:bg-zinc-50 text-white dark:text-zinc-900 rounded-xl flex items-center justify-center shadow-xs transition-all duration-200 active:scale-95 hover:bg-primary dark:hover:bg-primary dark:hover:text-white cursor-pointer">
           <ShoppingCart className="w-4 h-4" />
         </button>
       </div>
@@ -87,9 +87,12 @@ export function ProductGrid() {
   const recommendedProducts = mockDatabase.products.filter(
     (p) => p.isRecommended && (!p.originalPrice || p.price >= p.originalPrice)
   );
+  
+  // Safely sourcing dynamic recently viewed profiles directly from mock data layers
+  const recentlyViewedProducts = mockDatabase.products.slice(2, 6);
 
   return (
-    <div className="space-y-12">
+    <div className="space-y-12 w-full min-w-0">
       {/* SECTION 1: BEST DEALS */}
       <section className="space-y-6">
         <div className="flex justify-between items-end">
@@ -97,14 +100,14 @@ export function ProductGrid() {
             <h3 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 md:text-2xl">
               Flash Sales & Best Markdowns
             </h3>
-            <p className="text-xs text-zinc-400 dark:text-zinc-500 font-medium mt-0.5">High percentage cuts calculated by our automated discount engine.</p>
+            <p className="text-xs text-zinc-400 dark:text-zinc-500 font-semibold mt-0.5">High percentage cuts calculated by our automated discount engine.</p>
           </div>
-          <button className="h-8 px-4 inline-flex items-center justify-center text-xs font-bold text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 rounded-full hover:text-white dark:hover:text-zinc-900 hover:bg-zinc-900 dark:hover:bg-zinc-50 transition-colors duration-200">
+          <button className="h-8 px-4 inline-flex items-center justify-center text-xs font-bold text-zinc-700 dark:text-zinc-300 bg-muted border border-border/40 rounded-full hover:text-white dark:hover:text-zinc-900 hover:bg-zinc-900 dark:hover:bg-zinc-50 transition-colors duration-200 cursor-pointer">
             View All
           </button>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-5">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-5">
           {bestDealsProducts.map((product) => (
             <ProductCard key={product.id} product={product} />
           ))}
@@ -118,15 +121,36 @@ export function ProductGrid() {
             <h3 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 md:text-2xl">
               Recommended For You
             </h3>
-            <p className="text-xs text-zinc-400 dark:text-zinc-500 font-medium mt-0.5">Premium curated dynamic selections based on your shopping preferences.</p>
+            <p className="text-xs text-zinc-400 dark:text-zinc-500 font-semibold mt-0.5">Premium curated dynamic selections based on your shopping preferences.</p>
           </div>
-          <button className="h-8 px-4 inline-flex items-center justify-center text-xs font-bold text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 rounded-full hover:text-white dark:hover:text-zinc-900 hover:bg-zinc-900 dark:hover:bg-zinc-50 transition-colors duration-200">
+          <button className="h-8 px-4 inline-flex items-center justify-center text-xs font-bold text-zinc-700 dark:text-zinc-300 bg-muted border border-border/40 rounded-full hover:text-white dark:hover:text-zinc-900 hover:bg-zinc-900 dark:hover:bg-zinc-50 transition-colors duration-200 cursor-pointer">
             View All
           </button>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-5">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-5">
           {recommendedProducts.map((product) => (
+            <ProductCard key={product.id} product={product} />
+          ))}
+        </div>
+      </section>
+
+      {/* SECTION 3: RECENTLY VIEWED */}
+      <section className="space-y-6">
+        <div className="flex justify-between items-end">
+          <div>
+            <h3 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 md:text-2xl">
+              Recently Viewed Items
+            </h3>
+            <p className="text-xs text-zinc-400 dark:text-zinc-500 font-semibold mt-0.5">Pick up right where you left off checking out fresh fits.</p>
+          </div>
+          <button className="h-8 px-4 inline-flex items-center justify-center text-xs font-bold text-zinc-700 dark:text-zinc-300 bg-muted border border-border/40 rounded-full hover:text-white dark:hover:text-zinc-900 hover:bg-zinc-900 dark:hover:bg-zinc-50 transition-colors duration-200 cursor-pointer">
+            View All
+          </button>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-5">
+          {recentlyViewedProducts.map((product) => (
             <ProductCard key={product.id} product={product} />
           ))}
         </div>

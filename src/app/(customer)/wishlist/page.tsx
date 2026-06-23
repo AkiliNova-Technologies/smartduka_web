@@ -10,7 +10,7 @@ export default function WishlistPage() {
   const wishlistItems = mockDatabase.products.filter(p => p.isRecommended);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-8 selection:bg-emerald-500/10 selection:text-emerald-700">
+    <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-8 selection:bg-emerald-500/10 selection:text-emerald-700">
       
       {/* 1. GROUNDED LOCAL HEADER BLOCK */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/60 pb-6">
@@ -42,7 +42,7 @@ export default function WishlistPage() {
           </Link>
         </div>
       ) : (
-        <section className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+        <section className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 sm:gap-6">
           {wishlistItems.map((product) => {
             const discountPercentage = product.originalPrice 
               ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100) 

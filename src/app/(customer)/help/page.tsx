@@ -30,7 +30,7 @@ export default function HelpCenterPage() {
   });
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-12 space-y-12 text-foreground antialiased selection:bg-emerald-500/10 selection:text-emerald-700">
+    <div className="max-w-8xl mx-auto px-4 py-12 space-y-12 text-foreground antialiased selection:bg-emerald-500/10 selection:text-emerald-700">
       
       {/* 1. HEADER HERO SECTION */}
       <div className="text-center space-y-5 max-w-xl mx-auto">
