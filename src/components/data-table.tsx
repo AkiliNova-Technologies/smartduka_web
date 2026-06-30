@@ -1,6 +1,7 @@
-"use client"
+"use client";
+"use no memo"; // Bypasses React Compiler cascading mismatches globally for this layout file
 
-import * as React from "react"
+import * as React from "react";
 import {
   closestCenter,
   DndContext,
@@ -10,15 +11,15 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
-} from "@dnd-kit/core"
-import { restrictToVerticalAxis } from "@dnd-kit/modifiers"
+} from "@dnd-kit/core";
+import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import {
   arrayMove,
   SortableContext,
   useSortable,
   verticalListSortingStrategy,
-} from "@dnd-kit/sortable"
-import { CSS } from "@dnd-kit/utilities"
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import {
   flexRender,
   getCoreRowModel,
@@ -33,16 +34,16 @@ import {
   type Row,
   type SortingState,
   type VisibilityState,
-} from "@tanstack/react-table"
+} from "@tanstack/react-table";
 
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Label } from "@/components/ui/label"
+} from "@/components/ui/dropdown-menu";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -50,7 +51,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -58,7 +59,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
+} from "@/components/ui/table";
 import {
   GripVerticalIcon,
   Columns3Icon,
@@ -67,21 +68,19 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   ChevronsRightIcon,
-} from "lucide-react"
+} from "lucide-react";
 
-// Interface for Reusable Table Props
 interface ReusableDataTableProps<TData, TValue> {
-  columns: ColumnDef<TData, TValue>[]
-  data: TData[]
-  getRowId: (row: TData) => string
-  onReorder?: (newData: TData[]) => void
-  toolbarActions?: React.ReactNode
-  renderTabs?: React.ReactNode
+  columns: ColumnDef<TData, TValue>[];
+  data: TData[];
+  getRowId: (row: TData) => string;
+  onReorder?: (newData: TData[]) => void;
+  toolbarActions?: React.ReactNode;
+  renderTabs?: React.ReactNode;
 }
 
-// 1. Generic Drag Handle Component
 function DragHandle({ id }: { id: string }) {
-  const { attributes, listeners } = useSortable({ id })
+  const { attributes, listeners } = useSortable({ id });
 
   return (
     <Button
@@ -89,41 +88,39 @@ function DragHandle({ id }: { id: string }) {
       {...listeners}
       variant="ghost"
       size="icon"
-      className="size-7 text-muted-foreground hover:bg-transparent cursor-grab active:cursor-grabbing"
-    >
-      <GripVerticalIcon className="size-3 text-muted-foreground" />
+      className="size-7 text-muted-foreground hover:bg-transparent cursor-grab active:cursor-grabbing transition-colors">
+      <GripVerticalIcon className="size-3.5 opacity-70" />
       <span className="sr-only">Drag to reorder</span>
     </Button>
-  )
+  );
 }
 
-// 2. Generic Draggable Row Wrapper
 function DraggableRow<TData>({ row }: { row: Row<TData> }) {
   const { transform, transition, setNodeRef, isDragging } = useSortable({
     id: row.id,
-  })
+  });
 
   return (
     <TableRow
       data-state={row.getIsSelected() && "selected"}
       data-dragging={isDragging}
       ref={setNodeRef}
-      className="relative z-0 data-[dragging=true]:z-10 data-[dragging=true]:opacity-80"
+      className="relative z-0 h-14 hover:bg-muted/30 dark:hover:bg-zinc-900/40 transition-colors data-[dragging=true]:z-10 data-[dragging=true]:opacity-70 data-[dragging=true]:bg-muted/60"
       style={{
         transform: CSS.Transform.toString(transform),
         transition: transition,
-      }}
-    >
+      }}>
       {row.getVisibleCells().map((cell) => (
-        <TableCell key={cell.id}>
+        <TableCell
+          key={cell.id}
+          className="px-4 text-xs font-medium text-foreground tracking-tight">
           {flexRender(cell.column.columnDef.cell, cell.getContext())}
         </TableCell>
       ))}
     </TableRow>
-  )
+  );
 }
 
-// 3. Fully Reusable Main DataTable Component
 export function DataTable<TData, TValue>({
   columns,
   data,
@@ -132,35 +129,35 @@ export function DataTable<TData, TValue>({
   toolbarActions,
   renderTabs,
 }: ReusableDataTableProps<TData, TValue>) {
-  "use no memo"; // Opt out from React Compiler optimization safely
-
-  const [rowSelection, setRowSelection] = React.useState({})
-  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
-  const [sorting, setSorting] = React.useState<SortingState>([])
+  const [rowSelection, setRowSelection] = React.useState({});
+  const [columnVisibility, setColumnVisibility] =
+    React.useState<VisibilityState>({});
+  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
+    [],
+  );
+  const [sorting, setSorting] = React.useState<SortingState>([]);
   const [pagination, setPagination] = React.useState({
     pageIndex: 0,
     pageSize: 10,
-  })
+  });
 
-  const sortableId = React.useId()
+  const sortableId = React.useId();
   const sensors = useSensors(
     useSensor(MouseSensor, {}),
     useSensor(TouchSensor, {}),
-    useSensor(KeyboardSensor, {})
-  )
+    useSensor(KeyboardSensor, {}),
+  );
 
-  // Automatically prepend a Drag handle column if an onReorder callback is specified
   const finalColumns = React.useMemo(() => {
-    if (!onReorder) return columns
+    if (!onReorder) return columns;
 
     const dragColumn: ColumnDef<TData, unknown> = {
       id: "drag",
       header: () => null,
       cell: ({ row }) => <DragHandle id={row.id} />,
-    }
-    return [dragColumn, ...columns]
-  }, [columns, onReorder])
+    };
+    return [dragColumn, ...columns];
+  }, [columns, onReorder]);
 
   // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
@@ -186,56 +183,64 @@ export function DataTable<TData, TValue>({
     getSortedRowModel: getSortedRowModel(),
     getFacetedRowModel: getFacetedRowModel(),
     getFacetedUniqueValues: getFacetedUniqueValues(),
-  })
+  });
 
-  // Extracted rows to an independent reference variable to satisfy exhaustive-deps rules
-  const rows = table.getRowModel().rows
+  const rows = table.getRowModel().rows;
   const dataIds = React.useMemo(() => {
-    return rows.map((row) => row.id)
-  }, [rows])
+    return rows.map((row) => row.id);
+  }, [rows]);
 
   function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event
+    const { active, over } = event;
     if (active && over && active.id !== over.id && onReorder) {
-      const oldIndex = data.findIndex((item) => getRowId(item) === active.id.toString())
-      const newIndex = data.findIndex((item) => getRowId(item) === over.id.toString())
-      
+      const oldIndex = data.findIndex(
+        (item) => getRowId(item) === active.id.toString(),
+      );
+      const newIndex = data.findIndex(
+        (item) => getRowId(item) === over.id.toString(),
+      );
+
       if (oldIndex !== -1 && newIndex !== -1) {
-        const rearranged = arrayMove([...data], oldIndex, newIndex)
-        onReorder(rearranged)
+        const rearranged = arrayMove([...data], oldIndex, newIndex);
+        onReorder(rearranged);
       }
     }
   }
 
   return (
-    <div className="w-full flex flex-col gap-6">
-      {/* Top Toolbar */}
-      <div className="flex items-center justify-between px-4 lg:px-6">
+    <div className="w-full flex flex-col gap-5 bg-card text-card-foreground rounded-[24px] border border-border/60 p-5 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.02)]">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/40 pb-4">
         {renderTabs || <div />}
-        
-        <div className="flex items-center gap-2">
+
+        <div className="flex items-center gap-2.5 self-end sm:self-auto">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
-                <Columns3Icon className="size-4 mr-2" />
+              <Button
+                variant="outline"
+                className="h-9 w-[180px] px-4 rounded-xl text-xs font-medium tracking-tight border-border/60 hover:bg-muted/80 active:scale-95 transition-all flex justify-between">
+                <Columns3Icon className="size-3.5 mr-1.5 opacity-70" />
                 Columns
-                <ChevronDownIcon className="size-4 ml-2" />
+                <ChevronDownIcon className="size-3.5 ml-1.5 opacity-50" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-32">
+            <DropdownMenuContent
+              align="end"
+              className="rounded-xl border-border/60 p-1 min-w-[130px] text-xs font-medium">
               {table
                 .getAllColumns()
                 .filter(
                   (column) =>
-                    typeof column.accessorFn !== "undefined" && column.getCanHide()
+                    typeof column.accessorFn !== "undefined" &&
+                    column.getCanHide(),
                 )
                 .map((column) => (
                   <DropdownMenuCheckboxItem
                     key={column.id}
-                    className="capitalize"
+                    className="capitalize rounded-lg text-xs font-semibold py-1.5"
                     checked={column.getIsVisible()}
-                    onCheckedChange={(value) => column.toggleVisibility(!!value)}
-                  >
+                    onCheckedChange={(value) =>
+                      column.toggleVisibility(!!value)
+                    }>
                     {column.id}
                   </DropdownMenuCheckboxItem>
                 ))}
@@ -245,41 +250,51 @@ export function DataTable<TData, TValue>({
         </div>
       </div>
 
-      {/* Main Table Interface */}
-      <div className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6">
-        <div className="overflow-hidden rounded-lg border">
+      <div className="relative flex flex-col gap-4 overflow-auto">
+        <div className="overflow-hidden rounded-xl border border-border/60">
           <DndContext
             collisionDetection={closestCenter}
             modifiers={[restrictToVerticalAxis]}
             onDragEnd={handleDragEnd}
             sensors={sensors}
-            id={sortableId}
-          >
+            id={sortableId}>
             <Table>
-              <TableHeader className="sticky top-0 z-10 bg-muted">
+              <TableHeader className="sticky top-0 z-10 bg-muted/60 backdrop-blur-xs border-b border-border/60">
                 {table.getHeaderGroups().map((headerGroup) => (
-                  <TableRow key={headerGroup.id}>
+                  <TableRow
+                    key={headerGroup.id}
+                    className="h-10 hover:bg-transparent border-b border-border/60">
                     {headerGroup.headers.map((header) => (
-                      <TableHead key={header.id} colSpan={header.colSpan}>
+                      <TableHead
+                        key={header.id}
+                        colSpan={header.colSpan}
+                        className="px-4 text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
                         {header.isPlaceholder
                           ? null
-                          : flexRender(header.column.columnDef.header, header.getContext())}
+                          : flexRender(
+                              header.column.columnDef.header,
+                              header.getContext(),
+                            )}
                       </TableHead>
                     ))}
                   </TableRow>
                 ))}
               </TableHeader>
-              <TableBody className="**:data-[slot=table-cell]:first:w-8">
+              <TableBody className="**:data-[slot=table-cell]:first:w-8 divide-y divide-border/40">
                 {table.getRowModel().rows?.length ? (
-                  <SortableContext items={dataIds} strategy={verticalListSortingStrategy}>
+                  <SortableContext
+                    items={dataIds}
+                    strategy={verticalListSortingStrategy}>
                     {table.getRowModel().rows.map((row) => (
                       <DraggableRow key={row.id} row={row} />
                     ))}
                   </SortableContext>
                 ) : (
-                  <TableRow>
-                    <TableCell colSpan={finalColumns.length} className="h-24 text-center">
-                      No results.
+                  <TableRow className="hover:bg-transparent">
+                    <TableCell
+                      colSpan={finalColumns.length}
+                      className="h-28 text-center text-xs font-semibold text-muted-foreground">
+                      No results found matching execution parameters.
                     </TableCell>
                   </TableRow>
                 )}
@@ -288,28 +303,39 @@ export function DataTable<TData, TValue>({
           </DndContext>
         </div>
 
-        {/* Footer Pagination controls */}
-        <div className="flex items-center justify-between px-4">
-          <div className="hidden flex-1 text-sm text-muted-foreground lg:flex">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2 px-1 select-none">
+          <div className="hidden flex-1 text-xs font-semibold text-muted-foreground lg:flex">
             {table.getFilteredSelectedRowModel().rows.length} of{" "}
             {table.getFilteredRowModel().rows.length} row(s) selected.
           </div>
-          <div className="flex w-full items-center gap-8 lg:w-fit">
-            <div className="hidden items-center gap-2 lg:flex">
-              <Label htmlFor="rows-per-page" className="text-sm font-medium">
+
+          <div className="flex w-full sm:w-auto items-center justify-between sm:justify-end gap-6 lg:gap-8">
+            <div className="hidden items-center gap-2.5 lg:flex">
+              <Label
+                htmlFor="rows-per-page"
+                className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Rows per page
               </Label>
               <Select
                 value={`${table.getState().pagination.pageSize}`}
-                onValueChange={(value) => table.setPageSize(Number(value))}
-              >
-                <SelectTrigger size="sm" className="w-20" id="rows-per-page">
-                  <SelectValue placeholder={table.getState().pagination.pageSize} />
+                onValueChange={(value) => table.setPageSize(Number(value))}>
+                <SelectTrigger
+                  size="sm"
+                  className="w-20 h-8 rounded-lg border-border/60 text-xs font-medium"
+                  id="rows-per-page">
+                  <SelectValue
+                    placeholder={table.getState().pagination.pageSize}
+                  />
                 </SelectTrigger>
-                <SelectContent side="top">
+                <SelectContent
+                  side="top"
+                  className="rounded-xl border-border/60 p-1">
                   <SelectGroup>
                     {[10, 20, 30, 40, 50].map((pageSize) => (
-                      <SelectItem key={pageSize} value={`${pageSize}`}>
+                      <SelectItem
+                        key={pageSize}
+                        value={`${pageSize}`}
+                        className="rounded-lg text-xs font-semibold">
                         {pageSize}
                       </SelectItem>
                     ))}
@@ -317,49 +343,48 @@ export function DataTable<TData, TValue>({
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex w-fit items-center justify-center text-sm font-medium">
-              Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
+
+            <div className="text-xs font-medium text-foreground tracking-tight">
+              Page {table.getState().pagination.pageIndex + 1} of{" "}
+              {table.getPageCount()}
             </div>
-            <div className="ml-auto flex items-center gap-2 lg:ml-0">
+
+            <div className="flex items-center gap-1.5">
               <Button
                 variant="outline"
-                className="hidden h-8 w-8 p-0 lg:flex"
+                className="hidden h-8 w-8 p-0 rounded-lg border-border/60 lg:flex active:scale-95 transition-transform"
                 onClick={() => table.setPageIndex(0)}
-                disabled={!table.getCanPreviousPage()}
-              >
-                <ChevronsLeftIcon className="size-4" />
+                disabled={!table.getCanPreviousPage()}>
+                <ChevronsLeftIcon className="size-4 opacity-70" />
               </Button>
               <Button
                 variant="outline"
-                className="size-8"
+                className="size-8 rounded-lg border-border/60 active:scale-95 transition-transform"
                 size="icon"
                 onClick={() => table.previousPage()}
-                disabled={!table.getCanPreviousPage()}
-              >
-                <ChevronLeftIcon className="size-4" />
+                disabled={!table.getCanPreviousPage()}>
+                <ChevronLeftIcon className="size-4 opacity-70" />
               </Button>
               <Button
                 variant="outline"
-                className="size-8"
+                className="size-8 rounded-lg border-border/60 active:scale-95 transition-transform"
                 size="icon"
                 onClick={() => table.nextPage()}
-                disabled={!table.getCanNextPage()}
-              >
-                <ChevronRightIcon className="size-4" />
+                disabled={!table.getCanNextPage()}>
+                <ChevronRightIcon className="size-4 opacity-70" />
               </Button>
               <Button
                 variant="outline"
-                className="hidden size-8 lg:flex"
+                className="hidden size-8 rounded-lg border-border/60 lg:flex active:scale-95 transition-transform"
                 size="icon"
                 onClick={() => table.setPageIndex(table.getPageCount() - 1)}
-                disabled={!table.getCanNextPage()}
-              >
-                <ChevronsRightIcon className="size-4" />
+                disabled={!table.getCanNextPage()}>
+                <ChevronsRightIcon className="size-4 opacity-70" />
               </Button>
             </div>
           </div>
         </div>
       </div>
     </div>
-  )
+  );
 }

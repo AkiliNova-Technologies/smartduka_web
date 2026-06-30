@@ -10,20 +10,13 @@ import {
   ShoppingCart,
   LayoutGrid,
   MapPin,
-  Phone,
   ChevronRight,
   MessageSquare,
   ChevronLeft,
 } from "lucide-react";
-import {
-  IconBrandInstagram,
-  IconBrandTiktok,
-  IconBrandWhatsapp,
-  IconBrandX,
-  IconRosetteDiscountCheckFilled,
-} from "@tabler/icons-react";
 import { mockDatabase } from "@/data/mockDatabase";
 import { Product } from "@/types/marketplace";
+import { IconRosetteDiscountCheckFilled } from "@tabler/icons-react";
 
 interface PageProps {
   params: Promise<{ vendorSlug: string }>;
@@ -69,7 +62,7 @@ export default function StoreProfilePage({ params }: PageProps) {
         <div className="flex flex-1 items-center justify-between gap-3">
           <Link
             href="/brands"
-            className="w-9 h-9 rounded-full bg-muted text-card-foreground shadow-xs transition-all duration-200 hover:bg-zinc-900 hover:text-white dark:hover:bg-zinc-50 dark:hover:text-zinc-950 active:scale-95 shrink-0 flex items-center justify-center border border-border/40"
+            className="w-9 h-9 rounded-full bg-muted text-card-foreground shadow-[0_16px_40px_-12px_rgba(0,0,0,0.02)] transition-all duration-200 hover:bg-zinc-900 hover:text-white dark:hover:bg-zinc-50 dark:hover:text-zinc-950 active:scale-95 shrink-0 flex items-center justify-center border border-border/40"
             title="Back to Dukas"
           >
             <ChevronLeft className="w-4 h-4 stroke-[2.5]" />
@@ -128,11 +121,6 @@ export default function StoreProfilePage({ params }: PageProps) {
                   <MapPin className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500" />
                   <span>Kampala, Uganda</span>
                 </div>
-                <span className="text-border hidden sm:inline">•</span>
-                <div className="flex items-center gap-1.5">
-                  <Phone className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500" />
-                  <span>+256 700 000000</span>
-                </div>
               </div>
             </div>
 
@@ -140,26 +128,6 @@ export default function StoreProfilePage({ params }: PageProps) {
               {storeDescription}
             </p>
 
-            {/* Social Connect Triggers */}
-            <div className="flex items-center gap-2.5 pt-1.5">
-              {[
-                { title: "Chat on WhatsApp", icon: IconBrandWhatsapp, href: "https://wa.me/256700000000" },
-                { title: "Follow on Instagram", icon: IconBrandInstagram, href: `https://instagram.com/${store.slug}` },
-                { title: "Follow on TikTok", icon: IconBrandTiktok, href: `https://tiktok.com/@${store.slug}` },
-                { title: "Follow on X", icon: IconBrandX, href: `https://x.com/${store.slug}` }
-              ].map((social, i) => (
-                <a
-                  key={i}
-                  href={social.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-9 h-9 rounded-full bg-muted flex items-center justify-center text-zinc-500 dark:text-zinc-400 border border-border/40 hover:text-white dark:hover:text-zinc-900 hover:bg-zinc-900 dark:hover:bg-zinc-50 transition-all duration-200 active:scale-90 shadow-xs"
-                  title={social.title}
-                >
-                  <social.icon stroke={2} className="w-4.5 h-4.5" />
-                </a>
-              ))}
-            </div>
           </div>
         </div>
       </div>
@@ -233,7 +201,7 @@ export default function StoreProfilePage({ params }: PageProps) {
               <h3 className="text-sm font-bold text-zinc-700 dark:text-zinc-300">No items available</h3>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 sm:gap-6">
               {filteredProducts.map((product: Product) => {
                 const discountPercentage = product.originalPrice
                   ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
@@ -244,7 +212,7 @@ export default function StoreProfilePage({ params }: PageProps) {
                     key={product.id}
                     className="group relative bg-card text-card-foreground rounded-[24px] p-0 border border-border/60 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.03)] dark:border-zinc-800/80 dark:shadow-none flex flex-col justify-between cursor-pointer transition-all duration-300 hover:shadow-[0_32px_64px_-8px_rgba(0,0,0,0.06)]"
                   >
-                    <button className="absolute top-4 right-4 z-20 w-9 h-9 rounded-full bg-white dark:bg-zinc-800 flex items-center justify-center text-zinc-400 dark:text-zinc-500 border border-border/40 dark:border-zinc-700 shadow-xs transition-colors hover:text-rose-500 dark:hover:text-rose-400 hover:bg-zinc-50 dark:hover:bg-zinc-700 active:scale-90">
+                    <button className="absolute top-4 right-4 z-20 w-9 h-9 rounded-full bg-white dark:bg-zinc-800 flex items-center justify-center text-zinc-400 dark:text-zinc-500 border border-border/40 dark:border-zinc-700 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.02)] transition-colors hover:text-rose-500 dark:hover:text-rose-400 hover:bg-zinc-50 dark:hover:bg-zinc-700 active:scale-90">
                       <Heart className="w-4 h-4" />
                     </button>
 
@@ -293,7 +261,7 @@ export default function StoreProfilePage({ params }: PageProps) {
                           UGX {product.price.toLocaleString()}
                         </span>
                       </div>
-                      <button className="w-9 h-9 bg-zinc-900 dark:bg-zinc-50 text-white dark:text-zinc-900 rounded-xl flex items-center justify-center shadow-xs transition-all duration-200 active:scale-95 hover:bg-primary dark:hover:bg-primary dark:hover:text-white">
+                      <button className="w-9 h-9 bg-zinc-900 dark:bg-zinc-50 text-white dark:text-zinc-900 rounded-xl flex items-center justify-center shadow-[0_16px_40px_-12px_rgba(0,0,0,0.02)] transition-all duration-200 active:scale-95 hover:bg-primary dark:hover:bg-primary dark:hover:text-white">
                         <ShoppingCart className="w-4 h-4" />
                       </button>
                     </div>

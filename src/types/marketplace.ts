@@ -158,7 +158,7 @@ export interface Order {
   id: string;
   userId: string;
   date: string;
-  status: "Pending" | "In Transit" | "Delivered";
+  status: "Pending" | "In Transit" | "Delivered" | "Rejected";
   total: number;
   vendor: string;
   storeId: string;

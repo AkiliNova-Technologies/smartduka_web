@@ -4,9 +4,9 @@ import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { 
-  ShoppingBag, Home, LayoutGrid, Tag, Sparkles, 
-  Store, Heart,
-  Settings, Headphones, Moon, Sun 
+  LayoutDashboard, ShoppingCart, Package, FileChartColumn,
+  Store, Moon, Sun,
+  Home
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/hooks/use-theme";
@@ -24,29 +24,24 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 
-const discoverItems = [
-  { name: "Home", href: "/", icon: Home },
-  { name: "Categories", href: "/categories", icon: LayoutGrid },
-  { name: "Deals", href: "/deals", icon: Tag },
-  { name: "New Arrivals", href: "/new-arrivals", icon: Sparkles },
-  { name: "Brands", href: "/brands", icon: Store },
+const operationsItems = [
+  { name: "Overview", href: "/vendor", icon: LayoutDashboard },
+  { name: "Orders Manager", href: "/vendor/orders", icon: ShoppingCart },
+  { name: "Products & Stock", href: "/vendor/products", icon: Package },
 ];
 
-const workspaceItems = [
-  { name: "My Orders", href: "/orders", icon: ShoppingBag },
-  { name: "Wishlist", href: "/wishlist", icon: Heart },
-  // { name: "Coupons", href: "/coupons", icon: Ticket },
-  { name: "Settings", href: "/settings", icon: Settings },
+const marketingItems = [
+  { name: "Fulfillment Reports", href: "/vendor/reports", icon: FileChartColumn },
 ];
 
 const emptySubscribe = () => () => {};
 
-export function CustomerSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+export function VendorSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname();
   const { state } = useSidebar();
-  
   const { isDark, toggleTheme } = useTheme();
   
+  // High-performance client mount indicator avoiding cascading renders
   const mounted = React.useSyncExternalStore(
     emptySubscribe,
     () => true,  
@@ -56,32 +51,35 @@ export function CustomerSidebar({ ...props }: React.ComponentProps<typeof Sideba
   return (
     <Sidebar 
       collapsible="icon" 
-      className="border-r border-border/60 bg-card text-card-foreground transition-all duration-300"
+      className="border-r border-border/60 bg-customer-sidebar dark:bg-customer-sidebar text-card-foreground transition-all"
       {...props}
     >
-      {/* BRAND IDENTITY HEADER */}
       <SidebarHeader className="p-4 flex flex-row items-center gap-3 select-none overflow-hidden h-18 border-b border-border/40">
         <div className="w-9 h-9 bg-primary text-primary-foreground rounded-xl flex items-center justify-center shadow-[0_16px_40px_-12px_rgba(0,0,0,0.02)] shrink-0 transition-transform duration-300 hover:rotate-6">
-          <ShoppingBag className="w-4 h-4 stroke-[2.5]" />
+          <Store className="w-4 h-4 stroke-[2.5]" />
         </div>
         {state === "expanded" && (
-          <h1 className="font-bold text-lg tracking-tight text-zinc-900 dark:text-zinc-50 transition-fadeIn">
-            Smart<span className="text-primary">Duka</span>
-          </h1>
+          <div className="flex flex-col gap-0.5 leading-none transition-fadeIn animate-in fade-in duration-200">
+            <h1 className="font-bold text-sm tracking-tight text-zinc-900 dark:text-zinc-50">
+              Apex Sportswear
+            </h1>
+            <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">
+              Kampala Hub
+            </span>
+          </div>
         )}
       </SidebarHeader>
 
-      {/* CORE HUB NAVIGATION */}
       <SidebarContent className="px-2 py-4 space-y-4 rounded-xl">
         
-        {/* DISCOVER SECTION */}
+        {/* OPERATIONS PIPELINE */}
         <SidebarGroup>
           <SidebarGroupLabel className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 tracking-widest uppercase mb-2 px-3">
-            Discover
+            Operations
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {discoverItems.map((item) => {
+              {operationsItems.map((item) => {
                 const isActive = pathname === item.href;
                 return (
                   <SidebarMenuItem key={item.name}>
@@ -90,14 +88,14 @@ export function CustomerSidebar({ ...props }: React.ComponentProps<typeof Sideba
                       isActive={isActive}
                       tooltip={item.name}
                       className={cn(
-                        "w-full px-4 py-2.5 rounded-full text-xs font-bold tracking-tight transition-all duration-200 cursor-pointer",
+                        "w-full px-4 py-2.5 rounded-full text-xs font-medium tracking-tight transition-all duration-200 cursor-pointer",
                         isActive 
                           ? "bg-primary text-primary-foreground shadow-[0_16px_40px_-12px_rgba(0,0,0,0.02)] dark:bg-zinc-800" 
                           : "text-zinc-500 dark:text-zinc-400 hover:bg-muted hover:text-foreground"
                       )}
                     >
                       <Link href={item.href}>
-                        <item.icon className={cn("w-4 h-4 shrink-0", isActive ? "stroke-[2.5]" : "opacity-80")} />
+                        <item.icon className={cn("w-4 h-4 shrink-0", isActive ? "stroke-[1]" : "opacity-80")} />
                         <span>{item.name}</span>
                       </Link>
                     </SidebarMenuButton>
@@ -108,14 +106,14 @@ export function CustomerSidebar({ ...props }: React.ComponentProps<typeof Sideba
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {/* WORKSPACE SECTION */}
+        {/* MARKETING & GROWTH TOOLS */}
         <SidebarGroup>
           <SidebarGroupLabel className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 tracking-widest uppercase mb-2 px-3">
-            Workspace
+            Growth
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {workspaceItems.map((item) => {
+              {marketingItems.map((item) => {
                 const isActive = pathname === item.href;
                 return (
                   <SidebarMenuItem key={item.name}>
@@ -124,14 +122,14 @@ export function CustomerSidebar({ ...props }: React.ComponentProps<typeof Sideba
                       isActive={isActive}
                       tooltip={item.name}
                       className={cn(
-                        "w-full px-4 py-2.5 rounded-full text-xs font-bold tracking-tight transition-all duration-200 cursor-pointer",
+                        "w-full px-4 py-2.5 rounded-full text-xs font-medium tracking-tight transition-all duration-200 cursor-pointer",
                         isActive 
                           ? "bg-primary text-primary-foreground shadow-[0_16px_40px_-12px_rgba(0,0,0,0.02)] dark:bg-zinc-800" 
                           : "text-zinc-500 dark:text-zinc-400 hover:bg-muted hover:text-foreground"
                       )}
                     >
                       <Link href={item.href}>
-                        <item.icon className={cn("w-4 h-4 shrink-0", isActive ? "stroke-[2.5]" : "opacity-80")} />
+                        <item.icon className={cn("w-4 h-4 shrink-0", isActive ? "stroke-[2]" : "opacity-80")} />
                         <span>{item.name}</span>
                       </Link>
                     </SidebarMenuButton>
@@ -144,42 +142,35 @@ export function CustomerSidebar({ ...props }: React.ComponentProps<typeof Sideba
 
       </SidebarContent>
 
-      {/* SYSTEM PREFERENCES UTILITY FOOTER */}
+      {/* 3. SYSTEM PREFERENCES UTILITY FOOTER */}
       <SidebarFooter className="p-3 border-t border-border/40 space-y-1">
         <SidebarMenu>
           
-          {/* HELP HUB TRIGGER */}
+          {/* BACK TO PUBLIC MARKETPLACE MARGIN */}
           <SidebarMenuItem>
             <SidebarMenuButton 
               asChild 
-              isActive={pathname === "/help"}
-              tooltip="Help Center"
-              className={cn(
-                "w-full px-4 py-2.5 rounded-full text-xs font-bold tracking-tight transition-all cursor-pointer",
-                pathname === "/help"
-                  ? "bg-primary text-primary-foreground shadow-[0_16px_40px_-12px_rgba(0,0,0,0.02)] dark:bg-zinc-800"
-                  : "text-zinc-500 dark:text-zinc-400 hover:bg-muted hover:text-foreground"
-              )}
+              tooltip="View Marketplace"
+              className="w-full px-4 py-2.5 rounded-full text-xs font-medium tracking-tight text-zinc-500 dark:text-zinc-400 hover:bg-muted hover:text-foreground cursor-pointer"
             >
-              <Link href="/help">
-                <Headphones className="w-4 h-4 shrink-0" />
-                <span>Help Center</span>
+              <Link href="/">
+                <Home className="w-4 h-4 shrink-0" />
+                <span>MarketPlace</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
 
-          {/* DYNAMIC THEME SYSTEM SWITCH TOKENS */}
+          {/* DYNAMIC THEME SYSTEM TOGGLE PANEL */}
           <SidebarMenuItem>
             <SidebarMenuButton 
               onClick={toggleTheme}
               tooltip={!mounted ? "Loading Theme" : isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
-              className="w-full px-4 py-2.5 rounded-full text-xs font-bold tracking-tight text-zinc-500 dark:text-zinc-400 hover:bg-muted hover:text-foreground cursor-pointer"
+              className="w-full px-4 py-2.5 rounded-full text-xs font-medium tracking-tight text-zinc-500 dark:text-zinc-400 hover:bg-muted hover:text-foreground cursor-pointer"
             >
-              {/* Check mount status before evaluating dynamic theme variables */}
               {!mounted ? (
                 <>
                   <div className="w-4 h-4 rounded-full border border-zinc-300 dark:border-zinc-700 animate-pulse shrink-0" />
-                  <span className="text-muted-foreground/60">Loading Theme...</span>
+                  <span className="text-muted-foreground/60">Loading...</span>
                 </>
               ) : isDark ? (
                 <>
