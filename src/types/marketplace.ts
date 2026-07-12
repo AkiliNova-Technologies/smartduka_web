@@ -5,30 +5,27 @@
 // ==========================================
 
 export interface UserProfile {
-  id: string; // Standard UUID Primary Key matching CURRENT_USER_ID
+  id: string; 
   name: string;
   email: string;
   avatar: string;
 }
 
 export interface UserSettingsProfile {
-  userId: string; // Master UUID linking to currentUser
+  userId: string;
   fullName: string;
   email: string;
   phoneNumber: string;
   avatarUrl: string;
   
-  // Regional & Currency Preferences
   currency: "UGX" | "USD" | "KES";
-  deliveryDistrict: string; // e.g., "Kampala Central", "Nakawa", "Lubaga"
+  deliveryDistrict: string; 
   primaryLanguage: string;
   
-  // Payment Integration Verification Trackers
   momoNumber: string;
   momoNetwork: "MTN" | "Airtel";
-  buyerProtectionEnabled: boolean; // Escrow Safe Hold toggle state
+  buyerProtectionEnabled: boolean;
   
-  // Notification Delivery Toggles
   orderAlertsEmail: boolean;
   orderAlertsPush: boolean;
   marketingNewsletter: boolean;
@@ -61,14 +58,14 @@ export interface SecuritySettings {
 // ==========================================
 
 export interface Store {
-  id: string; // Relational Primary Key e.g., SEED_STORE_1_ID
-  vendorId: string; // Foreign Key pointing to the User owner profile
-  name: string; // e.g., "Apex Sportswear Kampala"
-  slug: string; // URL-safe identifier e.g., "apex-sportswear"
-  logo: string; // High-fidelity Unsplash branding graphics URL
-  rating: number; // Aggregate feedback score
-  verified: boolean; // KYC compliance indicator flag
-  subscriptionPlan: "Premium Tier" | "Standard Tier" | "Basic Tier";
+  id: string;
+  vendorId?: string;
+  name: string; 
+  slug: string; 
+  logo: string; 
+  rating?: number; 
+  verified: boolean;
+  subscriptionPlan?: "Premium Tier" | "Standard Tier" | "Basic Tier";
 }
 
 export interface Coupon {
@@ -86,23 +83,88 @@ export interface Category {
   id: string; 
   name: string; 
   slug: string; 
-  icon: string; 
-  image?: string;
+  description: string;           
+  image: string;                 
+  parentId: string | null; 
+  _count?: {
+    products: number;
+    subCategories: number;
+  };
+}
+
+export interface CategoryTree extends Category {
+  productCount?: number;
+  subCategories?: CategoryTree[];
 }
 
 export interface Product {
   id: string;
-  storeId: string; // Relational Foreign Key matching a valid Store.id
-  categoryId: string; // Relational Foreign Key matching a valid ProductCategory.id
+  vendorId: string;                    
+  categoryId: string | null;           
+  subCategoryId?: string | null;       
+  name: string;                        
+  slug: string;                        
+  brand: string | null;                
+  description?: string | null;         
+  basePrice: number;                   
+  compareAtPrice?: number | null;      
+  inventoryCount: number;              
+  sku?: string | null;                 
+  status?: "DRAFT" | "PUBLISHED" | "ACTIVE" | "ARCHIVED" | "OUT_OF_STOCK"; 
+  rating?: number;                    
+  reviews?: number;                   
+  image: string;                      
+  images?: ProductImage[];            
+  sizes?: string[];                   
+  colors?: string[];                  
+  specs?: ProductSpec[];              
+  tags?: string[];                     
+  isRecommended?: boolean;             
+  createdAt?: string;                  
+  updatedAt?: string;                  
+}
+
+export interface ProductImage {
+  id: string;
+  productId: string;
+  url: string;
+  isFeatured: boolean;
+  sortOrder: number;
+}
+
+export interface ProductVariant {
+  id: string;
+  productId: string;
+  sku: string;
+  name: string;                       
+  price: number;
+  inventoryCount: number;
+  options: Record<string, string>;    
+}
+
+export interface ProductSpec {
+  name: string;                        
+  value: string;                       
+}
+
+export interface ProductFormData {
+  title: string;                       
+  slug?: string;
   brand: string;
-  title: string;
-  price: number; // Base currency integer value (UGX)
-  originalPrice?: number; // Optional fallback value for live Markdown engines
-  rating: number;
-  reviews: number;
-  image: string; // High-resolution product image asset URL
-  isRecommended?: boolean; // Visibility control mapping for Recommended section feeds
-  inventoryCount: number; // Low-stock threshold limit counter
+  description: string;
+  basePrice: number;
+  compareAtPrice?: number;
+  categoryId: string;
+  subCategoryId?: string;
+  inventoryCount: number;
+  sku?: string;
+  image: string;                       
+  images: string[];                    
+  sizes: string[];
+  colors: string[];
+  specs: ProductSpec[];
+  tags: string[];
+  status?: "DRAFT" | "PUBLISHED";
 }
 
 export interface ProductCampaign {
@@ -187,7 +249,7 @@ export interface ProductReview {
   userName: string;
   rating: number;
   comment: string;
-  createdAt: string; // ISO Timestamp format sequence
+  createdAt: string; 
 }
 
 // ==========================================

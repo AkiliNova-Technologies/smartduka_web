@@ -35,7 +35,7 @@ export default function OrderDetailPage({ params }: PageProps) {
 
     return {
       id: orderItem.productId,
-      title: matchingProduct?.title || "Marketplace Product Drop",
+      title: matchingProduct?.name || "Marketplace Product Drop",
       price: orderItem.priceAtPurchase,
       quantity: orderItem.quantity,
       image:

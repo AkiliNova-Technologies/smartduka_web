@@ -126,35 +126,31 @@ export const mockDatabase = {
       id: SEED_CAT_FOOTWEAR,
       name: "Footwear & Sportswear",
       slug: "footwear-sportswear",
-      icon: "Sparkles",
+      
       image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=600&q=80",
     },
     {
       id: SEED_CAT_ELECTRONICS,
       name: "Electronics & Audio",
       slug: "electronics-audio",
-      icon: "Zap",
       image: "https://images.unsplash.com/photo-1546868871-7041f2a55e12?auto=format&fit=crop&w=600&q=80",
     },
     {
       id: SEED_CAT_ACCESSORIES,
       name: "Luxury Eyewear & Accessories",
       slug: "luxury-eyewear-accessories",
-      icon: "Glasses",
       image: "https://images.unsplash.com/photo-1524592094714-0f0654e20314?auto=format&fit=crop&w=600&q=80",
     },
     {
       id: SEED_CAT_APPLIANCES,
       name: "Home Utilities & Appliances",
       slug: "home-utilities-appliances",
-      icon: "ChefHat",
       image: "https://images.unsplash.com/photo-1621972750749-0fbb1abb7736?auto=format&fit=crop&w=600&q=80",
     },
     {
       id: SEED_CAT_APPAREL,
       name: "Apparel & Designer Fashion",
       slug: "apparel-designer-fashion",
-      icon: "Shirt",
       image: "https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&w=600&q=80",
     },
   ] as Category[],
@@ -322,11 +318,11 @@ export const mockDatabase = {
     {
       id: "deal-1",
       categoryId: SEED_CAT_FOOTWEAR,
-      storeId: SEED_STORE_1_ID,
+      vendorId: SEED_STORE_1_ID,
       brand: "Nike Sportswear",
       title: "Air Max 270 React Premium",
-      price: 480000,
-      originalPrice: 620000,
+      basePrice: 480000,
+      compareAtPrice: 620000,
       rating: 4.8,
       reviews: 142,
       image:
@@ -337,11 +333,11 @@ export const mockDatabase = {
     {
       id: "deal-2",
       categoryId: SEED_CAT_ELECTRONICS,
-      storeId: SEED_STORE_2_ID,
+      vendorId: SEED_STORE_2_ID,
       brand: "Sony",
       title: "WH-1000XM5 Wireless Headphones",
-      price: 1100000,
-      originalPrice: 1350000,
+      basePrice: 1100000,
+      compareAtPrice: 1350000,
       rating: 4.9,
       reviews: 96,
       image:
@@ -352,11 +348,11 @@ export const mockDatabase = {
     {
       id: "deal-3",
       categoryId: SEED_CAT_ACCESSORIES,
-      storeId: SEED_STORE_3_ID,
+      vendorId: SEED_STORE_3_ID,
       brand: "Ray-Ban",
       title: "Classic Aviator Sunglasses (Polarized)",
-      price: 650000,
-      originalPrice: 780000,
+      basePrice: 650000,
+      compareAtPrice: 780000,
       rating: 4.7,
       reviews: 54,
       image:
@@ -367,11 +363,11 @@ export const mockDatabase = {
     {
       id: "deal-4",
       categoryId: SEED_CAT_ELECTRONICS,
-      storeId: SEED_STORE_2_ID,
+      vendorId: SEED_STORE_2_ID,
       brand: "Apple",
       title: 'iPad Air 10.9" M1 Chip (64GB)',
-      price: 2450000,
-      originalPrice: 2800000,
+      basePrice: 2450000,
+      compareAtPrice: 2800000,
       rating: 4.8,
       reviews: 67,
       image:
@@ -382,11 +378,11 @@ export const mockDatabase = {
     {
       id: "deal-5",
       categoryId: SEED_CAT_APPLIANCES,
-      storeId: SEED_STORE_4_ID,
+      vendorId: SEED_STORE_4_ID,
       brand: "Philips",
       title: "Essential Airfryer XL 6.2L",
-      price: 580000,
-      originalPrice: 720000,
+      basePrice: 580000,
+      compareAtPrice: 720000,
       rating: 4.7,
       reviews: 112,
       image:
@@ -397,11 +393,11 @@ export const mockDatabase = {
     {
       id: "deal-6",
       categoryId: SEED_CAT_ELECTRONICS,
-      storeId: SEED_STORE_2_ID,
+      vendorId: SEED_STORE_2_ID,
       brand: "Samsung",
       title: "Galaxy Watch 6 Pro LTE 44mm",
-      price: 1150000,
-      originalPrice: 1400000,
+      basePrice: 1150000,
+      compareAtPrice: 1400000,
       rating: 4.5,
       reviews: 43,
       image:
@@ -412,10 +408,10 @@ export const mockDatabase = {
     {
       id: "arrival-1",
       categoryId: SEED_CAT_FOOTWEAR,
-      storeId: SEED_STORE_1_ID,
+      vendorId: SEED_STORE_1_ID,
       brand: "Adidas",
       title: "Ultraboost Light Running Shoes",
-      price: 550000,
+      basePrice: 550000,
       rating: 4.6,
       reviews: 38,
       image:
@@ -426,10 +422,10 @@ export const mockDatabase = {
     {
       id: "arrival-2",
       categoryId: SEED_CAT_ACCESSORIES,
-      storeId: SEED_STORE_3_ID,
+      vendorId: SEED_STORE_3_ID,
       brand: "Ray-Ban",
       title: "Clubmaster Classic Black-Gold",
-      price: 720000,
+      basePrice: 720000,
       rating: 4.9,
       reviews: 19,
       image:
@@ -440,10 +436,10 @@ export const mockDatabase = {
     {
       id: "arrival-3",
       categoryId: SEED_CAT_FOOTWEAR,
-      storeId: SEED_STORE_1_ID,
+      vendorId: SEED_STORE_1_ID,
       brand: "Puma",
-      title: "Rider FV Future Vintage Sneakers",
-      price: 320000,
+      name: "Rider FV Future Vintage Sneakers",
+      basePrice: 320000,
       rating: 4.4,
       reviews: 28,
       image:
@@ -454,10 +450,10 @@ export const mockDatabase = {
     {
       id: "arrival-4",
       categoryId: SEED_CAT_APPAREL,
-      storeId: SEED_STORE_5_ID,
+      vendorId: SEED_STORE_5_ID,
       brand: "Carhartt WIP",
-      title: "Detroit Canvas Utility Jacket",
-      price: 680000,
+      name: "Detroit Canvas Utility Jacket",
+      basePrice: 680000,
       rating: 4.8,
       reviews: 31,
       image:
@@ -468,10 +464,10 @@ export const mockDatabase = {
     {
       id: "arrival-5",
       categoryId: SEED_CAT_ELECTRONICS,
-      storeId: SEED_STORE_2_ID,
+      vendorId: SEED_STORE_2_ID,
       brand: "Anker",
-      title: "Soundcore Motion+ Bluetooth Speaker",
-      price: 450000,
+      name: "Soundcore Motion+ Bluetooth Speaker",
+      basePrice: 450000,
       rating: 4.7,
       reviews: 89,
       image:
@@ -482,10 +478,10 @@ export const mockDatabase = {
     {
       id: "arrival-6",
       categoryId: SEED_CAT_ACCESSORIES,
-      storeId: SEED_STORE_3_ID,
+      vendorId: SEED_STORE_3_ID,
       brand: "Fossil",
-      title: "Minimalist Chronograph Leather Watch",
-      price: 520000,
+      name: "Minimalist Chronograph Leather Watch",
+      basePrice: 520000,
       rating: 4.3,
       reviews: 22,
       image:
@@ -496,10 +492,10 @@ export const mockDatabase = {
     {
       id: "arrival-7",
       categoryId: SEED_CAT_FOOTWEAR,
-      storeId: SEED_STORE_1_ID,
+      vendorId: SEED_STORE_1_ID,
       brand: "New Balance",
-      title: "990v5 Heritage Lifestyle Shoes",
-      price: 790000,
+      name: "990v5 Heritage Lifestyle Shoes",
+      basePrice: 790000,
       rating: 4.9,
       reviews: 74,
       image:
@@ -510,10 +506,10 @@ export const mockDatabase = {
     {
       id: "arrival-8",
       categoryId: SEED_CAT_ELECTRONICS,
-      storeId: SEED_STORE_2_ID,
+      vendorId: SEED_STORE_2_ID,
       brand: "Logitech",
-      title: "MX Master 3S Wireless Mouse",
-      price: 390000,
+      name: "MX Master 3S Wireless Mouse",
+      basePrice: 390000,
       rating: 4.8,
       reviews: 156,
       image:
@@ -524,10 +520,10 @@ export const mockDatabase = {
     {
       id: "arrival-9",
       categoryId: SEED_CAT_APPAREL,
-      storeId: SEED_STORE_5_ID,
+      vendorId: SEED_STORE_5_ID,
       brand: "Nike Sportswear",
-      title: "Club Fleece Heavyweight Hoodie",
-      price: 260000,
+      name: "Club Fleece Heavyweight Hoodie",
+      basePrice: 260000,
       rating: 4.6,
       reviews: 210,
       image:
@@ -538,10 +534,10 @@ export const mockDatabase = {
     {
       id: "arrival-10",
       categoryId: SEED_CAT_APPLIANCES,
-      storeId: SEED_STORE_4_ID,
+      vendorId: SEED_STORE_4_ID,
       brand: "Nespresso",
-      title: "Vertuo Next Coffee/Espresso Machine",
-      price: 850000,
+      name: "Vertuo Next Coffee/Espresso Machine",
+      basePrice: 850000,
       rating: 4.5,
       reviews: 62,
       image:
@@ -552,10 +548,10 @@ export const mockDatabase = {
     {
       id: "arrival-11",
       categoryId: SEED_CAT_ELECTRONICS,
-      storeId: SEED_STORE_2_ID,
+      vendorId: SEED_STORE_2_ID,
       brand: "JBL",
-      title: "Tune 760NC Wireless Over-Ear Noise Cancelling",
-      price: 420000,
+      name: "Tune 760NC Wireless Over-Ear Noise Cancelling",
+      basePrice: 420000,
       rating: 4.4,
       reviews: 48,
       image:
@@ -566,10 +562,10 @@ export const mockDatabase = {
     {
       id: "arrival-12",
       categoryId: SEED_CAT_ACCESSORIES,
-      storeId: SEED_STORE_3_ID,
+      vendorId: SEED_STORE_3_ID,
       brand: "Bellroy",
-      title: "Premium Hide & Seek Leather Wallet",
-      price: 340000,
+      name: "Premium Hide & Seek Leather Wallet",
+      basePrice: 340000,
       rating: 4.7,
       reviews: 83,
       image:
@@ -580,10 +576,10 @@ export const mockDatabase = {
     {
       id: "arrival-13",
       categoryId: SEED_CAT_APPAREL,
-      storeId: SEED_STORE_5_ID,
+      vendorId: SEED_STORE_5_ID,
       brand: "Levi's",
-      title: "511 Slim Fit Premium Denim Jeans",
-      price: 290000,
+      name: "511 Slim Fit Premium Denim Jeans",
+      basePrice: 290000,
       rating: 4.5,
       reviews: 124,
       image:
@@ -594,10 +590,10 @@ export const mockDatabase = {
     {
       id: "arrival-14",
       categoryId: SEED_CAT_ELECTRONICS,
-      storeId: SEED_STORE_2_ID,
+      vendorId: SEED_STORE_2_ID,
       brand: "Keychron",
-      title: "K2 V2 Mechanical Wireless Keyboard",
-      price: 490000,
+      name: "K2 V2 Mechanical Wireless Keyboard",
+      basePrice: 490000,
       rating: 4.8,
       reviews: 105,
       image:
@@ -608,10 +604,10 @@ export const mockDatabase = {
     {
       id: "arrival-15",
       categoryId: SEED_CAT_FOOTWEAR,
-      storeId: SEED_STORE_1_ID,
+      vendorId: SEED_STORE_1_ID,
       brand: "Vans",
-      title: "Old Skool Classic Skate Shoes",
-      price: 240000,
+      name: "Old Skool Classic Skate Shoes",
+      basePrice: 240000,
       rating: 4.7,
       reviews: 340,
       image:
@@ -622,11 +618,11 @@ export const mockDatabase = {
     {
       id: "arrival-16",
       categoryId: SEED_CAT_ACCESSORIES,
-      storeId: SEED_STORE_3_ID,
+      vendorId: SEED_STORE_3_ID,
       brand: "Herschel",
-      title: "Little America Premium Backpack",
-      price: 380000,
-      originalPrice: 450000,
+      name: "Little America Premium Backpack",
+      basePrice: 380000,
+      compareAtPrice: 450000,
       rating: 4.6,
       reviews: 94,
       image:
@@ -806,7 +802,7 @@ export const mockDatabase = {
       status: "Pending" as "Pending" | "In Transit" | "Delivered",
       total: 1490000,
       vendor: "Sound & Vision Official",
-      storeId: SEED_STORE_2_ID,
+      vendorId: SEED_STORE_2_ID,
       deliveryAddress: "Bukoto Heights Apartments, Block C, Kampala",
       customerName: "Brian Mukasa",
       customerPhone: "+256 772 123456",
@@ -831,7 +827,7 @@ export const mockDatabase = {
       status: "Delivered" as "Pending" | "In Transit" | "Delivered",
       total: 1100000,
       vendor: "Ray-Ban Kampala Boutique",
-      storeId: SEED_STORE_3_ID,
+      vendorId: SEED_STORE_3_ID,
       deliveryAddress: "Makerere University, West Road, Kampala",
       customerName: "Brian Mukasa",
       customerPhone: "+256 772 123456",

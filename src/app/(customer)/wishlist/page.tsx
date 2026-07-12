@@ -44,8 +44,8 @@ export default function WishlistPage() {
       ) : (
         <section className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 sm:gap-6">
           {wishlistItems.map((product) => {
-            const discountPercentage = product.originalPrice 
-              ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100) 
+            const discountPercentage = product.compareAtPrice 
+              ? Math.round(((product.compareAtPrice - product.basePrice) / product.compareAtPrice) * 100) 
               : 0;
 
             return (
@@ -69,7 +69,7 @@ export default function WishlistPage() {
                       <Image
                         className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
                         src={product.image}
-                        alt={product.title}
+                        alt={product.name}
                         fill
                         sizes="(max-w-768px) 50vw, 25vw"
                         loading="lazy"
@@ -94,7 +94,7 @@ export default function WishlistPage() {
                       </p>
                       
                       <h3 className="text-xs sm:text-sm font-bold text-zinc-800 dark:text-zinc-200 line-clamp-1 tracking-tight transition-colors group-hover:text-primary">
-                        {product.title}
+                        {product.name}
                       </h3>
                     </div>
                   </div>
@@ -103,13 +103,13 @@ export default function WishlistPage() {
                 {/* Price and Cart Footer Segment */}
                 <div className="flex justify-between items-center mt-4 pt-1 px-4 pb-4 relative z-10">
                   <div className="flex flex-col">
-                    {product.originalPrice && (
+                    {product.compareAtPrice && (
                       <span className="text-[11px] text-zinc-400 dark:text-zinc-500 line-through font-medium leading-none mb-0.5">
-                        UGX {product.originalPrice.toLocaleString()}
+                        UGX {product.compareAtPrice.toLocaleString()}
                       </span>
                     )}
                     <span className="text-sm sm:text-base font-bold text-zinc-900 dark:text-zinc-50 tracking-tight leading-none">
-                      UGX {product.price.toLocaleString()}
+                      UGX {product.basePrice.toLocaleString()}
                     </span>
                   </div>
                   

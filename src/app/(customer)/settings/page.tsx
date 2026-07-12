@@ -1,18 +1,29 @@
 "use client";
 
 import React, { useState } from "react";
-import { 
-  Settings, 
-  Shield, 
-  Bell, 
-  User, 
-  Globe, 
+import {
+  Settings,
+  Shield,
+  Bell,
+  User,
+  Globe,
+  Loader2,
+  LogOut,
 } from "lucide-react";
-import { CURRENT_USER_ID, mockDatabase } from "@/data/mockDatabase";
+import { useSettings } from "@/hooks/use-settings";
+import { useAuth } from "@/hooks/use-auth";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import Image from "next/image";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 type TabID = "profile" | "notifications" | "regional" | "security";
 
@@ -32,34 +43,72 @@ const MOMO_NETWORKS = [
   { value: "Airtel", label: "Airtel Money" },
 ];
 
-const DELIVERY_DISTRICTS = ["Nakawa", "Central", "Makindye", "Rubaga", "Kawempe"];
+const DELIVERY_DISTRICTS = [
+  "Nakawa",
+  "Central",
+  "Makindye",
+  "Rubaga",
+  "Kawempe",
+];
 
-export default function SettingsPage() {
-  const userProfile = mockDatabase.settingsProfiles[CURRENT_USER_ID];
+interface SettingsFormContentProps {
+  settings: NonNullable<ReturnType<typeof useSettings>["settings"]>;
+  user: ReturnType<typeof useAuth>["user"];
+  saving: boolean;
+  updateSettings: ReturnType<typeof useSettings>["updateSettings"];
+  logout: () => void;
+  actionLoading: boolean;
+  router: ReturnType<typeof useRouter>;
+}
 
-  // Navigation Routing Tab State
+function SettingsFormContent({
+  settings,
+  user,
+  saving,
+  updateSettings,
+  logout,
+  actionLoading,
+  router,
+}: SettingsFormContentProps) {
   const [activeTab, setActiveTab] = useState<TabID>("profile");
 
-  // Live premium state hooks populated directly from the relational data layers
-  const [fullName, setFullName] = useState(userProfile.fullName);
-  const [email, setEmail] = useState(userProfile.email);
-  const [phoneNumber, setPhoneNumber] = useState(userProfile.phoneNumber);
-  
-  const [emailAlerts, setEmailAlerts] = useState(userProfile.orderAlertsEmail);
-  const [smsAlerts, setSmsAlerts] = useState(userProfile.securityAlertsSMS);
-  const [marketingAlerts, setMarketingAlerts] = useState(userProfile.marketingNewsletter);
-  
-  const [currency, setCurrency] = useState(userProfile.currency);
-  const [language, setLanguage] = useState(userProfile.primaryLanguage === "English (UG)" ? "en" : "sw");
-  const [deliveryDistrict, setDeliveryDistrict] = useState(userProfile.deliveryDistrict);
-  
-  // Mobile Money parameters matching local Kampala transaction frameworks
-  const [momoNumber, setMomoNumber] = useState(userProfile.momoNumber);
-  const [momoNetwork, setMomoNetwork] = useState(userProfile.momoNetwork);
+  // Local form state – initialised once from the received settings
+  const [fullName, setFullName] = useState(
+    settings.fullName || user?.displayName || ""
+  );
+  const [phoneNumber, setPhoneNumber] = useState(
+    settings.phoneNumber || user?.phoneNumber || ""
+  );
+  const [currency, setCurrency] = useState(settings.currency || "UGX");
+  const [language, setLanguage] = useState(settings.primaryLanguage || "en");
+  const [deliveryDistrict, setDeliveryDistrict] = useState(
+    settings.deliveryDistrict || ""
+  );
+  const [momoNumber, setMomoNumber] = useState(settings.momoNumber || "");
+  const [momoNetwork, setMomoNetwork] = useState(settings.momoNetwork || "");
+
+  const handleSaveProfile = () => {
+    updateSettings({ fullName, phoneNumber });
+  };
+
+  const handleSaveRegional = () => {
+    updateSettings({
+      currency,
+      primaryLanguage: language,
+      deliveryDistrict,
+      momoNetwork: momoNetwork || null,
+      momoNumber: momoNumber || null,
+    });
+  };
+
+  const handleToggleNotification = (key: string, value: boolean) => {
+    updateSettings({ [key]: value });
+  };
+
+  const userEmail = user?.email || "";
 
   return (
     <div className="max-w-8xl mx-auto px-4 py-10 space-y-10 text-foreground antialiased selection:bg-emerald-500/10 selection:text-emerald-700">
-      
       {/* Header Section */}
       <div className="border-b border-border/60 pb-6">
         <div className="flex items-center gap-2.5">
@@ -71,163 +120,166 @@ export default function SettingsPage() {
               Account Settings
             </h1>
             <p className="text-xs font-semibold text-zinc-400 dark:text-zinc-500 mt-0.5">
-              Manage your profile parameters, localized payment channels, notification routing, and multi-vendor tracking rules.
+              Manage your profile, payment channels, notifications, and security
+              preferences.
             </p>
           </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        
-        {/* Left Hand Navigation Links / Fast Anchors */}
-        <div className="space-y-1 md:col-span-1">
+        {/* Left Navigation */}
+        <div className="space-y-1 md:col-span-1 flex flex-col h-full">
           <p className="text-[10px] font-bold tracking-wider text-zinc-400 dark:text-zinc-500 uppercase px-3 mb-2">
             Configurations
           </p>
-          
-          <button 
-            onClick={() => setActiveTab("profile")}
-            className={`w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold rounded-full transition-all text-left cursor-pointer ${
-              activeTab === "profile" 
-                ? "bg-zinc-900 text-white dark:bg-zinc-50 dark:text-zinc-950 shadow-xs" 
-                : "text-zinc-500 hover:bg-muted hover:text-zinc-900 dark:hover:text-zinc-200"
-            }`}
-          >
-            <User className="w-4 h-4" /> Account Profile
-          </button>
 
-          <button 
-            onClick={() => setActiveTab("notifications")}
-            className={`w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold rounded-full transition-all text-left cursor-pointer ${
-              activeTab === "notifications" 
-                ? "bg-zinc-900 text-white dark:bg-zinc-50 dark:text-zinc-950 shadow-xs" 
-                : "text-zinc-500 hover:bg-muted hover:text-zinc-900 dark:hover:text-zinc-200"
-            }`}
-          >
-            <Bell className="w-4 h-4" /> Notifications
-          </button>
+          {(
+            [
+              { id: "profile", label: "Account Profile", icon: User },
+              { id: "notifications", label: "Notifications", icon: Bell },
+              { id: "regional", label: "Regional Setup", icon: Globe },
+              { id: "security", label: "Login & Security", icon: Shield },
+            ] as const
+          ).map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold rounded-full transition-all text-left cursor-pointer ${
+                activeTab === tab.id
+                  ? "bg-zinc-900 text-white dark:bg-zinc-50 dark:text-zinc-950 shadow-xs"
+                  : "text-zinc-500 hover:bg-muted hover:text-zinc-900 dark:hover:text-zinc-200"
+              }`}
+            >
+              <tab.icon className="w-4 h-4" /> {tab.label}
+            </button>
+          ))}
 
-          <button 
-            onClick={() => setActiveTab("regional")}
-            className={`w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold rounded-full transition-all text-left cursor-pointer ${
-              activeTab === "regional" 
-                ? "bg-zinc-900 text-white dark:bg-zinc-50 dark:text-zinc-950 shadow-xs" 
-                : "text-zinc-500 hover:bg-muted hover:text-zinc-900 dark:hover:text-zinc-200"
-            }`}
-          >
-            <Globe className="w-4 h-4" /> Regional Setup
-          </button>
+          {/* Spacer */}
+          <div className="flex-1" />
 
-          <button 
-            onClick={() => setActiveTab("security")}
-            className={`w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold rounded-full transition-all text-left cursor-pointer ${
-              activeTab === "security" 
-                ? "bg-zinc-900 text-white dark:bg-zinc-50 dark:text-zinc-950 shadow-xs" 
-                : "text-zinc-500 hover:bg-muted hover:text-zinc-900 dark:hover:text-zinc-200"
-            }`}
+          {/* Separator */}
+          <div className="h-px bg-border/60 my-2" />
+
+          {/* Logout button */}
+          <button
+            onClick={() => {
+              logout();
+              router.push("/");
+              toast.success("You've been logged out successfully.");
+            }}
+            disabled={actionLoading}
+            className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold rounded-full transition-all text-left cursor-pointer text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 hover:text-rose-700 dark:hover:text-rose-300 disabled:opacity-50"
           >
-            <Shield className="w-4 h-4" /> Login & Security
+            {actionLoading ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <LogOut className="w-4 h-4" />
+            )}
+            {actionLoading ? "Signing out..." : "Sign Out"}
           </button>
         </div>
 
-        {/* Right Hand Settings Content Cards */}
+        {/* Right Content Cards */}
         <div className="md:col-span-2 space-y-6">
-          
-          {/* CARD 1: IDENTITY PROFILE */}
+          {/* PROFILE CARD */}
           {activeTab === "profile" && (
             <div className="bg-card text-card-foreground border border-border/60 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.03)] dark:shadow-none overflow-hidden animate-in fade-in-50 duration-200">
               <div className="p-6 border-b border-border/60 bg-muted/30">
-                <div className="flex items-center gap-3">
-                  <div>
-                    <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-50">Identity Profile Settings</h3>
-                    <p className="text-xs text-zinc-400 dark:text-zinc-500">Update workspace metadata credentials, security contacts, and store profile logos.</p>
-                  </div>
-                </div>
+                <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-50">
+                  Identity Profile Settings
+                </h3>
+                <p className="text-xs text-zinc-400 dark:text-zinc-500">
+                  Update your avatar, name, and contact information.
+                </p>
               </div>
-              
-              <div className="p-6 space-y-5">
-                <div className="flex items-center gap-4 pb-2">
-                  <div className="w-14 h-14 bg-muted rounded-full border border-border relative overflow-hidden shrink-0">
-                    <Image 
-                      src={userProfile.avatarUrl} 
-                      alt={fullName} 
-                      fill
-                      className="object-cover"
-                      sizes="56px"
-                    />
-                  </div>
-                  <div>
-                    <button className="px-3.5 h-8 border border-border text-zinc-700 dark:text-zinc-300 font-bold text-xs rounded-full hover:bg-muted active:scale-95 transition-all cursor-pointer">
-                      Change Photo
-                    </button>
-                    <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-1">JPG or PNG. Max 2MB.</p>
-                  </div>
-                </div>
 
+              <div className="p-6 space-y-5">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 tracking-tight block">Full Name</label>
-                    <Input 
-                      type="text" 
-                      value={fullName} 
+                    <label className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 tracking-tight block">
+                      Full Name
+                    </label>
+                    <Input
+                      type="text"
+                      value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
-                      className="w-full text-xs font-semibold text-zinc-800 dark:text-zinc-100 bg-card border border-border rounded-full h-10 px-4 focus:outline-none focus:border-primary transition-all" 
+                      className="w-full text-xs font-semibold rounded-full h-10 px-4"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 tracking-tight block">Email Address</label>
-                    <Input 
-                      type="email" 
-                      value={email} 
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="w-full text-xs font-semibold text-zinc-800 dark:text-zinc-100 bg-card border border-border rounded-full h-10 px-4 focus:outline-none focus:border-primary transition-all" 
+                    <label className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 tracking-tight block">
+                      Email Address
+                    </label>
+                    <Input
+                      type="email"
+                      value={userEmail}
+                      disabled
+                      className="w-full text-xs font-semibold rounded-full h-10 px-4 bg-muted/50 cursor-not-allowed opacity-60"
                     />
                   </div>
                   <div className="space-y-1.5 sm:col-span-2">
-                    <label className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 tracking-tight block">Phone Contact</label>
-                    <Input 
-                      type="text" 
-                      value={phoneNumber} 
+                    <label className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 tracking-tight block">
+                      Phone Contact
+                    </label>
+                    <Input
+                      type="text"
+                      value={phoneNumber}
+                      placeholder="+256 xxxxxxxxx"
                       onChange={(e) => setPhoneNumber(e.target.value)}
-                      className="w-full text-xs font-semibold text-zinc-800 dark:text-zinc-100 bg-card border border-border rounded-full h-10 px-4 focus:outline-none focus:border-primary transition-all" 
+                      className="w-full text-xs font-semibold rounded-full h-10 px-4"
                     />
                   </div>
                 </div>
               </div>
 
               <div className="p-4 bg-muted/20 border-t border-border/60 flex justify-end gap-3">
-                <button className="px-5 h-9 bg-zinc-900 dark:bg-zinc-50 text-white dark:text-zinc-900 hover:bg-primary dark:hover:bg-primary dark:hover:text-white text-xs font-bold rounded-full active:scale-95 transition-all cursor-pointer shadow-xs">
-                  Save Profile Changes
+                <button
+                  onClick={handleSaveProfile}
+                  disabled={saving}
+                  className="px-5 h-9 bg-zinc-900 dark:bg-zinc-50 text-white dark:text-zinc-900 hover:bg-primary dark:hover:bg-primary dark:hover:text-white text-xs font-bold rounded-full active:scale-95 transition-all cursor-pointer shadow-xs disabled:opacity-50"
+                >
+                  {saving ? (
+                    <span className="flex items-center gap-1.5">
+                      <Loader2 className="w-3 h-3 animate-spin" /> Saving...
+                    </span>
+                  ) : (
+                    "Save Profile Changes"
+                  )}
                 </button>
               </div>
             </div>
           )}
 
-          {/* CARD 2: PREFERENCES & LOCALIZATION */}
+          {/* REGIONAL CARD */}
           {activeTab === "regional" && (
             <div className="bg-card text-card-foreground border border-border/60 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.03)] dark:shadow-none overflow-hidden animate-in fade-in-50 duration-200">
               <div className="p-6 border-b border-border/60 bg-muted/30">
-                <div className="flex items-center gap-3">
-                  <div>
-                    <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-50">Regional Setup & Preferences</h3>
-                    <p className="text-xs text-zinc-400 dark:text-zinc-500">Configure default localized parameters for pricing metrics, payment routes, and fulfillment tracking.</p>
-                  </div>
-                </div>
+                <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-50">
+                  Regional Setup & Preferences
+                </h3>
+                <p className="text-xs text-zinc-400 dark:text-zinc-500">
+                  Configure currency, language, and delivery defaults.
+                </p>
               </div>
 
               <div className="p-6 space-y-6">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  
-                  {/* Dynamic Primary Currency */}
                   <div className="space-y-1.5">
-                    <Label className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 tracking-tight block">Primary Currency</Label>
+                    <Label className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 tracking-tight block">
+                      Primary Currency
+                    </Label>
                     <Select value={currency} onValueChange={setCurrency}>
-                      <SelectTrigger className="w-full text-xs font-semibold text-zinc-800 dark:text-zinc-100 bg-card border border-border rounded-full px-4 h-10">
+                      <SelectTrigger className="w-full text-xs font-semibold rounded-full px-4 h-10">
                         <SelectValue placeholder="Select currency" />
                       </SelectTrigger>
-                      <SelectContent position="popper" className="bg-card border border-border">
+                      <SelectContent>
                         {CURRENCIES.map((curr) => (
-                          <SelectItem key={curr.value} value={curr.value} className="text-xs font-semibold">
+                          <SelectItem
+                            key={curr.value}
+                            value={curr.value}
+                            className="text-xs font-semibold"
+                          >
                             {curr.label}
                           </SelectItem>
                         ))}
@@ -235,16 +287,21 @@ export default function SettingsPage() {
                     </Select>
                   </div>
 
-                  {/* Dynamic System Language */}
                   <div className="space-y-1.5">
-                    <Label className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 tracking-tight block">System Language</Label>
+                    <Label className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 tracking-tight block">
+                      System Language
+                    </Label>
                     <Select value={language} onValueChange={setLanguage}>
-                      <SelectTrigger className="w-full text-xs font-semibold text-zinc-800 dark:text-zinc-100 bg-card border border-border rounded-full px-4 h-10">
+                      <SelectTrigger className="w-full text-xs font-semibold rounded-full px-4 h-10">
                         <SelectValue placeholder="Select language" />
                       </SelectTrigger>
-                      <SelectContent position="popper" className="bg-card border border-border">
+                      <SelectContent>
                         {LANGUAGES.map((lang) => (
-                          <SelectItem key={lang.value} value={lang.value} className="text-xs font-semibold">
+                          <SelectItem
+                            key={lang.value}
+                            value={lang.value}
+                            className="text-xs font-semibold"
+                          >
                             {lang.label}
                           </SelectItem>
                         ))}
@@ -252,17 +309,27 @@ export default function SettingsPage() {
                     </Select>
                   </div>
 
-                  {/* Dynamic Delivery District */}
                   <div className="space-y-1.5">
-                    <Label className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 tracking-tight block">Delivery District</Label>
-                    <Select value={deliveryDistrict} onValueChange={setDeliveryDistrict}>
-                      <SelectTrigger className="w-full text-xs font-semibold text-zinc-800 dark:text-zinc-100 bg-card border border-border rounded-full px-4 h-10">
+                    <Label className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 tracking-tight block">
+                      Delivery District
+                    </Label>
+                    <Select
+                      value={deliveryDistrict}
+                      onValueChange={setDeliveryDistrict}
+                    >
+                      <SelectTrigger className="w-full text-xs font-semibold rounded-full px-4 h-10">
                         <SelectValue placeholder="Select district" />
                       </SelectTrigger>
-                      <SelectContent position="popper" className="bg-card border border-border">
+                      <SelectContent>
                         {DELIVERY_DISTRICTS.map((district) => (
-                          <SelectItem key={district} value={district} className="text-xs font-semibold">
-                            {district === "Central" ? "Kampala Central" : district}
+                          <SelectItem
+                            key={district}
+                            value={district}
+                            className="text-xs font-semibold"
+                          >
+                            {district === "Central"
+                              ? "Kampala Central"
+                              : district}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -270,37 +337,45 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
-                {/* Localized Mobile Money Payment Layer Wallet Setup */}
                 <div className="border-t border-border/60 pt-5 space-y-3">
                   <p className="text-[10px] font-bold tracking-wider text-zinc-400 dark:text-zinc-500 uppercase">
-                    Integrated Payout & Disbursal Channels
+                    Mobile Money Payout Channel
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    
-                    {/* Dynamic Mobile Money Network */}
                     <div className="space-y-1.5">
-                      <Label className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 tracking-tight block">Mobile Money Network</Label>
-                      <Select value={momoNetwork} onValueChange={setMomoNetwork}>
-                        <SelectTrigger className="w-full text-xs font-semibold text-zinc-800 dark:text-zinc-100 bg-card border border-border rounded-full px-4 h-10">
+                      <Label className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 tracking-tight block">
+                        Mobile Money Network
+                      </Label>
+                      <Select
+                        value={momoNetwork}
+                        onValueChange={setMomoNetwork}
+                      >
+                        <SelectTrigger className="w-full text-xs font-semibold rounded-full px-4 h-10">
                           <SelectValue placeholder="Select network" />
                         </SelectTrigger>
-                        <SelectContent position="popper" className="bg-card border border-border">
+                        <SelectContent>
                           {MOMO_NETWORKS.map((net) => (
-                            <SelectItem key={net.value} value={net.value} className="text-xs font-semibold">
+                            <SelectItem
+                              key={net.value}
+                              value={net.value}
+                              className="text-xs font-semibold"
+                            >
                               {net.label}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
-                    
+
                     <div className="space-y-1.5">
-                      <Label className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 tracking-tight block">MoMo Payment Number</Label>
-                      <Input 
-                        type="text" 
-                        value={momoNumber} 
+                      <Label className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 tracking-tight block">
+                        MoMo Payment Number
+                      </Label>
+                      <Input
+                        type="text"
+                        value={momoNumber}
                         onChange={(e) => setMomoNumber(e.target.value)}
-                        className="w-full text-xs font-semibold text-zinc-800 dark:text-zinc-100 bg-card border border-border rounded-full h-10 px-4 focus:outline-none focus:border-primary transition-all" 
+                        className="w-full text-xs font-semibold rounded-full h-10 px-4"
                       />
                     </div>
                   </div>
@@ -308,130 +383,201 @@ export default function SettingsPage() {
               </div>
 
               <div className="p-4 bg-muted/20 border-t border-border/60 flex justify-end gap-3">
-                <button className="px-5 h-9 bg-zinc-900 dark:bg-zinc-50 text-white dark:text-zinc-900 hover:bg-primary dark:hover:bg-primary dark:hover:text-white text-xs font-bold rounded-full active:scale-95 transition-all cursor-pointer shadow-xs">
-                  Save Regional Rules
+                <button
+                  onClick={handleSaveRegional}
+                  disabled={saving}
+                  className="px-5 h-9 bg-zinc-900 dark:bg-zinc-50 text-white dark:text-zinc-900 hover:bg-primary dark:hover:bg-primary dark:hover:text-white text-xs font-bold rounded-full active:scale-95 transition-all cursor-pointer shadow-xs disabled:opacity-50"
+                >
+                  {saving ? (
+                    <span className="flex items-center gap-1.5">
+                      <Loader2 className="w-3 h-3 animate-spin" /> Saving...
+                    </span>
+                  ) : (
+                    "Save Regional Rules"
+                  )}
                 </button>
               </div>
             </div>
           )}
 
-          {/* CARD 3: NOTIFICATIONS */}
+          {/* NOTIFICATIONS CARD */}
           {activeTab === "notifications" && (
             <div className="bg-card text-card-foreground border border-border/60 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.03)] dark:shadow-none overflow-hidden animate-in fade-in-50 duration-200">
               <div className="p-6 border-b border-border/60 bg-muted/30">
-                <div className="flex items-center gap-3">
-                  <div>
-                    <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-50">Alert Channels & Tracking</h3>
-                    <p className="text-xs text-zinc-400 dark:text-zinc-500">Control real-time updates regarding multi-vendor transactions, checkout dispatches, and campaign updates.</p>
-                  </div>
-                </div>
+                <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-50">
+                  Alert Channels & Tracking
+                </h3>
+                <p className="text-xs text-zinc-400 dark:text-zinc-500">
+                  Control real-time updates for orders, security, and
+                  promotions.
+                </p>
               </div>
 
               <div className="p-6 divide-y divide-border/60 space-y-4">
-                {/* Toggle Row 1 */}
-                <div className="flex items-center justify-between pb-4">
-                  <div className="space-y-0.5 flex-1 pr-4">
-                    <p className="text-xs font-bold text-zinc-800 dark:text-zinc-200">Email Dispatch Routing</p>
-                    <p className="text-[11px] text-zinc-400 dark:text-zinc-500">Receive comprehensive marketplace checkout summaries and automated receipts.</p>
-                  </div>
-                  <button 
-                    onClick={() => setEmailAlerts(!emailAlerts)}
-                    className={`w-10 h-5 rounded-full p-0.5 transition-all duration-200 ease-in-out cursor-pointer ${emailAlerts ? 'bg-primary flex justify-end' : 'bg-muted border border-border/60 flex justify-start'}`}
+                {(
+                  [
+                    {
+                      key: "orderAlertsEmail",
+                      label: "Email Dispatch Routing",
+                      desc: "Receive order summaries and automated receipts.",
+                      value: settings.orderAlertsEmail,
+                    },
+                    {
+                      key: "securityAlertsSMS",
+                      label: "SMS Security Alerts",
+                      desc: "Get text alerts for sensitive account changes.",
+                      value: settings.securityAlertsSMS,
+                    },
+                    {
+                      key: "marketingNewsletter",
+                      label: "Campaign Flash Sales",
+                      desc: "Notify me when price cuts or promotions activate.",
+                      value: settings.marketingNewsletter,
+                    },
+                  ] as const
+                ).map((item) => (
+                  <div
+                    key={item.key}
+                    className="flex items-center justify-between py-4"
                   >
-                    <span className="w-4 h-4 rounded-full bg-white dark:bg-zinc-950 shadow-xs block"></span>
-                  </button>
-                </div>
-
-                {/* Toggle Row 2 */}
-                <div className="flex items-center justify-between pt-4 pb-4">
-                  <div className="space-y-0.5 flex-1 pr-4">
-                    <p className="text-xs font-bold text-zinc-800 dark:text-zinc-200">SMS Security Alerts</p>
-                    <p className="text-[11px] text-zinc-400 dark:text-zinc-500">Get direct smartphone text alerts for sensitive merchant dashboard modifications or profile shifts.</p>
+                    <div className="space-y-0.5 flex-1 pr-4">
+                      <p className="text-xs font-bold text-zinc-800 dark:text-zinc-200">
+                        {item.label}
+                      </p>
+                      <p className="text-[11px] text-zinc-400 dark:text-zinc-500">
+                        {item.desc}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() =>
+                        handleToggleNotification(item.key, !item.value)
+                      }
+                      disabled={saving}
+                      className={`w-10 h-5 rounded-full p-0.5 transition-all duration-200 ease-in-out cursor-pointer ${
+                        item.value
+                          ? "bg-primary flex justify-end"
+                          : "bg-muted border border-border/60 flex justify-start"
+                      }`}
+                    >
+                      <span className="w-4 h-4 rounded-full bg-white dark:bg-zinc-950 shadow-xs block" />
+                    </button>
                   </div>
-                  <button 
-                    onClick={() => setSmsAlerts(!smsAlerts)}
-                    className={`w-10 h-5 rounded-full p-0.5 transition-all duration-200 ease-in-out cursor-pointer ${smsAlerts ? 'bg-primary flex justify-end' : 'bg-muted border border-border/60 flex justify-start'}`}
-                  >
-                    <span className="w-4 h-4 rounded-full bg-white dark:bg-zinc-950 shadow-xs block"></span>
-                  </button>
-                </div>
-
-                {/* Toggle Row 3 */}
-                <div className="flex items-center justify-between pt-4 pb-4">
-                  <div className="space-y-0.5 flex-1 pr-4">
-                    <p className="text-xs font-bold text-zinc-800 dark:text-zinc-200">Campaign Flash Sales</p>
-                    <p className="text-[11px] text-zinc-400 dark:text-zinc-500">Notify me immediately when automated multi-vendor price cuts or markdown campaign tokens activate.</p>
-                  </div>
-                  <button 
-                    onClick={() => setMarketingAlerts(!marketingAlerts)}
-                    className={`w-10 h-5 rounded-full p-0.5 transition-all duration-200 ease-in-out cursor-pointer ${marketingAlerts ? 'bg-primary flex justify-end' : 'bg-muted border border-border/60 flex justify-start'}`}
-                  >
-                    <span className="w-4 h-4 rounded-full bg-white dark:bg-zinc-950 shadow-xs block"></span>
-                  </button>
-                </div>
-              </div>
-
-              <div className="p-4 bg-muted/20 border-t border-border/60 flex justify-end gap-3">
-                <button className="px-5 h-9 bg-zinc-900 dark:bg-zinc-50 text-white dark:text-zinc-900 hover:bg-primary dark:hover:bg-primary dark:hover:text-white text-xs font-bold rounded-full active:scale-95 transition-all cursor-pointer shadow-xs">
-                  Save Preferences
-                </button>
+                ))}
               </div>
             </div>
           )}
 
-          {/* CARD 4: SECURITY */}
+          {/* SECURITY CARD */}
           {activeTab === "security" && (
             <div className="bg-card text-card-foreground border border-border/60 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.03)] dark:shadow-none overflow-hidden animate-in fade-in-50 duration-200">
               <div className="p-6 border-b border-border/60 bg-muted/30">
-                <div className="flex items-center gap-3">
-                  <div>
-                    <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-50">Security & Credentials</h3>
-                    <p className="text-xs text-zinc-400 dark:text-zinc-500">Enforce safe workspace sessions, protect administrative actions, and audit access flags.</p>
-                  </div>
-                </div>
+                <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-50">
+                  Security & Credentials
+                </h3>
+                <p className="text-xs text-zinc-400 dark:text-zinc-500">
+                  Manage authentication and account protection settings.
+                </p>
               </div>
 
               <div className="p-6 space-y-4">
                 <div className="flex items-center justify-between text-xs pb-4 border-b border-border/60">
                   <div className="flex-1 pr-4">
-                    <p className="font-bold text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5">
+                    <p className="font-bold text-zinc-800 dark:text-zinc-200">
                       Two-Factor Authentication (2FA)
                     </p>
-                    <p className="text-[11px] text-zinc-400 dark:text-zinc-500 mt-0.5">Secure your customer dashboard access via an authorization phone token layer.</p>
+                    <p className="text-[11px] text-zinc-400 dark:text-zinc-500 mt-0.5">
+                      Secure your account with an additional verification step.
+                    </p>
                   </div>
-                  <span className="px-2.5 py-0.5 text-[10px] font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200 dark:border-amber-900/60 rounded-md">
-                    Inactive
+                  <span
+                    className={`px-2.5 py-0.5 text-[10px] font-bold rounded-md border ${
+                      settings.twoFactorEnabled
+                        ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900/60"
+                        : "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 border-amber-200 dark:border-amber-900/60"
+                    }`}
+                  >
+                    {settings.twoFactorEnabled ? "Active" : "Inactive"}
                   </span>
                 </div>
 
                 <div className="flex items-center justify-between text-xs pt-2">
                   <div className="flex-1 pr-4">
-                    <p className="font-bold text-zinc-800 dark:text-zinc-200">Buyer Protection Protocol</p>
-                    <p className="text-[11px] text-zinc-400 dark:text-zinc-500 mt-0.5">Enforce safe delivery escrow holding gates across all multi-vendor orders automatically.</p>
+                    <p className="font-bold text-zinc-800 dark:text-zinc-200">
+                      Buyer Protection Protocol
+                    </p>
+                    <p className="text-[11px] text-zinc-400 dark:text-zinc-500 mt-0.5">
+                      Enforce safe delivery escrow across all orders.
+                    </p>
                   </div>
-                  <span className={`px-2.5 py-0.5 text-[10px] font-bold rounded-md border ${
-                    userProfile.buyerProtectionEnabled 
-                      ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900/60" 
-                      : "bg-muted text-zinc-400 dark:text-zinc-500 border-border"
-                  }`}>
-                    {userProfile.buyerProtectionEnabled ? "Active" : "Inactive"}
-                  </span>
+                  <button
+                    onClick={() =>
+                      updateSettings({
+                        buyerProtectionEnabled:
+                          !settings.buyerProtectionEnabled,
+                      })
+                    }
+                    disabled={saving}
+                    className={`w-10 h-5 rounded-full p-0.5 transition-all duration-200 ease-in-out cursor-pointer ${
+                      settings.buyerProtectionEnabled
+                        ? "bg-primary flex justify-end"
+                        : "bg-muted border border-border/60 flex justify-start"
+                    }`}
+                  >
+                    <span className="w-4 h-4 rounded-full bg-white dark:bg-zinc-950 shadow-xs block" />
+                  </button>
                 </div>
-              </div>
-
-              <div className="p-4 bg-muted/20 border-t border-border/60 flex justify-end items-center gap-3">
-                <button className="px-4 py-2 text-xs font-bold text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 transition-all cursor-pointer">
-                  Cancel
-                </button>
-                <button className="px-5 h-9 bg-zinc-900 dark:bg-zinc-50 text-white dark:text-zinc-900 hover:bg-primary dark:hover:bg-primary dark:hover:text-white text-xs font-bold rounded-full active:scale-95 transition-all cursor-pointer shadow-xs">
-                  Save System Settings
-                </button>
               </div>
             </div>
           )}
-
         </div>
       </div>
     </div>
+  );
+}
+
+// ─── Page component ───
+export default function SettingsPage() {
+  const { user, logout, actionLoading } = useAuth();
+  const { settings, loading, saving, updateSettings } = useSettings();
+  const router = useRouter();
+
+  // All hooks called unconditionally here
+  if (loading || !settings) {
+    return (
+      <div className="max-w-8xl mx-auto px-4 py-10 space-y-10">
+        <div className="border-b border-border/60 pb-6">
+          <div className="flex items-center gap-2.5">
+            <Skeleton className="w-9 h-9 rounded-full" />
+            <div className="space-y-1.5">
+              <Skeleton className="h-5 w-36" />
+              <Skeleton className="h-3 w-64" />
+            </div>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="space-y-2">
+            {[1, 2, 3, 4].map((i) => (
+              <Skeleton key={i} className="h-10 w-full rounded-full" />
+            ))}
+          </div>
+          <div className="md:col-span-2">
+            <Skeleton className="h-64 w-full rounded-2xl" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <SettingsFormContent
+      key={JSON.stringify(settings)}
+      settings={settings}
+      user={user}
+      saving={saving}
+      updateSettings={updateSettings}
+      logout={logout}
+      actionLoading={actionLoading}
+      router={router}
+    />
   );
 }

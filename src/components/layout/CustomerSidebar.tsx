@@ -3,13 +3,23 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { 
-  ShoppingBag, Home, LayoutGrid, Tag, Sparkles, 
-  Store, Heart,
-  Settings, Headphones, Moon, Sun 
+import {
+  ShoppingBag,
+  Home,
+  LayoutGrid,
+  Tag,
+  Sparkles,
+  Store,
+  Heart,
+  Settings,
+  Headphones,
+  Moon,
+  Sun,
+  LogIn,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/hooks/use-theme";
+import { useAuth } from "@/hooks/use-auth";
 import {
   Sidebar,
   SidebarContent,
@@ -35,27 +45,33 @@ const discoverItems = [
 const workspaceItems = [
   { name: "My Orders", href: "/orders", icon: ShoppingBag },
   { name: "Wishlist", href: "/wishlist", icon: Heart },
-  // { name: "Coupons", href: "/coupons", icon: Ticket },
   { name: "Settings", href: "/settings", icon: Settings },
+];
+
+const authItems = [
+  { name: "Sign In", href: "/login", icon: LogIn },
 ];
 
 const emptySubscribe = () => () => {};
 
-export function CustomerSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+export function CustomerSidebar({
+  ...props
+}: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname();
   const { state } = useSidebar();
-  
+  const { isAuthenticated, loading: authLoading } = useAuth();
+
   const { isDark, toggleTheme } = useTheme();
-  
+
   const mounted = React.useSyncExternalStore(
     emptySubscribe,
-    () => true,  
-    () => false 
+    () => true,
+    () => false
   );
 
   return (
-    <Sidebar 
-      collapsible="icon" 
+    <Sidebar
+      collapsible="icon"
       className="border-r border-border/60 bg-card text-card-foreground transition-all duration-300"
       {...props}
     >
@@ -73,8 +89,7 @@ export function CustomerSidebar({ ...props }: React.ComponentProps<typeof Sideba
 
       {/* CORE HUB NAVIGATION */}
       <SidebarContent className="px-2 py-4 space-y-4 rounded-xl">
-        
-        {/* DISCOVER SECTION */}
+        {/* DISCOVER SECTION — always visible */}
         <SidebarGroup>
           <SidebarGroupLabel className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 tracking-widest uppercase mb-2 px-3">
             Discover
@@ -85,19 +100,24 @@ export function CustomerSidebar({ ...props }: React.ComponentProps<typeof Sideba
                 const isActive = pathname === item.href;
                 return (
                   <SidebarMenuItem key={item.name}>
-                    <SidebarMenuButton 
-                      asChild 
+                    <SidebarMenuButton
+                      asChild
                       isActive={isActive}
                       tooltip={item.name}
                       className={cn(
                         "w-full px-4 py-2.5 rounded-full text-xs font-bold tracking-tight transition-all duration-200 cursor-pointer",
-                        isActive 
-                          ? "bg-primary text-primary-foreground shadow-[0_16px_40px_-12px_rgba(0,0,0,0.02)] dark:bg-zinc-800" 
+                        isActive
+                          ? "bg-primary text-primary-foreground shadow-[0_16px_40px_-12px_rgba(0,0,0,0.02)] dark:bg-zinc-800"
                           : "text-zinc-500 dark:text-zinc-400 hover:bg-muted hover:text-foreground"
                       )}
                     >
                       <Link href={item.href}>
-                        <item.icon className={cn("w-4 h-4 shrink-0", isActive ? "stroke-[2.5]" : "opacity-80")} />
+                        <item.icon
+                          className={cn(
+                            "w-4 h-4 shrink-0",
+                            isActive ? "stroke-[2.5]" : "opacity-80"
+                          )}
+                        />
                         <span>{item.name}</span>
                       </Link>
                     </SidebarMenuButton>
@@ -108,50 +128,112 @@ export function CustomerSidebar({ ...props }: React.ComponentProps<typeof Sideba
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {/* WORKSPACE SECTION */}
-        <SidebarGroup>
-          <SidebarGroupLabel className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 tracking-widest uppercase mb-2 px-3">
-            Workspace
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {workspaceItems.map((item) => {
-                const isActive = pathname === item.href;
-                return (
-                  <SidebarMenuItem key={item.name}>
-                    <SidebarMenuButton 
-                      asChild 
-                      isActive={isActive}
-                      tooltip={item.name}
-                      className={cn(
-                        "w-full px-4 py-2.5 rounded-full text-xs font-bold tracking-tight transition-all duration-200 cursor-pointer",
-                        isActive 
-                          ? "bg-primary text-primary-foreground shadow-[0_16px_40px_-12px_rgba(0,0,0,0.02)] dark:bg-zinc-800" 
-                          : "text-zinc-500 dark:text-zinc-400 hover:bg-muted hover:text-foreground"
-                      )}
-                    >
-                      <Link href={item.href}>
-                        <item.icon className={cn("w-4 h-4 shrink-0", isActive ? "stroke-[2.5]" : "opacity-80")} />
-                        <span>{item.name}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {/* WORKSPACE SECTION — only visible when authenticated */}
+        {isAuthenticated && (
+          <SidebarGroup>
+            <SidebarGroupLabel className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 tracking-widest uppercase mb-2 px-3">
+              Workspace
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {workspaceItems.map((item) => {
+                  const isActive = pathname === item.href;
+                  return (
+                    <SidebarMenuItem key={item.name}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={isActive}
+                        tooltip={item.name}
+                        className={cn(
+                          "w-full px-4 py-2.5 rounded-full text-xs font-bold tracking-tight transition-all duration-200 cursor-pointer",
+                          isActive
+                            ? "bg-primary text-primary-foreground shadow-[0_16px_40px_-12px_rgba(0,0,0,0.02)] dark:bg-zinc-800"
+                            : "text-zinc-500 dark:text-zinc-400 hover:bg-muted hover:text-foreground"
+                        )}
+                      >
+                        <Link href={item.href}>
+                          <item.icon
+                            className={cn(
+                              "w-4 h-4 shrink-0",
+                              isActive ? "stroke-[2.5]" : "opacity-80"
+                            )}
+                          />
+                          <span>{item.name}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
 
+        {/* AUTH SECTION — only visible when NOT authenticated and not loading */}
+        {!isAuthenticated && !authLoading && (
+          <SidebarGroup>
+            <SidebarGroupLabel className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 tracking-widest uppercase mb-2 px-3">
+              Account
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {authItems.map((item) => {
+                  const isActive = pathname === item.href;
+                  return (
+                    <SidebarMenuItem key={item.name}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={isActive}
+                        tooltip={item.name}
+                        className={cn(
+                          "w-full px-4 py-2.5 rounded-full text-xs font-bold tracking-tight transition-all duration-200 cursor-pointer",
+                          isActive
+                            ? "bg-primary text-primary-foreground shadow-[0_16px_40px_-12px_rgba(0,0,0,0.02)] dark:bg-zinc-800"
+                            : "text-zinc-500 dark:text-zinc-400 hover:bg-muted hover:text-foreground"
+                        )}
+                      >
+                        <Link href={item.href}>
+                          <item.icon
+                            className={cn(
+                              "w-4 h-4 shrink-0",
+                              isActive ? "stroke-[2.5]" : "opacity-80"
+                            )}
+                          />
+                          <span>{item.name}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+
+        {/* Loading skeleton for auth state */}
+        {authLoading && (
+          <SidebarGroup>
+            <SidebarGroupLabel className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 tracking-widest uppercase mb-2 px-3">
+              Workspace
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <div className="space-y-2 px-3">
+                <div className="h-9 bg-muted/60 rounded-full animate-pulse" />
+                <div className="h-9 bg-muted/60 rounded-full animate-pulse" />
+                <div className="h-9 bg-muted/60 rounded-full animate-pulse" />
+              </div>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
 
       {/* SYSTEM PREFERENCES UTILITY FOOTER */}
       <SidebarFooter className="p-3 border-t border-border/40 space-y-1">
         <SidebarMenu>
-          
           {/* HELP HUB TRIGGER */}
           <SidebarMenuItem>
-            <SidebarMenuButton 
-              asChild 
+            <SidebarMenuButton
+              asChild
               isActive={pathname === "/help"}
               tooltip="Help Center"
               className={cn(
@@ -170,16 +252,23 @@ export function CustomerSidebar({ ...props }: React.ComponentProps<typeof Sideba
 
           {/* DYNAMIC THEME SYSTEM SWITCH TOKENS */}
           <SidebarMenuItem>
-            <SidebarMenuButton 
+            <SidebarMenuButton
               onClick={toggleTheme}
-              tooltip={!mounted ? "Loading Theme" : isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
+              tooltip={
+                !mounted
+                  ? "Loading Theme"
+                  : isDark
+                    ? "Switch to Light Mode"
+                    : "Switch to Dark Mode"
+              }
               className="w-full px-4 py-2.5 rounded-full text-xs font-bold tracking-tight text-zinc-500 dark:text-zinc-400 hover:bg-muted hover:text-foreground cursor-pointer"
             >
-              {/* Check mount status before evaluating dynamic theme variables */}
               {!mounted ? (
                 <>
                   <div className="w-4 h-4 rounded-full border border-zinc-300 dark:border-zinc-700 animate-pulse shrink-0" />
-                  <span className="text-muted-foreground/60">Loading Theme...</span>
+                  <span className="text-muted-foreground/60">
+                    Loading Theme...
+                  </span>
                 </>
               ) : isDark ? (
                 <>
@@ -194,7 +283,6 @@ export function CustomerSidebar({ ...props }: React.ComponentProps<typeof Sideba
               )}
             </SidebarMenuButton>
           </SidebarMenuItem>
-
         </SidebarMenu>
       </SidebarFooter>
     </Sidebar>

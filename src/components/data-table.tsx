@@ -77,6 +77,7 @@ interface ReusableDataTableProps<TData, TValue> {
   onReorder?: (newData: TData[]) => void;
   toolbarActions?: React.ReactNode;
   renderTabs?: React.ReactNode;
+  isLoading?: boolean;
 }
 
 function DragHandle({ id }: { id: string }) {
@@ -128,6 +129,7 @@ export function DataTable<TData, TValue>({
   onReorder,
   toolbarActions,
   renderTabs,
+  isLoading = false, // Add default value
 }: ReusableDataTableProps<TData, TValue>) {
   const [rowSelection, setRowSelection] = React.useState({});
   const [columnVisibility, setColumnVisibility] =
@@ -138,7 +140,7 @@ export function DataTable<TData, TValue>({
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [pagination, setPagination] = React.useState({
     pageIndex: 0,
-    pageSize: 10,
+    pageSize: 5,
   });
 
   const sortableId = React.useId();
@@ -251,7 +253,21 @@ export function DataTable<TData, TValue>({
       </div>
 
       <div className="relative flex flex-col gap-4 overflow-auto">
-        <div className="overflow-hidden rounded-xl border border-border/60">
+        <div className="overflow-hidden rounded-xl border border-border/60 relative">
+          {/* Loading Overlay */}
+          {isLoading && (
+            <div className="absolute inset-0 z-20 bg-card/80 backdrop-blur-sm flex items-center justify-center">
+              <div className="flex flex-col items-center gap-3">
+                <div className="relative">
+                  <div className="w-10 h-10 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
+                </div>
+                <span className="text-xs font-medium text-muted-foreground animate-pulse">
+                  Loading data...
+                </span>
+              </div>
+            </div>
+          )}
+          
           <DndContext
             collisionDetection={closestCenter}
             modifiers={[restrictToVerticalAxis]}
@@ -294,7 +310,14 @@ export function DataTable<TData, TValue>({
                     <TableCell
                       colSpan={finalColumns.length}
                       className="h-28 text-center text-xs font-semibold text-muted-foreground">
-                      No results found matching execution parameters.
+                      {isLoading ? (
+                        <div className="flex items-center justify-center gap-2">
+                          <div className="w-4 h-4 border-2 border-muted-foreground/20 border-t-muted-foreground rounded-full animate-spin" />
+                          <span>Fetching records...</span>
+                        </div>
+                      ) : (
+                        "No results found."
+                      )}
                     </TableCell>
                   </TableRow>
                 )}
@@ -331,7 +354,7 @@ export function DataTable<TData, TValue>({
                   side="top"
                   className="rounded-xl border-border/60 p-1">
                   <SelectGroup>
-                    {[10, 20, 30, 40, 50].map((pageSize) => (
+                    {[5, 10, 20, 30, 40, 50].map((pageSize) => (
                       <SelectItem
                         key={pageSize}
                         value={`${pageSize}`}

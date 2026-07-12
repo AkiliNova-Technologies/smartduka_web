@@ -79,7 +79,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
 
   // Look up item context reactively out of the relational mockDatabase engine
   const targetItem = mockDatabase.products.find(p => p.id === resolvedParams.id) || mockDatabase.products[0];
-  const associatedStore = mockDatabase.stores.find(s => s.id === targetItem.storeId) || mockDatabase.stores[0];
+  const associatedStore = mockDatabase.stores.find(s => s.id === targetItem.vendorId) || mockDatabase.stores[0];
   
   // Find related products matching the same category scope
   const relatedProducts = mockDatabase.products
@@ -108,8 +108,8 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=500&q=85"
   ];
 
-  const discountPercentage = targetItem.originalPrice 
-    ? Math.round(((targetItem.originalPrice - targetItem.price) / targetItem.originalPrice) * 100) 
+  const discountPercentage = targetItem.compareAtPrice 
+    ? Math.round(((targetItem.compareAtPrice - targetItem.basePrice) / targetItem.compareAtPrice) * 100) 
     : 0;
 
   return (
@@ -136,7 +136,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
             </Link>
             <ChevronRight className="w-3 h-3 text-zinc-300 dark:text-zinc-700" />
             <span className="text-zinc-900 dark:text-zinc-100 truncate">
-              {targetItem.title}
+              {targetItem.name}
             </span>
           </nav>
         </div>
@@ -156,7 +156,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
             
             <Image
               src={imageStream[activeImgIndex]}
-              alt={targetItem.title}
+              alt={targetItem.name}
               fill
               priority
               className="object-cover w-full h-full dark:opacity-95"
@@ -187,7 +187,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
 
           <div className="space-y-2">
             <h1 className="text-xl lg:text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 leading-tight">
-              {targetItem.title}
+              {targetItem.name}
             </h1>
             <div className="flex items-center gap-3 text-xs font-semibold">
               <div className="flex items-center gap-1 text-amber-500 bg-amber-500/5 px-2 py-0.5 rounded-md">
@@ -201,11 +201,11 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
 
           <div className="border-t border-b border-border/60 py-4 flex items-baseline gap-2.5">
             <span className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
-              UGX {targetItem.price.toLocaleString()}
+              UGX {targetItem.basePrice.toLocaleString()}
             </span>
-            {targetItem.originalPrice && (
+            {targetItem.compareAtPrice && (
               <span className="text-sm font-semibold text-zinc-400 dark:text-zinc-500 line-through">
-                UGX {targetItem.originalPrice.toLocaleString()}
+                UGX {targetItem.compareAtPrice.toLocaleString()}
               </span>
             )}
           </div>
@@ -510,7 +510,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                       <Image
                         className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
                         src={item.image}
-                        alt={item.title}
+                        alt={item.name}
                         fill
                         sizes="(max-w-768px) 50vw, 25vw"
                         loading="lazy"
@@ -534,7 +534,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                       </p>
                       
                       <h3 className="text-sm font-bold text-zinc-800 dark:text-zinc-200 line-clamp-1 tracking-tight transition-colors group-hover:text-primary">
-                        {item.title}
+                        {item.name}
                       </h3>
                     </div>
                   </div>
@@ -542,13 +542,13 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
 
                 <div className="flex justify-between items-center mt-4 pt-1 px-4 pb-4 relative z-10">
                   <div className="flex flex-col">
-                    {item.originalPrice && (
+                    {item.compareAtPrice && (
                       <span className="text-[11px] text-zinc-400 dark:text-zinc-500 line-through font-medium leading-none mb-0.5">
-                        UGX {item.originalPrice.toLocaleString()}
+                        UGX {item.compareAtPrice.toLocaleString()}
                       </span>
                     )}
                     <span className="text-base font-bold text-zinc-900 dark:text-zinc-50 tracking-tight leading-none">
-                      UGX {item.price.toLocaleString()}
+                      UGX {item.basePrice.toLocaleString()}
                     </span>
                   </div>
                   <button className="w-9 h-9 bg-zinc-900 dark:bg-zinc-50 text-white dark:text-zinc-900 rounded-xl flex items-center justify-center shadow-xs transition-all duration-200 active:scale-95 hover:bg-primary dark:hover:bg-primary dark:hover:text-white cursor-pointer">

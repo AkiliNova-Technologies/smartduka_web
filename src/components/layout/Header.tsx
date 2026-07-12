@@ -10,8 +10,9 @@ import {
   ShoppingCart,
 } from "lucide-react";
 import Image from "next/image";
-import { mockDatabase } from "@/data/mockDatabase";
 import { useSidebar } from "@/components/ui/sidebar";
+import { useAuth } from "@/hooks/use-auth";
+import { Skeleton } from "@/components/ui/skeleton";
 
 // 1. Separate the dynamic search parameter reader block
 function SearchInputFields() {
@@ -39,7 +40,8 @@ function SearchInputFields() {
   return (
     <form
       onSubmit={handleSearchSubmit}
-      className="relative w-full max-w-md hidden md:block group">
+      className="relative w-full max-w-md hidden md:block group"
+    >
       <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" />
       <input
         type="text"
@@ -52,10 +54,72 @@ function SearchInputFields() {
   );
 }
 
-// 2. Export the main structural header with a Suspense fallback node
+// 2. Profile section that handles loading, authenticated, and unauthenticated states
+function ProfileSection() {
+  const router = useRouter();
+  const { user, loading } = useAuth();
+
+  // Loading state — skeleton pulse matching the profile layout
+  if (loading) {
+    return (
+      <div className="flex items-center gap-3">
+        <Skeleton className="w-9 h-9 rounded-full" />
+        <div className="hidden sm:block space-y-1.5">
+          <Skeleton className="h-3 w-16 rounded-full" />
+        </div>
+      </div>
+    );
+  }
+
+  // Unauthenticated state — show sign-in prompt
+  if (!user) {
+    return (
+      <button
+        onClick={() => router.push("/login")}
+        className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-full text-xs font-semibold hover:bg-emerald-600 transition-colors cursor-pointer"
+      >
+        <span className="hidden sm:inline">Sign In</span>
+      </button>
+    );
+  }
+
+  // Authenticated state — show profile avatar with user info
+  const displayName = user.displayName || user.email?.split("@")[0] || "User";
+  const avatarUrl = user.photoURL || null;
+
+  return (
+    <div
+      onClick={() => router.push("/settings")}
+      className="flex items-center gap-3 border-transparent hover:border-border hover:bg-card hover:shadow-2xs cursor-pointer group transition-all duration-200 rounded-full px-1 py-1"
+    >
+      <div className="relative w-9 h-9 rounded-full overflow-hidden ring-2 ring-transparent group-hover:ring-primary/20 transition-all shadow-none shrink-0">
+        {avatarUrl ? (
+          <Image
+            alt={`${displayName} Avatar Profile`}
+            src={avatarUrl}
+            fill
+            sizes="36px"
+            className="object-cover transition-transform duration-500 group-hover:scale-105"
+            priority
+          />
+        ) : (
+          // Fallback avatar when no photoURL is available
+          <div className="w-full h-full bg-primary/10 flex items-center justify-center rounded-full">
+            <span className="text-xs font-bold text-primary uppercase">
+              {displayName.split(" ")[1]?.charAt(0) || ""}
+            </span>
+          </div>
+        )}
+      </div>
+      <div className="text-left hidden sm:block select-none">
+      </div>
+    </div>
+  );
+}
+
+// 3. Export the main structural header with a Suspense fallback node
 export function Header() {
   const { toggleSidebar, open } = useSidebar();
-  const userProfile = mockDatabase.currentUser;
   const router = useRouter();
 
   return (
@@ -66,9 +130,12 @@ export function Header() {
           <button
             onClick={() => toggleSidebar()}
             aria-label={
-              open ? "Collapse Navigation Sidebar" : "Expand Navigation Sidebar"
+              open
+                ? "Collapse Navigation Sidebar"
+                : "Expand Navigation Sidebar"
             }
-            className="p-2.5 -ml-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-xl transition-all active:scale-95 cursor-pointer">
+            className="p-2.5 -ml-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-xl transition-all active:scale-95 cursor-pointer"
+          >
             {open ? (
               <AlignStartVertical className="w-5 h-5 animate-in fade-in zoom-in-75 duration-200" />
             ) : (
@@ -80,7 +147,8 @@ export function Header() {
           <Suspense
             fallback={
               <div className="w-full max-w-md h-11 bg-muted/40 rounded-full hidden md:block animate-pulse" />
-            }>
+            }
+          >
             <SearchInputFields />
           </Suspense>
         </div>
@@ -91,7 +159,8 @@ export function Header() {
           <button
             aria-label="Open Cart View"
             className="p-2.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full relative transition-all active:scale-95 group cursor-pointer"
-            onClick={() => router.push("/cart")}>
+            onClick={() => router.push("/cart")}
+          >
             <ShoppingCart className="w-5 h-5 transition-transform group-hover:scale-105" />
             {/* Live Count Ripple Badge Layer */}
             <span className="absolute top-1 right-1 w-4 h-4 bg-primary text-primary-foreground rounded-full text-[9px] font-bold flex items-center justify-center ring-2 ring-background scale-90 select-none">
@@ -108,24 +177,8 @@ export function Header() {
 
           <div className="h-5 w-[1px] bg-border mx-1.5 hidden sm:block" />
 
-          {/* Profile Snapshot Asset */}
-          <div className="flex items-center gap-3 border-transparent hover:border-border hover:bg-card hover:shadow-2xs cursor-pointer group transition-all duration-200">
-            <div className="relative w-9 h-9 rounded-full overflow-hidden ring-2 ring-transparent group-hover:ring-primary/20 transition-all shadow-none shrink-0">
-              <Image
-                alt={`${userProfile.name} Avatar Profile`}
-                src={userProfile.avatar}
-                fill
-                sizes="36px"
-                className="object-cover transition-transform duration-500 group-hover:scale-105"
-                priority
-              />
-            </div>
-            <div className="text-left hidden sm:block select-none">
-              <p className="text-xs font-bold text-foreground tracking-tight leading-none group-hover:text-primary transition-colors">
-                {userProfile.name.split(" ")[0]}
-              </p>
-            </div>
-          </div>
+          {/* Profile — now using useAuth hook via ProfileSection */}
+          <ProfileSection />
         </div>
       </div>
     </header>

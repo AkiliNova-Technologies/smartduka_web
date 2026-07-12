@@ -6,7 +6,6 @@ import { usePathname } from "next/navigation";
 import { 
   LayoutDashboard, ShoppingCart, Package, FileChartColumn,
   Store, Moon, Sun,
-  Home
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/hooks/use-theme";
@@ -23,6 +22,7 @@ import {
   SidebarMenuButton,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { IconTrolley } from "@tabler/icons-react";
 
 const operationsItems = [
   { name: "Overview", href: "/vendor", icon: LayoutDashboard },
@@ -154,7 +154,7 @@ export function VendorSidebar({ ...props }: React.ComponentProps<typeof Sidebar>
               className="w-full px-4 py-2.5 rounded-full text-xs font-medium tracking-tight text-zinc-500 dark:text-zinc-400 hover:bg-muted hover:text-foreground cursor-pointer"
             >
               <Link href="/">
-                <Home className="w-4 h-4 shrink-0" />
+                <IconTrolley className="w-4 h-4 shrink-0" />
                 <span>MarketPlace</span>
               </Link>
             </SidebarMenuButton>

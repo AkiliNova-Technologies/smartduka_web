@@ -2,16 +2,30 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { MarketplaceJWTPayload, verifyToken } from "@/lib/auth/jwt";
 
-// Configuration boundary definitions mapping directly to your Marketplace Route Groups structures
 const AUTH_ROUTES = ["/login", "/register", "/forgot-password"];
 const ADMIN_PREFIX = "/dashboard/admin";
 const VENDOR_PREFIX = "/dashboard/vendor";
 const CHECKOUT_PREFIX = "/checkout";
 
-/**
- * Next.js Edge Gateway Proxy Engine (Multi-Vendor Marketplace Edition)
- * Handles structural path shielding, multi-tenant layer context injection, and role isolation bounces.
- */
+// API routes that authenticate via x-marketplace-user-id header
+const HEADER_AUTH_API_PREFIXES = [
+  "/api/settings",
+  "/api/wishlist",
+  "/api/user-profile",
+];
+
+// API routes that authenticate via userId in request body
+const BODY_AUTH_API_PREFIXES = [
+  "/api/vendors",
+  "/api/admin/vendors", 
+];
+
+// API routes that are fully public — no auth required
+const PUBLIC_API_PREFIXES = [
+  "/api/categories",
+  "/api/products",
+];
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const origin = request.nextUrl.origin;
@@ -25,14 +39,40 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // 2. Fetch the marketplace access token cookie value securely from edge runtime memory
-  const tokenCookie = request.cookies.get("marketplace_access_token");
+  // 1.5 Header-based auth routes
+  if (HEADER_AUTH_API_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
+    const clientUserId = request.headers.get("x-marketplace-user-id");
+    if (clientUserId) {
+      const modifiedHeaders = new Headers(request.headers);
+      return NextResponse.next({
+        request: { headers: modifiedHeaders },
+      });
+    }
+    return NextResponse.json(
+      { error: "Authentication required. Please sign in." },
+      { status: 401 },
+    );
+  }
+
+  // 1.6 Body-based auth routes — pass through, route handles its own validation
+  if (BODY_AUTH_API_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
+    return NextResponse.next();
+  }
+
+  // 1.7 Fully public API routes
+  if (PUBLIC_API_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
+    return NextResponse.next();
+  }
+
+  // 2. Fetch the marketplace access token cookie
+  const tokenCookie = 
+    request.cookies.get("marketplace_access_token") ||
+    request.cookies.get("session");
   const token = tokenCookie?.value;
 
   // 3. Define routing scopes
   const isAuthRoute = AUTH_ROUTES.some((route) => pathname.startsWith(route));
 
-  // Public marketplace areas where buyers browse without requiring sessions
   const isPublicMarketplaceRoute =
     pathname === "/" ||
     ["/about", "/contact", "/products", "/cart", "/shop"].some((route) =>
@@ -45,24 +85,28 @@ export async function proxy(request: NextRequest) {
     session = await verifyToken(token);
   }
 
-  // 5. Handle Redirection logic blocks if authenticated users try to access auth routes
+  // 5. Handle Redirection for authenticated users on auth routes
   if (isAuthRoute) {
     if (session) {
       if (session.role === "ADMIN")
         return NextResponse.redirect(new URL(ADMIN_PREFIX, origin));
       if (session.role === "VENDOR")
         return NextResponse.redirect(new URL(VENDOR_PREFIX, origin));
-      return NextResponse.redirect(new URL("/", origin)); // Customers go back to global mall storefront
+      return NextResponse.redirect(new URL("/", origin));
     }
     return NextResponse.next();
   }
 
-  // 6. Define protected spaces (Dashboards, Order Pipelines, and core Backend APIs)
+  // 6. Define protected spaces
   const isProtectedArea =
     pathname.startsWith(ADMIN_PREFIX) ||
     pathname.startsWith(VENDOR_PREFIX) ||
     pathname.startsWith(CHECKOUT_PREFIX) ||
-    (pathname.startsWith("/api") && !pathname.startsWith("/api/public"));
+    (pathname.startsWith("/api") &&
+      !pathname.startsWith("/api/public") &&
+      !PUBLIC_API_PREFIXES.some((prefix) => pathname.startsWith(prefix)) &&
+      !HEADER_AUTH_API_PREFIXES.some((prefix) => pathname.startsWith(prefix)) &&
+      !BODY_AUTH_API_PREFIXES.some((prefix) => pathname.startsWith(prefix)));
 
   // 7. Enforce Authentication Guardrails
   if (isProtectedArea && !session && !isPublicMarketplaceRoute) {
@@ -80,52 +124,35 @@ export async function proxy(request: NextRequest) {
 
   // 8. Enforce Sub-System URL Access Isolation & Role Guardrails
   if (session) {
-    // Block non-admins from the Platform Super Admin Panel
     if (pathname.startsWith(ADMIN_PREFIX) && session.role !== "ADMIN") {
       return handleUnauthorizedRedirect(request, session, origin);
     }
-
-    // Block non-vendors from entering the Vendor Dashboard
     if (pathname.startsWith(VENDOR_PREFIX) && session.role !== "VENDOR") {
       return handleUnauthorizedRedirect(request, session, origin);
     }
   }
 
+  // 9. Inject headers
   const modifiedHeaders = new Headers(request.headers);
   if (session) {
     modifiedHeaders.set("x-marketplace-user-id", String(session.userId));
     modifiedHeaders.set("x-marketplace-email", String(session.email));
-
     if (session.platformRole) {
-      modifiedHeaders.set(
-        "x-marketplace-platform-role",
-        session.platformRole as string,
-      );
+      modifiedHeaders.set("x-marketplace-platform-role", session.platformRole as string);
     }
     if (session.vendorRole) {
-      modifiedHeaders.set(
-        "x-marketplace-vendor-role",
-        session.vendorRole as string,
-      );
+      modifiedHeaders.set("x-marketplace-vendor-role", session.vendorRole as string);
     }
     if (session.vendorId) {
-      modifiedHeaders.set(
-        "x-marketplace-vendor-id",
-        session.vendorId as string,
-      );
+      modifiedHeaders.set("x-marketplace-vendor-id", session.vendorId as string);
     }
   }
 
   return NextResponse.next({
-    request: {
-      headers: modifiedHeaders,
-    },
+    request: { headers: modifiedHeaders },
   });
 }
 
-/**
- * Centralized bounce logic for security context mismatches (403 errors / soft-redirects)
- */
 function handleUnauthorizedRedirect(
   request: NextRequest,
   session: MarketplaceJWTPayload,
@@ -137,7 +164,6 @@ function handleUnauthorizedRedirect(
       { status: 403 },
     );
   }
-
   if (session.role === "ADMIN")
     return NextResponse.redirect(new URL(ADMIN_PREFIX, origin));
   if (session.role === "VENDOR")
@@ -145,7 +171,6 @@ function handleUnauthorizedRedirect(
   return NextResponse.redirect(new URL("/", origin));
 }
 
-// Intercept all routes except static framework bundles, images, icons, and vector paths
 export const config = {
   matcher: [
     "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",

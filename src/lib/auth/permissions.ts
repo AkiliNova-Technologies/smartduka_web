@@ -22,6 +22,8 @@ export const PLATFORM_ROLE_PERMISSIONS: Record<PlatformRole, AppPermissionKey[]>
   ADMIN: ["platform:view_analytics", "platform:manage_vendors", "platform:manage_billing", "platform:customer_support"],
   SUPPORT: ["platform:customer_support"],
   BILLING: ["platform:view_analytics", "platform:manage_billing"],
+  VENDOR: [],   // Vendors use DEFAULT_ROLE_PERMISSIONS via VendorUserRole, not platform permissions
+  CUSTOMER: [], // Customers have no special platform permissions
 };
 
 /**

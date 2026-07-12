@@ -3,14 +3,20 @@ import { Geist, Geist_Mono, Inter } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Toaster } from "@/components/ui/sonner";
+
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
-const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
 
 export const metadata: Metadata = {
   title: "SmartDuka - Multi-Vendor Marketplace",
-  description: "Discover stores, buy products, and manage vendor spaces seamlessly.",
+  description:
+    "Discover stores, buy products, and manage vendor spaces seamlessly.",
 };
 
 export default function RootLayout({
@@ -26,13 +32,13 @@ export default function RootLayout({
         geistSans.variable,
         geistMono.variable,
         inter.variable,
-        "font-sans"
-      )}
-    >
+        "font-sans",
+      )}>
       <body className="min-h-full bg-background text-foreground flex flex-col">
-        <TooltipProvider delayDuration={200}>
-          {children}
-        </TooltipProvider>
+        
+          <TooltipProvider delayDuration={200}>{children}</TooltipProvider>
+          <Toaster position="top-right" closeButton={false} />
+        
       </body>
     </html>
   );

@@ -15,6 +15,8 @@ enum PlatformRole {
   ADMIN
   SUPPORT
   BILLING
+  VENDOR
+  CUSTOMER
 }
 
 enum VendorStatus {
@@ -41,9 +43,10 @@ enum UserStatus {
 
 enum ProductStatus {
   DRAFT
+  PUBLISHED
   ACTIVE
-  OUT_OF_STOCK
   ARCHIVED
+  OUT_OF_STOCK
 }
 
 enum OrderStatus {
@@ -136,6 +139,57 @@ enum DocumentType {
   OTHER
 }
 
+enum VerificationStatus {
+  PENDING
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+}
+
+// ==========================================
+// NEXT-AUTH REQUIRED MODELS
+// ==========================================
+
+model Account {
+  id                String  @id @default(uuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([sessionToken])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
 // ==========================================
 // USER & CORE AUTHENTICATION SECURITY
 // ==========================================
@@ -148,7 +202,7 @@ model User {
   passwordHash    String?
   avatarUrl       String?
   status          UserStatus    @default(PENDING)
-  platformRole    PlatformRole? // Nullable if the user is a customer or a vendor member
+  platformRole    PlatformRole?
 
   emailVerifiedAt DateTime?
   lastLoginAt     DateTime?
@@ -156,13 +210,18 @@ model User {
   updatedAt       DateTime      @updatedAt
   deletedAt       DateTime?
 
-  // Vendor Membership (An individual can be an employee of a specific vendor)
   vendorId        String?
   vendorRole      VendorUserRole?
   vendorProfile   VendorProfile? @relation("VendorEmployees", fields: [vendorId], references: [id], onDelete: SetNull)
+  ownedVendor     VendorProfile? @relation("VendorOwner")
 
-  // System Relations
-  ownedVendor     VendorProfile? @relation("VendorOwner") // 1-to-1 link if they are the primary creator
+  settings        UserSettings?
+
+  accounts        Account[]
+  sessions        Session[]
+
+  vendorApplications VendorApplication[]
+
   customerOrders  Order[]        @relation("CustomerOrders")
   reviewsWritten  ProductReview[]
   auditLogs       AuditLog[]
@@ -171,6 +230,121 @@ model User {
   @@index([status])
   @@index([vendorId])
   @@index([platformRole])
+}
+
+// ==========================================
+// USER SETTINGS & PREFERENCES
+// ==========================================
+
+model UserSettings {
+  id                    String    @id @default(uuid())
+  userId                String    @unique
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  fullName              String?
+  phoneNumber           String?
+  avatarUrl             String?
+
+  currency              String    @default("UGX")
+  primaryLanguage       String    @default("en")
+  deliveryDistrict      String?
+
+  momoNetwork           String?
+  momoNumber            String?
+
+  orderAlertsEmail      Boolean   @default(true)
+  orderAlertsPush       Boolean   @default(true)
+  securityAlertsSMS     Boolean   @default(true)
+  marketingNewsletter   Boolean   @default(false)
+
+  twoFactorEnabled      Boolean   @default(false)
+  buyerProtectionEnabled Boolean  @default(true)
+
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+}
+
+// ==========================================
+// VENDOR KYC / ONBOARDING
+// ==========================================
+
+model VendorApplication {
+  id              String             @id @default(uuid())
+  userId          String
+  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Business Info
+  storeName       String
+  storeSlug       String             @unique
+  businessType    String             
+  registrationNumber String?
+  taxId           String?
+  
+  // Contact
+  businessEmail   String
+  businessPhone   String
+  website         String?
+  
+  // Address
+  streetAddress   String
+  city            String             @default("Kampala")
+  district        String?
+  country         String             @default("Uganda")
+  postalCode      String?
+  
+  // Operations
+  productCategories String[]         @default([])
+  expectedMonthlyVolume String?      
+  hasPhysicalStore  Boolean          @default(false)
+  storeLocation     String?
+  
+  // Payment Setup
+  momoNetwork     String?            
+  momoNumber      String?
+  bankName        String?
+  bankAccountName String?
+  bankAccountNumber String?
+
+  // Status
+  status          VerificationStatus @default(PENDING)
+  reviewerNotes   String?
+  reviewedBy      String?
+  reviewedAt      DateTime?
+  
+  // Link to created vendor profile after approval
+  vendorProfileId String?           @unique
+  vendorProfile   VendorProfile?     @relation(fields: [vendorProfileId], references: [id], onDelete: SetNull)
+  
+  // Documents
+  documents       VendorDocument[]
+  
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@unique([userId])
+  @@index([status])
+  @@index([storeSlug])
+}
+
+model VendorDocument {
+  id              String             @id @default(uuid())
+  applicationId   String
+  application     VendorApplication  @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  
+  type            DocumentType
+  name            String
+  url             String
+  mimeType        String?
+  size            Int?
+  
+  status          VerificationStatus @default(PENDING)
+  notes           String?
+  
+  createdAt       DateTime           @default(now())
+
+  @@index([applicationId])
 }
 
 // ==========================================
@@ -198,8 +372,7 @@ model VendorProfile {
   timezone           String       @default("Africa/Kampala")
   status             VendorStatus @default(PENDING)
 
-  // Escrow & Split Payout Bank/Mobile Money Configurations
-  momoMerchantCode   String?      // For MTN/Airtel localized commercial routing
+  momoMerchantCode   String?
   bankAccountName    String?
   bankAccountNumber  String?
   bankName           String?
@@ -221,6 +394,7 @@ model VendorProfile {
   notifications      Notification[]
   auditLogs          AuditLog[]
   documents          Document[]
+  vendorApplication  VendorApplication?      
 
   @@index([status])
   @@index([createdAt])
@@ -234,43 +408,63 @@ model ProductCategory {
   id          String   @id @default(uuid())
   name        String
   slug        String   @unique
-  description String?
+  description String?  
+  image       String?   
+  
   parentId    String?
   parent      ProductCategory?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
   children    ProductCategory[] @relation("CategoryHierarchy")
-  products    Product[]
+  
+  products    Product[] @relation("CategoryProducts")
+  subProducts Product[] @relation("ProductSubCategory")
+  
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([parentId])
 }
 
 model Product {
-  id             String          @id @default(uuid())
-  vendorId       String
-  vendor         VendorProfile   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  categoryId     String?
-  category       ProductCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  id              String          @id @default(uuid())
+  vendorId        String
+  vendor          VendorProfile   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  categoryId      String?
+  category        ProductCategory? @relation("CategoryProducts", fields: [categoryId], references: [id], onDelete: SetNull)
+  subCategoryId   String?        
+  subCategory     ProductCategory? @relation("ProductSubCategory", fields: [subCategoryId], references: [id], onDelete: SetNull)
 
-  name           String
-  slug           String
-  description    String?
-  basePrice      Decimal         @db.Decimal(18, 2)
-  compareAtPrice Decimal?        @db.Decimal(18, 2) // For sales and discounts
-  status         ProductStatus   @default(DRAFT)
-  sku            String?
-  
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  deletedAt      DateTime?
+  name            String
+  slug            String          @unique
+  brand           String?         
+  description     String?         @db.Text
 
-  // Relations
-  images         ProductImage[]
-  variants       ProductVariant[]
-  orderItems     OrderItem[]
-  reviews        ProductReview[]
+  basePrice       Decimal         @db.Decimal(18, 2)
+  compareAtPrice  Decimal?        @db.Decimal(18, 2) 
+
+  inventoryCount  Int             @default(0) 
+  sku             String?
+  status          ProductStatus   @default(DRAFT)
+
+  sizes           String[]        @default([]) 
+  colors          String[]        @default([]) 
+
+  specs           Json?           
+
+  tags            String[]        @default([]) 
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  deletedAt       DateTime?
+
+  images          ProductImage[]
+  variants        ProductVariant[]
+  orderItems      OrderItem[]
+  reviews         ProductReview[]
 
   @@unique([vendorId, slug])
   @@index([vendorId])
   @@index([categoryId])
+  @@index([subCategoryId])
   @@index([status])
 }
 
@@ -282,6 +476,8 @@ model ProductImage {
   isFeatured Boolean  @default(false)
   sortOrder  Int      @default(0)
   createdAt  DateTime @default(now())
+
+  @@index([productId])
 }
 
 model ProductVariant {
@@ -290,10 +486,10 @@ model ProductVariant {
   product        Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
   
   sku            String      @unique
-  name           String      // e.g., "XL / Blue"
+  name           String      
   price          Decimal     @db.Decimal(18, 2)
   inventoryCount Int         @default(0)
-  options        Json        // Mapped values e.g., {"size": "XL", "color": "Blue"}
+  options        Json        
   
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
@@ -303,18 +499,36 @@ model ProductVariant {
   @@index([productId])
 }
 
+model ProductReview {
+  id              String    @id @default(uuid())
+  productId       String
+  product         Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rating          Int       @default(5)
+  comment         String?   @db.Text
+  reply           String?   
+  replyAt         DateTime?
+  verifiedPurchase Boolean  @default(false)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([productId, userId])
+  @@index([productId])
+  @@index([userId])
+}
+
 // ==========================================
 // THREE-TIER MULTI-VENDOR ORDER ENGINE
 // ==========================================
 
-// Tier 1: The Global Master Order (The Customer Checkout Instance)
 model Order {
   id                String         @id @default(uuid())
   customerId        String
   customer          User           @relation("CustomerOrders", fields: [customerId], references: [id])
   
-  orderNumber       String         @unique // Customer-facing reference e.g., SD-2026-X
-  totalAmount       Decimal        @db.Decimal(18, 2) // Gross total across all vendors
+  orderNumber       String         @unique
+  totalAmount       Decimal        @db.Decimal(18, 2)
   subTotal          Decimal        @db.Decimal(18, 2)
   totalShipping     Decimal        @db.Decimal(18, 2)
   taxAmount         Decimal        @default(0.00) @db.Decimal(18, 2)
@@ -323,8 +537,7 @@ model Order {
   paymentGateway    PaymentGateway
   paymentStatus     PaymentStatus  @default(PENDING)
   
-  // Third-party transaction hooks
-  gatewayReference  String?        @unique // Pesapal tracking ID or Stripe intent ID
+  gatewayReference  String?        @unique 
   shippingAddress   String
   shippingPhone     String
   shippingEmail     String
@@ -333,7 +546,6 @@ model Order {
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
 
-  // Children Breakdowns
   subOrders         SubOrder[]
   orderItems        OrderItem[]
 
@@ -342,7 +554,6 @@ model Order {
   @@index([createdAt])
 }
 
-// Tier 2: The Sub-Order Partition (Segregated per-vendor bucket)
 model SubOrder {
   id                String         @id @default(uuid())
   orderId           String
@@ -350,11 +561,11 @@ model SubOrder {
   vendorId          String
   vendor            VendorProfile  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
 
-  subOrderNumber    String         @unique // e.g., SD-2026-X-V1
+  subOrderNumber    String         @unique 
   vendorSubTotal    Decimal        @db.Decimal(18, 2)
-  vendorShipping    Decimal        @db.Decimal(18, 2) // Shipping fee computed specifically for this vendor's node
+  vendorShipping    Decimal        @db.Decimal(18, 2) 
   vendorTotal       Decimal        @db.Decimal(18, 2)
-  platformCommission Decimal       @db.Decimal(18, 2) // Computed commission cut retained by the super admin
+  platformCommission Decimal       @db.Decimal(18, 2) 
 
   status            SubOrderStatus @default(PENDING)
   notes             String?
@@ -362,7 +573,6 @@ model SubOrder {
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
 
-  // Children Item nodes
   items             OrderItem[]
 
   @@index([orderId])
@@ -370,7 +580,6 @@ model SubOrder {
   @@index([status])
 }
 
-// Tier 3: The Individual Product Item Line Node
 model OrderItem {
   id              String          @id @default(uuid())
   orderId         String
@@ -405,7 +614,7 @@ model FinancialLedger {
   
   type            LedgerTransactionType
   amount          Decimal               @db.Decimal(18, 2)
-  reference       String?               // Related OrderNumber, SubOrderNumber or Payout ID
+  reference       String?               
   description     String?
   
   createdAt       DateTime              @default(now())
@@ -422,7 +631,7 @@ model VendorPayout {
   
   amount          Decimal       @db.Decimal(18, 2)
   gateway         PaymentGateway
-  reference       String?       // Mobile money transmission code or bank advice reference
+  reference       String?       
   status          PayoutStatus  @default(PENDING)
   errorMessage    String?
   
@@ -447,8 +656,8 @@ model SubscriptionPlan {
   currency           String             @default("UGX")
   billingCycle       BillingCycle       @default(MONTHLY)
 
-  maxProducts        Int?               // Guard thresholds per tier
-  commissionRate     Decimal            @db.Decimal(5, 2) // Platform commission percentage fee (e.g., 5.50%)
+  maxProducts        Int?
+  commissionRate     Decimal            @db.Decimal(5, 2)
   hasPremiumThemes   Boolean            @default(false)
   hasAdvancedCharts  Boolean            @default(false)
   isActive           Boolean            @default(true)
@@ -484,28 +693,9 @@ model VendorSubscription {
 // SYSTEM ENGINE, AUDIT LOGS, INTEGRATIONS
 // ==========================================
 
-model ProductReview {
-  id          String   @id @default(uuid())
-  productId   String
-  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  customerId  String
-  customer    User     @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  
-  rating      Int      @default(5) // Scale 1 - 5
-  comment     String?
-  reply       String?  // Vendor feedback loop channel response
-  replyAt     DateTime?
-
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@unique([productId, customerId])
-  @@index([productId])
-}
-
 model Notification {
   id              String           @id @default(uuid())
-  vendorId        String?          // Null if system wide or direct customer
+  vendorId        String?
   vendor          VendorProfile?   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   userId          String?
   user            User?            @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -523,8 +713,8 @@ model Notification {
 
 model Document {
   id              String       @id @default(uuid())
-  vendorId        String
-  vendor          VendorProfile @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  vendorId        String?
+  vendor          VendorProfile? @relation(fields: [vendorId], references: [id], onDelete: Cascade)
 
   type            DocumentType @default(OTHER)
   name            String
@@ -543,8 +733,8 @@ model AuditLog {
   userId          String?
   user            User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
 
-  action          String         // e.g., "PRODUCT_PRICE_UPDATED", "PAYOUT_APPROVED"
-  entity          String         // e.g., "Product", "VendorPayout"
+  action          String
+  entity          String
   entityId        String?
   oldValues       Json?
   newValues       Json?
@@ -573,8 +763,8 @@ model PesapalIpnRegistry {
 model PaymentGatewayWebhookLog {
   id              String               @id @default(uuid())
   gateway         PaymentGateway
-  trackingId      String               // Tracking ID from Pesapal or Stripe
-  reference       String               // Local Master Order Number
+  trackingId      String
+  reference       String
   eventType       String?
   payload         Json
   status          WebhookProcessStatus @default(UNPROCESSED)
