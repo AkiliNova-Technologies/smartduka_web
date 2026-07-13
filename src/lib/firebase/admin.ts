@@ -1,19 +1,9 @@
-import type { ServiceAccount } from "firebase-admin/app";
-import type { Auth } from "firebase-admin/auth";
+import { getApps, initializeApp, cert } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
 
-let adminAuthInstance: Auth | null = null;
-
-async function getFirebaseAuth(): Promise<Auth> {
-  if (adminAuthInstance) return adminAuthInstance;
-
-  // Dynamic import — avoids bundling firebase-admin at build time,
-  // which prevents the jose/jwks-rsa ESM conflict on Vercel
-  const { getApps, initializeApp, cert } = await import("firebase-admin/app");
-  const { getAuth } = await import("firebase-admin/auth");
-
+function getFirebaseAuth() {
   if (getApps().length > 0) {
-    adminAuthInstance = getAuth();
-    return adminAuthInstance;
+    return getAuth();
   }
 
   const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
@@ -22,7 +12,7 @@ async function getFirebaseAuth(): Promise<Auth> {
 
   if (!projectId || !clientEmail || !privateKey) {
     throw new Error(
-      "Missing Firebase Admin credentials. Ensure NEXT_PUBLIC_FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY are set."
+      "Missing Firebase Admin credentials."
     );
   }
 
@@ -31,32 +21,20 @@ async function getFirebaseAuth(): Promise<Auth> {
     .replace(/"/g, "")
     .trim();
 
-  if (!privateKey.includes("-----BEGIN PRIVATE KEY-----")) {
-    throw new Error(
-      "FIREBASE_PRIVATE_KEY is not in valid PEM format."
-    );
-  }
-
   const app = initializeApp({
-    credential: cert({
-      projectId,
-      clientEmail,
-      privateKey,
-    } as ServiceAccount),
+    credential: cert({ projectId, clientEmail, privateKey }),
   });
 
-  adminAuthInstance = getAuth(app);
-  return adminAuthInstance;
+  return getAuth(app);
 }
 
-// Export a proxy that lazily initializes
 export const adminAuth = {
-  verifyIdToken: async (token: string) => {
-    const auth = await getFirebaseAuth();
+  verifyIdToken: (token: string) => {
+    const auth = getFirebaseAuth();
     return auth.verifyIdToken(token);
   },
-  getUser: async (uid: string) => {
-    const auth = await getFirebaseAuth();
+  getUser: (uid: string) => {
+    const auth = getFirebaseAuth();
     return auth.getUser(uid);
   },
 };

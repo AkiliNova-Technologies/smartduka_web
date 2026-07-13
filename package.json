@@ -9,6 +9,9 @@
     "start": "next start",
     "lint": "eslint"
   },
+  "overrides": {
+    "jose": "4.15.5"
+  },
   "dependencies": {
     "@ark-ui/react": "^5.37.2",
     "@auth/core": "^0.34.3",
@@ -29,7 +32,7 @@
     "firebase": "^12.16.0",
     "firebase-admin": "^14.1.0",
     "input-otp": "^1.4.2",
-    "jose": "^6.2.3",
+    "jose": "4.15.5",
     "lucide-react": "^1.20.0",
     "next": "16.2.9",
     "next-auth": "^5.0.0-beta.31",

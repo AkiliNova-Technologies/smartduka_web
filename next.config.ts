@@ -1,9 +1,13 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  reactCompiler: true,
-  serverExternalPackages: ["firebase-admin"],
-  
+  serverExternalPackages: [
+    "firebase-admin",
+    "firebase-admin/app",
+    "firebase-admin/auth",
+    "jwks-rsa",
+    "jose",
+  ],
   images: {
     remotePatterns: [
       {
