@@ -203,13 +203,13 @@ function InnerCategoryView() {
 
   const [sortBy, setSortBy] = useState("recommended");
 
-  const { categories, isLoading, error } = useCategories({ mode: "tree" });
+  const { categories, categoriesLoading, error } = useCategories();
   const categoryTree = categories as CategoryTree[];
 
   const currentCategory = categoryTree.find((c) => c.slug === activeSlug);
 
   // Loading state — full skeleton
-  if (isLoading) {
+  if (categoriesLoading) {
     return activeSlug ? <CategoryDetailSkeleton /> : <CategoryGridIndexSkeleton />;
   }
 
@@ -231,7 +231,7 @@ function InnerCategoryView() {
   }
 
   if (!activeSlug || !currentCategory)
-    return <CategoryGridIndex categories={categoryTree} isLoading={isLoading} />;
+    return <CategoryGridIndex categories={categoryTree} categoriesLoading={categoriesLoading} />;
 
   const targetedProducts = mockDatabase.products.filter(
     (p: Product) => p.categoryId === currentCategory.id
@@ -343,15 +343,15 @@ function InnerCategoryView() {
 
 function CategoryGridIndex({
   categories,
-  isLoading,
+  categoriesLoading,
 }: {
   categories: CategoryTree[];
-  isLoading: boolean;
+  categoriesLoading: boolean;
 }) {
   const fallbackImage =
     "https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&w=600&q=80";
 
-  if (isLoading) {
+  if (categoriesLoading) {
     return <CategoryGridIndexSkeleton />;
   }
 

@@ -15,7 +15,6 @@ import {
   Headphones,
   Moon,
   Sun,
-  LogIn,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/hooks/use-theme";
@@ -48,9 +47,6 @@ const workspaceItems = [
   { name: "Settings", href: "/settings", icon: Settings },
 ];
 
-const authItems = [
-  { name: "Sign In", href: "/login", icon: LogIn },
-];
 
 const emptySubscribe = () => () => {};
 
@@ -137,47 +133,6 @@ export function CustomerSidebar({
             <SidebarGroupContent>
               <SidebarMenu>
                 {workspaceItems.map((item) => {
-                  const isActive = pathname === item.href;
-                  return (
-                    <SidebarMenuItem key={item.name}>
-                      <SidebarMenuButton
-                        asChild
-                        isActive={isActive}
-                        tooltip={item.name}
-                        className={cn(
-                          "w-full px-4 py-2.5 rounded-full text-xs font-bold tracking-tight transition-all duration-200 cursor-pointer",
-                          isActive
-                            ? "bg-primary text-primary-foreground shadow-[0_16px_40px_-12px_rgba(0,0,0,0.02)] dark:bg-zinc-800"
-                            : "text-zinc-500 dark:text-zinc-400 hover:bg-muted hover:text-foreground"
-                        )}
-                      >
-                        <Link href={item.href}>
-                          <item.icon
-                            className={cn(
-                              "w-4 h-4 shrink-0",
-                              isActive ? "stroke-[2.5]" : "opacity-80"
-                            )}
-                          />
-                          <span>{item.name}</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  );
-                })}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
-
-        {/* AUTH SECTION — only visible when NOT authenticated and not loading */}
-        {!isAuthenticated && !authLoading && (
-          <SidebarGroup>
-            <SidebarGroupLabel className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 tracking-widest uppercase mb-2 px-3">
-              Account
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {authItems.map((item) => {
                   const isActive = pathname === item.href;
                   return (
                     <SidebarMenuItem key={item.name}>

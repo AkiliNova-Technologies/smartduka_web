@@ -55,7 +55,7 @@ export default function VendorProductFormPage() {
   const vendorId = profile?.id;
 
   // Fetch categories
-  const { categories } = useCategories({ mode: "tree" });
+  const { categories } = useCategories();
 
   // Product hook for create/update operations
   const { createProduct } = useProducts();

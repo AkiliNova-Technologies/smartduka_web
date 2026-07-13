@@ -67,3 +67,10 @@ export async function getMyVendorProfile() {
   const userId = await getCurrentUserId();
   return vendorService.getVendorProfileByOwner(userId);
 }
+
+/**
+ * Get all active vendor stores for the public brands listing page
+ */
+export async function getPublicStoreListings() {
+  return vendorService.getPublicStoreListings();
+}

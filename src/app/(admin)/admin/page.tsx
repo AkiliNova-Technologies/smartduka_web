@@ -31,11 +31,11 @@ export default function AdminDashboardPage() {
   // Use real categories from API
   const {
     categories,
-    isLoading: categoriesLoading,
+    categoriesLoading,
     error: categoriesError,
-    refresh: refreshCategories,
+    refreshCategories,
     deleteCategory,
-  } = useCategories({ mode: "flat" });
+  } = useCategories();
 
   // Delete dialog hook
   const {

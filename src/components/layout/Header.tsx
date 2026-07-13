@@ -14,7 +14,6 @@ import { useSidebar } from "@/components/ui/sidebar";
 import { useAuth } from "@/hooks/use-auth";
 import { Skeleton } from "@/components/ui/skeleton";
 
-// 1. Separate the dynamic search parameter reader block
 function SearchInputFields() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -54,25 +53,19 @@ function SearchInputFields() {
   );
 }
 
-// 2. Profile section that handles loading, authenticated, and unauthenticated states
 function ProfileSection() {
   const router = useRouter();
-  const { user, loading } = useAuth();
+  const { user, loading, isAuthenticated, userRole } = useAuth();
 
-  // Loading state — skeleton pulse matching the profile layout
-  if (loading) {
+  if (loading && !isAuthenticated) {
     return (
       <div className="flex items-center gap-3">
         <Skeleton className="w-9 h-9 rounded-full" />
-        <div className="hidden sm:block space-y-1.5">
-          <Skeleton className="h-3 w-16 rounded-full" />
-        </div>
       </div>
     );
   }
 
-  // Unauthenticated state — show sign-in prompt
-  if (!user) {
+  if (!isAuthenticated) {
     return (
       <button
         onClick={() => router.push("/login")}
@@ -83,35 +76,61 @@ function ProfileSection() {
     );
   }
 
-  // Authenticated state — show profile avatar with user info
-  const displayName = user.displayName || user.email?.split("@")[0] || "User";
-  const avatarUrl = user.photoURL || null;
+  // Show dashboard for privileged roles
+  const canAccessDashboard = userRole === "SUPER_ADMIN" || 
+                              userRole === "ADMIN" || 
+                              userRole === "VENDOR";
+  
+  const getDashboardPath = () => {
+    switch (userRole) {
+      case "SUPER_ADMIN":
+      case "ADMIN":
+        return "/admin";
+      case "VENDOR":
+        return "/vendor";
+      default:
+        return "/";
+    }
+  };
+
+  const displayName = user?.displayName || user?.email?.split("@")[0] || "User";
+  const avatarUrl = user?.photoURL || null;
 
   return (
-    <div
-      onClick={() => router.push("/settings")}
-      className="flex items-center gap-3 border-transparent hover:border-border hover:bg-card hover:shadow-2xs cursor-pointer group transition-all duration-200 rounded-full px-1 py-1"
-    >
-      <div className="relative w-9 h-9 rounded-full overflow-hidden ring-2 ring-transparent group-hover:ring-primary/20 transition-all shadow-none shrink-0">
-        {avatarUrl ? (
-          <Image
-            alt={`${displayName} Avatar Profile`}
-            src={avatarUrl}
-            fill
-            sizes="36px"
-            className="object-cover transition-transform duration-500 group-hover:scale-105"
-            priority
-          />
-        ) : (
-          // Fallback avatar when no photoURL is available
-          <div className="w-full h-full bg-primary/10 flex items-center justify-center rounded-full">
-            <span className="text-xs font-bold text-primary uppercase">
-              {displayName.split(" ")[1]?.charAt(0) || ""}
-            </span>
-          </div>
-        )}
-      </div>
-      <div className="text-left hidden sm:block select-none">
+    <div className="flex items-center gap-2">
+      {/* Dashboard Button - now using isAuthenticated + userRole */}
+      {isAuthenticated && canAccessDashboard && (
+        <button
+          onClick={() => router.push(getDashboardPath())}
+          className="hidden sm:flex items-center gap-2 px-3 py-2 bg-primary/10 hover:bg-primary/20 text-primary rounded-full text-xs font-semibold transition-all duration-200 hover:shadow-sm cursor-pointer border border-primary/20"
+          title={`${userRole === "VENDOR" ? "Vendor" : "Admin"} Dashboard`}
+        >
+          <span>Dashboard</span>
+        </button>
+      )}
+
+      <div
+        onClick={() => router.push("/settings")}
+        className="flex items-center gap-3 border-transparent hover:border-border hover:bg-card hover:shadow-2xs cursor-pointer group transition-all duration-200 rounded-full px-1 py-1"
+      >
+        <div className="relative w-9 h-9 rounded-full overflow-hidden ring-2 ring-transparent group-hover:ring-primary/20 transition-all shadow-none shrink-0">
+          {avatarUrl ? (
+            <Image
+              alt={`${displayName} Avatar Profile`}
+              src={avatarUrl}
+              fill
+              sizes="36px"
+              className="object-cover"
+              priority
+            />
+          ) : (
+            <div className="w-full h-full bg-primary/10 flex items-center justify-center rounded-full">
+              <span className="text-xs font-bold text-primary uppercase">
+                {displayName.charAt(0)}
+              </span>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -175,9 +194,10 @@ export function Header() {
             <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-primary rounded-full animate-ping opacity-40" />
           </button>
 
+          {/* Add a Dashboard button that appears when one logs in this button will be able to redirect a user to there dashboard according to there role */}
+
           <div className="h-5 w-[1px] bg-border mx-1.5 hidden sm:block" />
 
-          {/* Profile — now using useAuth hook via ProfileSection */}
           <ProfileSection />
         </div>
       </div>

@@ -112,7 +112,7 @@ export const vendorService = {
     applicationId: string,
     status: VerificationStatus,
     reviewerNotes?: string,
-    reviewedBy?: string
+    reviewedBy?: string,
   ) {
     const application = await prisma.vendorApplication.update({
       where: { id: applicationId },
@@ -230,5 +230,37 @@ export const vendorService = {
         },
       },
     });
+  },
+
+  /**
+   * Get all active vendor profiles for the public brands/stores listing page
+   */
+  async getPublicStoreListings() {
+    const vendorProfiles = await prisma.vendorProfile.findMany({
+      where: {
+        status: "ACTIVE",
+        deletedAt: null,
+      },
+      include: {
+        _count: {
+          select: { products: true },
+        },
+        products: {
+          take: 1,
+          orderBy: { createdAt: "desc" },
+          select: {
+            images: {
+              take: 1,
+              orderBy: { sortOrder: "asc" },
+              select: { url: true },
+            },
+            categoryId: true,
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    return vendorProfiles;
   },
 };

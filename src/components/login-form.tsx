@@ -58,7 +58,6 @@ export function LoginForm({
       const result = await loginWithEmail(email, password);
       if (result.success) {
         toast.success("Welcome back to SmartDuka!");
-        handleRoleRedirection(result.user?.role);
       } else {
         toast.error(getFriendlyErrorMessage(result.error || ""));
       }
@@ -73,28 +72,12 @@ export function LoginForm({
       const result = await loginWithGoogle();
       if (result.success) {
         toast.success(`Logged in successfully!`);
-        handleRoleRedirection(result.user?.role);
       } else {
         toast.error(getFriendlyErrorMessage(result.error || ""));
       }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "";
       toast.error(getFriendlyErrorMessage(message));
-    }
-  };
-
-  const handleRoleRedirection = (role?: string) => {
-    switch (role) {
-      case "SUPER_ADMIN":
-      case "ADMIN":
-        router.push("/admin");
-        break;
-      case "VENDOR":
-        router.push("/vendor");
-        break;
-      default:
-        router.push("/");
-        break;
     }
   };
 

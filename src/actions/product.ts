@@ -9,6 +9,21 @@ import {
 import { Product } from "@/types/marketplace";
 
 // ==========================================
+// HELPERS
+// ==========================================
+
+/**
+ * Converts Prisma Decimal fields to plain numbers for safe client serialization
+ */
+function serializeProduct(product: Record<string, unknown>): Record<string, unknown> {
+  return {
+    ...product,
+    basePrice: product.basePrice != null ? Number(product.basePrice) : 0,
+    compareAtPrice: product.compareAtPrice != null ? Number(product.compareAtPrice) : null,
+  };
+}
+
+// ==========================================
 // READ ACTIONS
 // ==========================================
 
@@ -28,7 +43,7 @@ export async function getProductAction(id: string) {
     return {
       success: true,
       data: {
-        ...product,
+        ...serializeProduct(product as unknown as Record<string, unknown>),
         image: primaryImage,
       } as unknown as Product,
     };
@@ -44,7 +59,10 @@ export async function getProductBySlugAction(slug: string) {
     if (!product) {
       return { success: false, error: "Product not found." };
     }
-    return { success: true, data: product };
+    return {
+      success: true,
+      data: serializeProduct(product as unknown as Record<string, unknown>) as unknown as Product,
+    };
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Failed to fetch product.";
     return { success: false, error: message };
@@ -69,7 +87,10 @@ export async function createProductAction(input: CreateProductInput) {
     revalidatePath("/vendor/products");
     revalidatePath("/admin/products");
     revalidatePath("/products");
-    return { success: true, data: product };
+    return {
+      success: true,
+      data: serializeProduct(product as unknown as Record<string, unknown>) as unknown as Product,
+    };
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Failed to create product.";
     return { success: false, error: message };
@@ -91,7 +112,10 @@ export async function updateProductAction(input: UpdateProductInput) {
     revalidatePath("/vendor/products");
     revalidatePath("/admin/products");
     revalidatePath(`/products/${input.id}`);
-    return { success: true, data: product };
+    return {
+      success: true,
+      data: serializeProduct(product as unknown as Record<string, unknown>) as unknown as Product,
+    };
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Failed to update product.";
     return { success: false, error: message };

@@ -3,8 +3,8 @@ import type { NextRequest } from "next/server";
 import { MarketplaceJWTPayload, verifyToken } from "@/lib/auth/jwt";
 
 const AUTH_ROUTES = ["/login", "/register", "/forgot-password"];
-const ADMIN_PREFIX = "/dashboard/admin";
-const VENDOR_PREFIX = "/dashboard/vendor";
+const ADMIN_PREFIX = "/admin";
+const VENDOR_PREFIX = "/vendor";
 const CHECKOUT_PREFIX = "/checkout";
 
 // API routes that authenticate via x-marketplace-user-id header
@@ -17,13 +17,14 @@ const HEADER_AUTH_API_PREFIXES = [
 // API routes that authenticate via userId in request body
 const BODY_AUTH_API_PREFIXES = [
   "/api/vendors",
-  "/api/admin/vendors", 
+  "/api/admin/vendors",
 ];
 
 // API routes that are fully public — no auth required
 const PUBLIC_API_PREFIXES = [
   "/api/categories",
   "/api/products",
+  "/api/vendors/public",
 ];
 
 export async function proxy(request: NextRequest) {
@@ -65,7 +66,7 @@ export async function proxy(request: NextRequest) {
   }
 
   // 2. Fetch the marketplace access token cookie
-  const tokenCookie = 
+  const tokenCookie =
     request.cookies.get("marketplace_access_token") ||
     request.cookies.get("session");
   const token = tokenCookie?.value;
@@ -75,7 +76,7 @@ export async function proxy(request: NextRequest) {
 
   const isPublicMarketplaceRoute =
     pathname === "/" ||
-    ["/about", "/contact", "/products", "/cart", "/shop"].some((route) =>
+    ["/about", "/contact", "/products", "/cart", "/shop", "/brands"].some((route) =>
       pathname.startsWith(route),
     );
 
@@ -88,9 +89,10 @@ export async function proxy(request: NextRequest) {
   // 5. Handle Redirection for authenticated users on auth routes
   if (isAuthRoute) {
     if (session) {
-      if (session.role === "ADMIN")
+      // FIXED: session.role → session.platformRole
+      if (session.platformRole === "ADMIN")
         return NextResponse.redirect(new URL(ADMIN_PREFIX, origin));
-      if (session.role === "VENDOR")
+      if (session.platformRole === "VENDOR")
         return NextResponse.redirect(new URL(VENDOR_PREFIX, origin));
       return NextResponse.redirect(new URL("/", origin));
     }
@@ -124,10 +126,11 @@ export async function proxy(request: NextRequest) {
 
   // 8. Enforce Sub-System URL Access Isolation & Role Guardrails
   if (session) {
-    if (pathname.startsWith(ADMIN_PREFIX) && session.role !== "ADMIN") {
+    // FIXED: session.role → session.platformRole
+    if (pathname.startsWith(ADMIN_PREFIX) && session.platformRole !== "ADMIN") {
       return handleUnauthorizedRedirect(request, session, origin);
     }
-    if (pathname.startsWith(VENDOR_PREFIX) && session.role !== "VENDOR") {
+    if (pathname.startsWith(VENDOR_PREFIX) && session.platformRole !== "VENDOR") {
       return handleUnauthorizedRedirect(request, session, origin);
     }
   }
@@ -138,13 +141,13 @@ export async function proxy(request: NextRequest) {
     modifiedHeaders.set("x-marketplace-user-id", String(session.userId));
     modifiedHeaders.set("x-marketplace-email", String(session.email));
     if (session.platformRole) {
-      modifiedHeaders.set("x-marketplace-platform-role", session.platformRole as string);
+      modifiedHeaders.set("x-marketplace-platform-role", session.platformRole);
     }
     if (session.vendorRole) {
-      modifiedHeaders.set("x-marketplace-vendor-role", session.vendorRole as string);
+      modifiedHeaders.set("x-marketplace-vendor-role", session.vendorRole);
     }
     if (session.vendorId) {
-      modifiedHeaders.set("x-marketplace-vendor-id", session.vendorId as string);
+      modifiedHeaders.set("x-marketplace-vendor-id", session.vendorId);
     }
   }
 
@@ -164,9 +167,10 @@ function handleUnauthorizedRedirect(
       { status: 403 },
     );
   }
-  if (session.role === "ADMIN")
+  // FIXED: session.role → session.platformRole
+  if (session.platformRole === "ADMIN")
     return NextResponse.redirect(new URL(ADMIN_PREFIX, origin));
-  if (session.role === "VENDOR")
+  if (session.platformRole === "VENDOR")
     return NextResponse.redirect(new URL(VENDOR_PREFIX, origin));
   return NextResponse.redirect(new URL("/", origin));
 }

@@ -4,7 +4,9 @@ import "./globals.css";
 import { cn } from "@/lib/utils";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
-
+import { AuthProvider } from "@/providers/AuthProvider";
+import { VendorDataProvider } from "@/providers/VendorDataProvider";
+import { CatalogDataProvider } from "@/providers/CatalogDataProvider";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -35,10 +37,14 @@ export default function RootLayout({
         "font-sans",
       )}>
       <body className="min-h-full bg-background text-foreground flex flex-col">
-        
-          <TooltipProvider delayDuration={200}>{children}</TooltipProvider>
-          <Toaster position="top-right" closeButton={false} />
-        
+        <AuthProvider>
+          <VendorDataProvider>
+            <CatalogDataProvider>
+              <TooltipProvider delayDuration={200}>{children}</TooltipProvider>
+              <Toaster position="top-right" closeButton={false} />
+            </CatalogDataProvider>
+          </VendorDataProvider>
+        </AuthProvider>
       </body>
     </html>
   );

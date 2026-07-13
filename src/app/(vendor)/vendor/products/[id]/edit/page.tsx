@@ -32,14 +32,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { ImageUpload } from "@/components/image-upload";
 import { ImageUploadMini } from "@/components/image-upload-mini";
 import { useCategories } from "@/hooks/use-categories";
 import { useProducts } from "@/hooks/use-products";
 import { useVendor } from "@/hooks/use-vendor";
-import { mockDatabase } from "@/data/mockDatabase";
-import type { CategoryTree } from "@/types/marketplace";
+import type { CategoryTree, Product, ProductSpec } from "@/types/marketplace";
+
+// ─── Types ───
 
 interface SubCategoryItem {
   id: string;
@@ -48,32 +50,129 @@ interface SubCategoryItem {
   productCount?: number;
 }
 
+interface ProductFormData {
+  title: string;
+  slug: string;
+  brand: string;
+  price: string;
+  compareAtPrice: string;
+  image: string;
+  images: string[];
+  categoryId: string;
+  subCategoryId: string;
+  tags: string[];
+  tagInput: string;
+  inventoryCount: string;
+  sku: string;
+  description: string;
+  sizes: string[];
+  colors: string[];
+  colorInput: string;
+  manufacturer: string;
+  material: string;
+  cushioning: string;
+  origin: string;
+  weight: string;
+  outsole: string;
+}
+
+// ─── Loading skeleton ───
+
+function EditFormSkeleton() {
+  return (
+    <div className="space-y-8 w-full max-w-8xl mx-auto">
+      <div className="flex items-center gap-3 border-b border-border/40 pb-4">
+        <Skeleton className="w-10 h-10 rounded-xl" />
+        <div className="space-y-1.5">
+          <Skeleton className="h-6 w-48 rounded-md" />
+          <Skeleton className="h-3 w-36 rounded-md" />
+        </div>
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <div className="lg:col-span-7 space-y-5">
+          <Skeleton className="h-10 w-full rounded-full" />
+          <div className="grid grid-cols-2 gap-4">
+            <Skeleton className="h-10 w-full rounded-full" />
+            <Skeleton className="h-10 w-full rounded-full" />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <Skeleton className="h-10 w-full rounded-full" />
+            <Skeleton className="h-10 w-full rounded-full" />
+          </div>
+          <Skeleton className="h-10 w-full rounded-full" />
+          <Skeleton className="h-10 w-full rounded-full" />
+        </div>
+        <div className="lg:col-span-5">
+          <Skeleton className="h-96 w-full rounded-2xl" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Empty form factory ───
+
+const emptyFormData = (): ProductFormData => ({
+  title: "",
+  slug: "",
+  brand: "",
+  price: "",
+  compareAtPrice: "",
+  image: "",
+  images: ["", "", "", ""],
+  categoryId: "",
+  subCategoryId: "",
+  tags: [],
+  tagInput: "",
+  inventoryCount: "0",
+  sku: "",
+  description: "",
+  sizes: [],
+  colors: [],
+  colorInput: "",
+  manufacturer: "",
+  material: "",
+  cushioning: "",
+  origin: "",
+  weight: "",
+  outsole: "",
+});
+
+// ─── Page component ───
+
 export default function VendorProductEditPage() {
   const router = useRouter();
   const params = useParams();
   const productId = typeof params.id === "string" ? params.id : null;
   const isEditMode = Boolean(productId);
 
-  // Fetch real vendor profile
-  const { profile} = useVendor();
+  const { profile } = useVendor();
   const vendorId = profile?.id;
-
-  // Fetch categories
-  const { categories } = useCategories({ mode: "tree" });
-
-  // Product hook for create/update operations
-  const { createProduct, updateProduct } = useProducts();
+  const { categories } = useCategories();
+  const { createProduct, updateProduct, fetchProductById } = useProducts();
 
   const [currentStep, setCurrentStep] = React.useState(1);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [existingProduct, setExistingProduct] = React.useState<Product | null>(null);
+  const [formData, setFormData] = React.useState<ProductFormData | null>(null);
+  const fetchedRef = React.useRef(false);
 
-  // Get existing product data (using mock data for now)
-  const existingProduct = React.useMemo(() => {
-    if (!isEditMode || !productId) return null;
-    return mockDatabase.products.find((p) => p.id === productId) || null;
-  }, [isEditMode, productId]);
+  // Fetch product in edit mode
+  React.useEffect(() => {
+    if (!isEditMode || !productId || fetchedRef.current) return;
+    fetchedRef.current = true;
 
-  // Helper functions for data extraction
+    (async () => {
+      try {
+        const product = await fetchProductById(productId);
+        setExistingProduct(product);
+      } catch {
+        toast.error("Failed to load product data");
+      }
+    })();
+  }, [isEditMode, productId, fetchProductById]);
+
+  // Helper: extract image URL
   const extractImageUrl = (img: unknown): string => {
     if (!img) return "";
     if (typeof img === "string") return img;
@@ -83,91 +182,105 @@ export default function VendorProductEditPage() {
     return "";
   };
 
-  function extractSpecValue(product: unknown, specName: string): string {
-    if (!product || typeof product !== "object") return "";
-    const p = product as Record<string, unknown>;
-    if (!p.specs) return "";
-    if (Array.isArray(p.specs)) {
-      const spec = (p.specs as Array<{ name: string; value: string }>).find(
-        (s) => s.name === specName,
-      );
-      return spec?.value || "";
-    }
-    if (typeof p.specs === "object") {
-      return (p.specs as Record<string, string>)[specName] || "";
-    }
-    return "";
-  }
-
-  function extractStringArray(value: unknown): string[] {
-    if (Array.isArray(value))
-      return value.filter((v): v is string => typeof v === "string");
-    if (typeof value === "string")
-      return value
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
-    return [];
-  }
-
-  // Form state initialization
-  const [formData, setFormData] = React.useState({
-    title: existingProduct?.name || "",
-    slug: existingProduct?.slug || "",
-    brand: existingProduct?.brand || "",
-    price: String(existingProduct?.basePrice || ""),
-    compareAtPrice: String(existingProduct?.compareAtPrice || ""),
-    image: extractImageUrl(existingProduct?.image),
-    images: (existingProduct?.images?.length
-      ? [
-          ...(existingProduct.images as unknown[]).map(extractImageUrl),
-          ...Array(Math.max(0, 4 - (existingProduct.images?.length || 0))).fill(
-            "",
-          ),
-        ].slice(0, 4)
-      : ["", "", "", ""]) as string[],
-    categoryId: existingProduct?.categoryId || "",
-    subCategoryId: existingProduct?.subCategoryId || "",
-    tags: extractStringArray(existingProduct?.tags) as string[],
-    tagInput: "",
-    inventoryCount: String(existingProduct?.inventoryCount ?? 0),
-    sku: existingProduct?.sku || "",
-    description: existingProduct?.description || "",
-    sizes: extractStringArray(existingProduct?.sizes) as string[],
-    colors: extractStringArray(existingProduct?.colors) as string[],
-    colorInput: "",
-    manufacturer: extractSpecValue(existingProduct, "Manufacturer"),
-    material: extractSpecValue(existingProduct, "Primary Material"),
-    cushioning: extractSpecValue(existingProduct, "Cushioning Tech"),
-    origin: extractSpecValue(existingProduct, "Origin"),
-    weight: extractSpecValue(existingProduct, "Weight"),
-    outsole: extractSpecValue(existingProduct, "Outsole Grip"),
-  });
-
-  const getInitialSubCategories = (): SubCategoryItem[] => {
-    if (!isEditMode || !existingProduct?.categoryId) return [];
-    const selectedCategory = (categories as CategoryTree[]).find(
-      (cat) => cat.id === existingProduct.categoryId,
-    );
-    return (selectedCategory?.subCategories as SubCategoryItem[]) || [];
+  // Helper: extract spec
+  const extractSpecValue = (specs: ProductSpec[] | undefined, name: string): string => {
+    if (!specs || !Array.isArray(specs)) return "";
+    return specs.find((s) => s.name === name)?.value || "";
   };
 
-  const [availableSubCategories, setAvailableSubCategories] = React.useState<SubCategoryItem[]>(getInitialSubCategories);
+  // Helper: extract string array
+  const extractStringArray = (value: unknown): string[] => {
+    if (Array.isArray(value)) return value.filter((v): v is string => typeof v === "string");
+    if (typeof value === "string") return value.split(",").map((s) => s.trim()).filter(Boolean);
+    return [];
+  };
 
-  const generateSlug = (val: string) => {
-    return val
+  // Build form data from product — stabilized with useCallback
+  const buildFormData = React.useCallback((product: Product | null): ProductFormData => {
+    if (!product) return emptyFormData();
+
+    const primaryImage =
+      product.image ||
+      (product.images && product.images.length > 0
+        ? extractImageUrl(product.images[0])
+        : "");
+
+    const galleryImages = product.images?.length
+      ? [
+          ...product.images.map(extractImageUrl),
+          ...Array(Math.max(0, 4 - (product.images?.length || 0))).fill(""),
+        ].slice(0, 4)
+      : ["", "", "", ""];
+
+    const specs = (product.specs as ProductSpec[] | undefined) || [];
+
+    return {
+      title: product.name || "",
+      slug: product.slug || "",
+      brand: product.brand || "",
+      price: String(product.basePrice || ""),
+      compareAtPrice: product.compareAtPrice ? String(product.compareAtPrice) : "",
+      image: primaryImage,
+      images: galleryImages,
+      categoryId: product.categoryId || "",
+      subCategoryId: product.subCategoryId || "",
+      tags: extractStringArray(product.tags),
+      tagInput: "",
+      inventoryCount: String(product.inventoryCount ?? 0),
+      sku: product.sku || "",
+      description: product.description || "",
+      sizes: extractStringArray(product.sizes),
+      colors: extractStringArray(product.colors),
+      colorInput: "",
+      manufacturer: extractSpecValue(specs, "Manufacturer"),
+      material: extractSpecValue(specs, "Primary Material"),
+      cushioning: extractSpecValue(specs, "Cushioning Tech"),
+      origin: extractSpecValue(specs, "Origin"),
+      weight: extractSpecValue(specs, "Weight"),
+      outsole: extractSpecValue(specs, "Outsole Grip"),
+    };
+  }, []);
+
+  // Initialize form when data is ready — deferred via queueMicrotask
+  React.useEffect(() => {
+    queueMicrotask(() => {
+      if (!isEditMode) {
+        setFormData(emptyFormData());
+      } else if (existingProduct && categories && (categories as CategoryTree[]).length > 0) {
+        setFormData(buildFormData(existingProduct));
+      }
+    });
+  }, [isEditMode, existingProduct, categories, buildFormData]);
+
+  // Computed subcategories — extract categoryId first to satisfy React Compiler
+  const categoryId = formData?.categoryId;
+
+  const availableSubCategories = React.useMemo<SubCategoryItem[]>(() => {
+    if (!categoryId || !categories || !Array.isArray(categories)) return [];
+    const selectedCategory = (categories as CategoryTree[]).find(
+      (cat) => cat.id === categoryId,
+    );
+    return (selectedCategory?.subCategories as SubCategoryItem[]) || [];
+  }, [categoryId, categories]);
+
+  const generateSlug = (val: string) =>
+    val
       .toLowerCase()
       .trim()
       .replace(/[^a-z0-9\s-]/g, "")
       .replace(/\s+/g, "-")
       .replace(/-+/g, "-");
-  };
 
-  // ==========================================
-  // HANDLERS
-  // ==========================================
+  // ─── Guard: show skeleton until form is ready ───
+  if (!formData) {
+    return <EditFormSkeleton />;
+  }
+
+  // ─── Handlers ───
+
   const updateField = (field: string, value: string | string[]) => {
     setFormData((prev) => {
+      if (!prev) return prev;
       const updated = { ...prev, [field]: value };
       if (field === "title" && !isEditMode) {
         updated.slug = generateSlug(value as string);
@@ -179,67 +292,66 @@ export default function VendorProductEditPage() {
   const handleCategoryChange = (categoryId: string) => {
     updateField("categoryId", categoryId);
     updateField("subCategoryId", "");
-
-    const selectedCategory = (categories as CategoryTree[]).find(
-      (cat) => cat.id === categoryId,
-    );
-    if (selectedCategory?.subCategories) {
-      setAvailableSubCategories(
-        selectedCategory.subCategories as SubCategoryItem[],
-      );
-    } else {
-      setAvailableSubCategories([]);
-    }
   };
 
   const toggleSize = (size: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      sizes: prev.sizes.includes(size)
-        ? prev.sizes.filter((s) => s !== size)
-        : [...prev.sizes, size],
-    }));
+    setFormData((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        sizes: prev.sizes.includes(size)
+          ? prev.sizes.filter((s) => s !== size)
+          : [...prev.sizes, size],
+      };
+    });
   };
 
   const addColor = () => {
-    if (formData.colorInput.trim()) {
-      setFormData((prev) => ({
+    if (!formData.colorInput.trim()) return;
+    setFormData((prev) => {
+      if (!prev) return prev;
+      return {
         ...prev,
         colors: [...prev.colors, prev.colorInput.trim()],
         colorInput: "",
-      }));
-    }
+      };
+    });
   };
 
   const removeColor = (index: number) => {
-    setFormData((prev) => ({
-      ...prev,
-      colors: prev.colors.filter((_, i) => i !== index),
-    }));
+    setFormData((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        colors: prev.colors.filter((_, i) => i !== index),
+      };
+    });
   };
 
   const addTag = () => {
-    if (formData.tagInput.trim()) {
-      setFormData((prev) => ({
+    if (!formData.tagInput.trim()) return;
+    setFormData((prev) => {
+      if (!prev) return prev;
+      return {
         ...prev,
         tags: [...prev.tags, prev.tagInput.trim().toLowerCase()],
         tagInput: "",
-      }));
-    }
+      };
+    });
   };
 
   const removeTag = (index: number) => {
-    setFormData((prev) => ({
-      ...prev,
-      tags: prev.tags.filter((_, i) => i !== index),
-    }));
+    setFormData((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        tags: prev.tags.filter((_, i) => i !== index),
+      };
+    });
   };
 
   const handleNextStep = () => {
-    if (
-      currentStep === 1 &&
-      (!formData.title || !formData.price || !formData.categoryId)
-    ) {
+    if (currentStep === 1 && (!formData.title || !formData.price || !formData.categoryId)) {
       toast.error("Please fill in product title, price, and category.");
       return;
     }
@@ -250,14 +362,13 @@ export default function VendorProductEditPage() {
     setCurrentStep((prev) => Math.min(prev + 1, 4));
   };
 
-  // ==========================================
-  // SUBMIT HANDLER
-  // ==========================================
+  // ─── Submit ───
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!isEditMode && !vendorId) {
-      toast.error("Vendor profile not loaded. Please try again.");
+      toast.error("Vendor profile not loaded.");
       return;
     }
 
@@ -265,18 +376,9 @@ export default function VendorProductEditPage() {
 
     try {
       const specs = [
-        formData.manufacturer && {
-          name: "Manufacturer",
-          value: formData.manufacturer,
-        },
-        formData.material && {
-          name: "Primary Material",
-          value: formData.material,
-        },
-        formData.cushioning && {
-          name: "Cushioning Tech",
-          value: formData.cushioning,
-        },
+        formData.manufacturer && { name: "Manufacturer", value: formData.manufacturer },
+        formData.material && { name: "Primary Material", value: formData.material },
+        formData.cushioning && { name: "Cushioning Tech", value: formData.cushioning },
         formData.origin && { name: "Origin", value: formData.origin },
         formData.weight && { name: "Weight", value: formData.weight },
         formData.outsole && { name: "Outsole Grip", value: formData.outsole },
@@ -285,15 +387,8 @@ export default function VendorProductEditPage() {
       const images = [
         { url: formData.image, isFeatured: true, sortOrder: 0 },
         ...formData.images
-          .filter(
-            (img): img is string =>
-              typeof img === "string" && img.trim() !== "",
-          )
-          .map((url, index) => ({
-            url,
-            isFeatured: false,
-            sortOrder: index + 1,
-          })),
+          .filter((img): img is string => typeof img === "string" && img.trim() !== "")
+          .map((url, index) => ({ url, isFeatured: false, sortOrder: index + 1 })),
       ];
 
       if (isEditMode && productId) {
@@ -303,9 +398,7 @@ export default function VendorProductEditPage() {
           brand: formData.brand,
           description: formData.description,
           basePrice: Number(formData.price),
-          compareAtPrice: formData.compareAtPrice
-            ? Number(formData.compareAtPrice)
-            : null,
+          compareAtPrice: formData.compareAtPrice ? Number(formData.compareAtPrice) : null,
           categoryId: formData.categoryId,
           subCategoryId: formData.subCategoryId || null,
           inventoryCount: Number(formData.inventoryCount),
@@ -324,15 +417,13 @@ export default function VendorProductEditPage() {
         }
       } else {
         const result = await createProduct({
-          vendorId: vendorId!, 
+          vendorId: vendorId!,
           name: formData.title,
           slug: formData.slug || generateSlug(formData.title),
           brand: formData.brand,
           description: formData.description,
           basePrice: Number(formData.price),
-          compareAtPrice: formData.compareAtPrice
-            ? Number(formData.compareAtPrice)
-            : undefined,
+          compareAtPrice: formData.compareAtPrice ? Number(formData.compareAtPrice) : undefined,
           categoryId: formData.categoryId,
           subCategoryId: formData.subCategoryId || undefined,
           inventoryCount: Number(formData.inventoryCount),
@@ -353,11 +444,12 @@ export default function VendorProductEditPage() {
         }
       }
     } catch {
-      toast.error("Failed to save product. Please try again.");
+      toast.error("Failed to save product.");
     } finally {
       setIsSubmitting(false);
     }
   };
+
 
   return (
     <div className="space-y-8 max-w-6xl mx-auto animate-in fade-in duration-300">
@@ -482,22 +574,16 @@ export default function VendorProductEditPage() {
                   <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                     Main Category *
                   </Label>
-                  <Select
-                    value={formData.categoryId}
-                    onValueChange={handleCategoryChange}>
+                  {/* Main Category Select */}
+                  <Select value={formData.categoryId} onValueChange={handleCategoryChange}>
                     <SelectTrigger className="w-full h-10 rounded-full text-xs font-semibold border-border/60 bg-background">
                       <SelectValue placeholder="Select Main Category" />
                     </SelectTrigger>
                     <SelectContent className="rounded-xl border-border/60 p-1">
                       <SelectGroup>
                         {(categories as CategoryTree[]).map((cat) => (
-                          <SelectItem
-                            key={cat.id}
-                            value={cat.id}
-                            className="rounded-lg text-xs font-medium py-2">
-                            <div className="flex items-center justify-between w-full">
-                              <span>{cat.name}</span>
-                            </div>
+                          <SelectItem key={cat.id} value={cat.id} className="rounded-lg text-xs font-medium py-2">
+                            {cat.name}
                           </SelectItem>
                         ))}
                       </SelectGroup>
@@ -511,27 +597,16 @@ export default function VendorProductEditPage() {
                   <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                     Subcategory *
                   </Label>
-                  <Select
-                    value={formData.subCategoryId}
-                    onValueChange={(val) => updateField("subCategoryId", val)}>
+                  {/* Subcategory Select */}
+                  <Select value={formData.subCategoryId} onValueChange={(val) => updateField("subCategoryId", val)}>
                     <SelectTrigger className="w-full h-10 rounded-full text-xs font-semibold border-border/60 bg-background">
                       <SelectValue placeholder="Select Subcategory" />
                     </SelectTrigger>
                     <SelectContent className="rounded-xl border-border/60 p-1">
                       <SelectGroup>
                         {availableSubCategories.map((sub) => (
-                          <SelectItem
-                            key={sub.id}
-                            value={sub.id}
-                            className="rounded-lg text-xs font-medium py-2">
-                            <div className="flex items-center justify-between w-full">
-                              <span>{sub.name}</span>
-                              {sub.productCount && sub.productCount > 0 && (
-                                <span className="text-[10px] text-muted-foreground">
-                                  {sub.productCount} products
-                                </span>
-                              )}
-                            </div>
+                          <SelectItem key={sub.id} value={sub.id} className="rounded-lg text-xs font-medium py-2">
+                            {sub.name}
                           </SelectItem>
                         ))}
                       </SelectGroup>

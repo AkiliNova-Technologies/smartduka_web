@@ -36,14 +36,20 @@ export const authService = {
    * Safe to call multiple times — uses upsert.
    */
   async syncUserProfile(user: FirebaseUser, extraName?: string) {
+    const idToken = await user.getIdToken();
     const rawName = extraName || user.displayName;
     const safeName =
-      rawName && rawName.trim() && !rawName.includes("@") ? rawName.trim() : null;
+      rawName && rawName.trim() && !rawName.includes("@")
+        ? rawName.trim()
+        : null;
 
     try {
       await fetch("/api/auth/sync", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
         body: JSON.stringify({
           userId: user.uid,
           name: safeName,

@@ -11,22 +11,20 @@ export default function VendorDashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <SidebarProvider >
-      {/* Sidebar set to matching variant="inset" format layout */}
-      <VendorSidebar variant="inset" />
-      
-      <SidebarInset>
-        {/* Site header wrapper containing top meta-actions */}
-        <VendorHeader />
-        
-        <div className="flex flex-1 flex-col bg-zinc-50/50 dark:bg-zinc-950">
-          <div className="@container/main flex flex-1 flex-col">
-            <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6 max-w-7xl w-full mx-auto px-4 lg:px-6">
-              {children}
+
+        <SidebarProvider>
+          <VendorSidebar variant="inset" />
+          <SidebarInset>
+            <VendorHeader />
+            <div className="flex flex-1 flex-col bg-zinc-50/50 dark:bg-zinc-950">
+              <div className="@container/main flex flex-1 flex-col">
+                <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6 max-w-7xl w-full mx-auto px-4 lg:px-6">
+                  {children}
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-      </SidebarInset>
-    </SidebarProvider>
+          </SidebarInset>
+        </SidebarProvider>
+
   );
 }

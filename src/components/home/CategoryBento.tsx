@@ -7,13 +7,13 @@ import { useCategories } from "@/hooks/use-categories";
 import { CategoryTree } from "@/types/marketplace";
 
 export function CategoryBento() {
-  const { categories, isLoading, error } = useCategories({ mode: "tree" });
+  const { categories, categoriesLoading, error } = useCategories();
   const categoryTree = categories as CategoryTree[];
   
   const fallbackImage = "https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&w=600&q=80";
 
   // Loading state
-  if (isLoading) {
+  if (categoriesLoading) {
     return (
       <section className="w-full hidden bg-card text-card-foreground rounded-[32px] p-5 sm:p-6 border border-border/60 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.02)] dark:border-zinc-800/80 dark:shadow-none transition-colors duration-300">
         <div className="flex items-center justify-center py-12">

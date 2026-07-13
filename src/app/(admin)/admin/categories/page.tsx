@@ -40,13 +40,13 @@ interface SubCategoryFormState {
 export default function AdminCategoriesPage() {
   const {
     categories,
-    isLoading,
     isMutating,
     error,
     createCategory,
     updateCategory,
     deleteCategory,
-  } = useCategories({ mode: "flat" });
+    categoriesLoading,
+  } = useCategories();
 
   // Delete dialog hook
   const {
@@ -62,7 +62,9 @@ export default function AdminCategoriesPage() {
   });
 
   const [drawerOpen, setDrawerOpen] = React.useState(false);
-  const [editingCategory, setEditingCategory] = React.useState<Category | null>(null);
+  const [editingCategory, setEditingCategory] = React.useState<Category | null>(
+    null,
+  );
 
   // Step 1 States (Main Category)
   const [name, setName] = React.useState("");
@@ -72,7 +74,9 @@ export default function AdminCategoriesPage() {
 
   // Step 2 States (Subcategories Configuration)
   const [step, setStep] = React.useState<1 | 2>(1);
-  const [subCategories, setSubCategories] = React.useState<SubCategoryFormState[]>([]);
+  const [subCategories, setSubCategories] = React.useState<
+    SubCategoryFormState[]
+  >([]);
   const [newSubName, setNewSubName] = React.useState("");
   const [newSubImage, setNewSubImage] = React.useState("");
 
@@ -104,26 +108,28 @@ export default function AdminCategoriesPage() {
   };
 
   // Open sheet for editing
-  const handleEditCategory = React.useCallback((category: Category) => {
-    setEditingCategory(category);
-    setName(category.name);
-    setSlug(category.slug);
-    setDescription(category.description || "");
-    setImage(category.image || "");
-    
-    // Find existing subcategories (children of this category)
-    const children = categories.filter(c => c.parentId === category.id);
-    setSubCategories(
-      children.map(child => ({
-        name: child.name,
-        slug: child.slug,
-        image: child.image || fallbackImage,
-      }))
-    );
-    
-    setDrawerOpen(true);
-    
-  }, [categories]);
+  const handleEditCategory = React.useCallback(
+    (category: Category) => {
+      setEditingCategory(category);
+      setName(category.name);
+      setSlug(category.slug);
+      setDescription(category.description || "");
+      setImage(category.image || "");
+
+      // Find existing subcategories (children of this category)
+      const children = categories.filter((c) => c.parentId === category.id);
+      setSubCategories(
+        children.map((child) => ({
+          name: child.name,
+          slug: child.slug,
+          image: child.image || fallbackImage,
+        })),
+      );
+
+      setDrawerOpen(true);
+    },
+    [categories],
+  );
 
   const handleNameChange = (val: string) => {
     setName(val);
@@ -158,7 +164,7 @@ export default function AdminCategoriesPage() {
     if (!name || !slug) return;
 
     let result;
-    
+
     if (editingCategory) {
       // Update existing category
       result = await updateCategory({
@@ -169,7 +175,7 @@ export default function AdminCategoriesPage() {
         image: image || fallbackImage,
         parentId: editingCategory.parentId || null,
       });
-      
+
       // TODO: Handle subcategory updates here
       // You might want to create new subcategories and delete removed ones
     } else {
@@ -270,19 +276,19 @@ export default function AdminCategoriesPage() {
             <button
               onClick={() => handleEditCategory(row.original)}
               className="p-1.5 text-muted-foreground hover:text-foreground rounded-md border border-border/40 hover:bg-muted transition-colors cursor-pointer"
-              title="Edit Category"
-            >
+              title="Edit Category">
               <Edit2 className="w-3.5 h-3.5" />
             </button>
             <button
-              onClick={() => openDeleteDialog(row.original.id, {
-                itemName: row.original.name,
-                itemType: "category",
-                title: "Delete Category",
-              })}
+              onClick={() =>
+                openDeleteDialog(row.original.id, {
+                  itemName: row.original.name,
+                  itemType: "category",
+                  title: "Delete Category",
+                })
+              }
               className="p-1.5 text-muted-foreground hover:text-rose-500 rounded-md border border-border/40 hover:bg-rose-500/5 transition-colors cursor-pointer"
-              title="Delete Category"
-            >
+              title="Delete Category">
               <Trash2 className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -314,7 +320,7 @@ export default function AdminCategoriesPage() {
         columns={columns}
         data={categories}
         getRowId={(row) => row.id}
-        isLoading={isLoading}
+        isLoading={categoriesLoading}
         renderTabs={
           <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground select-none flex items-center gap-2">
             <span>Marketplace Catalog Structure</span>
@@ -344,15 +350,15 @@ export default function AdminCategoriesPage() {
                         ? "Edit Category Details"
                         : "Edit Subcategory Details"
                       : step === 1
-                      ? "Step 1: Parent Group Info"
-                      : "Step 2: Nested Subcategories"}
+                        ? "Step 1: Parent Group Info"
+                        : "Step 2: Nested Subcategories"}
                   </SheetTitle>
                   <SheetDescription className="text-xs font-medium text-muted-foreground leading-normal">
                     {editingCategory
                       ? `Editing "${editingCategory.name}"`
                       : step === 1
-                      ? "Set up the high-level group parameters and indexing overview."
-                      : `Assign specific sub-items to "${name}" alongside distinctive thumbnail references.`}
+                        ? "Set up the high-level group parameters and indexing overview."
+                        : `Assign specific sub-items to "${name}" alongside distinctive thumbnail references.`}
                   </SheetDescription>
                 </SheetHeader>
 
@@ -509,7 +515,9 @@ export default function AdminCategoriesPage() {
                       disabled={!name.trim()}
                       onClick={() => setStep(2)}
                       className="flex-1 h-10 rounded-full text-xs font-medium bg-primary hover:bg-emerald-600 text-white cursor-pointer disabled:opacity-50">
-                      {editingCategory ? "Edit Subcategories" : "Add SubCategories"}
+                      {editingCategory
+                        ? "Edit Subcategories"
+                        : "Add SubCategories"}
                     </Button>
                   </>
                 ) : (
@@ -526,7 +534,11 @@ export default function AdminCategoriesPage() {
                       disabled={isMutating}
                       onClick={handleSaveCategory}
                       className="flex-1 h-10 rounded-full text-xs font-medium bg-primary hover:bg-emerald-600 text-white cursor-pointer disabled:opacity-50">
-                      {isMutating ? "Saving..." : editingCategory ? "Update Category" : "Create Category"}
+                      {isMutating
+                        ? "Saving..."
+                        : editingCategory
+                          ? "Update Category"
+                          : "Create Category"}
                     </Button>
                   </>
                 )}

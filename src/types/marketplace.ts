@@ -99,29 +99,45 @@ export interface CategoryTree extends Category {
 
 export interface Product {
   id: string;
-  vendorId: string;                    
-  categoryId: string | null;           
-  subCategoryId?: string | null;       
-  name: string;                        
-  slug: string;                        
-  brand: string | null;                
-  description?: string | null;         
-  basePrice: number;                   
-  compareAtPrice?: number | null;      
-  inventoryCount: number;              
-  sku?: string | null;                 
-  status?: "DRAFT" | "PUBLISHED" | "ACTIVE" | "ARCHIVED" | "OUT_OF_STOCK"; 
-  rating?: number;                    
-  reviews?: number;                   
-  image: string;                      
-  images?: ProductImage[];            
-  sizes?: string[];                   
-  colors?: string[];                  
-  specs?: ProductSpec[];              
-  tags?: string[];                     
-  isRecommended?: boolean;             
-  createdAt?: string;                  
-  updatedAt?: string;                  
+  vendorId: string;
+  categoryId: string | null;
+  subCategoryId?: string | null;
+  name: string;
+  slug: string;
+  brand: string | null;
+  description?: string | null;
+  basePrice: number;
+  compareAtPrice?: number | null;
+  inventoryCount: number;
+  sku?: string | null;
+  status?: "DRAFT" | "PUBLISHED" | "ACTIVE" | "ARCHIVED" | "OUT_OF_STOCK";
+  rating?: number;
+  reviews?: number;
+  image: string;
+  images?: ProductImage[];
+  sizes?: string[];
+  colors?: string[];
+  specs?: ProductSpec[];
+  tags?: string[];
+  isRecommended?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+  category?: {
+    id: string;
+    name: string;
+    slug: string;
+  } | null;
+  subCategory?: {
+    id: string;
+    name: string;
+    slug: string;
+  } | null;
+  vendor?: {
+    id: string;
+    storeName: string;
+    slug: string;
+    logoUrl: string | null;
+  } | null;
 }
 
 export interface ProductImage {
