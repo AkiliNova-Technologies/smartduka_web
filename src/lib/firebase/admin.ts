@@ -1,9 +1,19 @@
-import { getApps, initializeApp, cert, App } from "firebase-admin/app";
-import { getAuth, Auth } from "firebase-admin/auth";
+import type { ServiceAccount } from "firebase-admin/app";
+import type { Auth } from "firebase-admin/auth";
 
-function getFirebaseAuth(): Auth {
+let adminAuthInstance: Auth | null = null;
+
+async function getFirebaseAuth(): Promise<Auth> {
+  if (adminAuthInstance) return adminAuthInstance;
+
+  // Dynamic import — avoids bundling firebase-admin at build time,
+  // which prevents the jose/jwks-rsa ESM conflict on Vercel
+  const { getApps, initializeApp, cert } = await import("firebase-admin/app");
+  const { getAuth } = await import("firebase-admin/auth");
+
   if (getApps().length > 0) {
-    return getAuth();
+    adminAuthInstance = getAuth();
+    return adminAuthInstance;
   }
 
   const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
@@ -12,40 +22,41 @@ function getFirebaseAuth(): Auth {
 
   if (!projectId || !clientEmail || !privateKey) {
     throw new Error(
-      "Missing Firebase Admin credentials. Ensure NEXT_PUBLIC_FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY are set in Vercel environment variables."
+      "Missing Firebase Admin credentials. Ensure NEXT_PUBLIC_FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY are set."
     );
   }
 
   privateKey = privateKey
     .replace(/\\n/g, "\n")
-    .replace(/\n/g, "\n")      
     .replace(/"/g, "")
     .trim();
 
-  // Validate PEM format
   if (!privateKey.includes("-----BEGIN PRIVATE KEY-----")) {
     throw new Error(
-      "FIREBASE_PRIVATE_KEY is missing the PEM header. On Vercel, paste the key with real line breaks (no quotes, no \\n)."
+      "FIREBASE_PRIVATE_KEY is not in valid PEM format."
     );
   }
 
-  let app: App;
-  try {
-    app = initializeApp({
-      credential: cert({
-        projectId,
-        clientEmail,
-        privateKey,
-      }),
-    });
-  } catch (error) {
-    console.error("Firebase Admin initialization failed:", error);
-    throw new Error(
-      `Firebase Admin SDK failed: ${error instanceof Error ? error.message : "Unknown error"}`
-    );
-  }
+  const app = initializeApp({
+    credential: cert({
+      projectId,
+      clientEmail,
+      privateKey,
+    } as ServiceAccount),
+  });
 
-  return getAuth(app);
+  adminAuthInstance = getAuth(app);
+  return adminAuthInstance;
 }
 
-export const adminAuth = getFirebaseAuth();
+// Export a proxy that lazily initializes
+export const adminAuth = {
+  verifyIdToken: async (token: string) => {
+    const auth = await getFirebaseAuth();
+    return auth.verifyIdToken(token);
+  },
+  getUser: async (uid: string) => {
+    const auth = await getFirebaseAuth();
+    return auth.getUser(uid);
+  },
+};
