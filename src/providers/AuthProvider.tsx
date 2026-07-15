@@ -52,13 +52,18 @@ interface AuthContextType {
 function extractRole(sessionData: Record<string, unknown> | undefined): string | null {
   if (!sessionData) return null;
 
-  // Check common response shapes
+  // The API returns { success: true, data: { platformRole } }
+  const data = sessionData.data as Record<string, unknown> | undefined;
+  if (data?.platformRole) return data.platformRole as string;
+  if (data?.role) return data.role as string;
+
+  // Fallback: direct platformRole on sessionData
+  if (sessionData.platformRole) return sessionData.platformRole as string;
+
+  // Legacy: user.platformRole
   const user = sessionData.user as Record<string, unknown> | undefined;
   if (user?.platformRole) return user.platformRole as string;
   if (user?.role) return user.role as string;
-
-  // Direct platformRole field
-  if (sessionData.platformRole) return sessionData.platformRole as string;
 
   return null;
 }

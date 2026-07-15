@@ -15,10 +15,7 @@ const HEADER_AUTH_API_PREFIXES = [
 ];
 
 // API routes that authenticate via userId in request body
-const BODY_AUTH_API_PREFIXES = [
-  "/api/vendors",
-  "/api/admin/vendors",
-];
+const BODY_AUTH_API_PREFIXES = ["/api/vendors", "/api/admin/vendors"];
 
 // API routes that are fully public — no auth required
 const PUBLIC_API_PREFIXES = [
@@ -76,8 +73,8 @@ export async function proxy(request: NextRequest) {
 
   const isPublicMarketplaceRoute =
     pathname === "/" ||
-    ["/about", "/contact", "/products", "/cart", "/shop", "/brands"].some((route) =>
-      pathname.startsWith(route),
+    ["/about", "/contact", "/products", "/cart", "/shop", "/brands"].some(
+      (route) => pathname.startsWith(route),
     );
 
   // 4. Decode session tokens at the edge
@@ -90,7 +87,10 @@ export async function proxy(request: NextRequest) {
   if (isAuthRoute) {
     if (session) {
       // FIXED: session.role → session.platformRole
-      if (session.platformRole === "ADMIN")
+      if (
+        session.platformRole === "ADMIN" ||
+        session.platformRole === "SUPER_ADMIN"
+      )
         return NextResponse.redirect(new URL(ADMIN_PREFIX, origin));
       if (session.platformRole === "VENDOR")
         return NextResponse.redirect(new URL(VENDOR_PREFIX, origin));
@@ -127,10 +127,18 @@ export async function proxy(request: NextRequest) {
   // 8. Enforce Sub-System URL Access Isolation & Role Guardrails
   if (session) {
     // FIXED: session.role → session.platformRole
-    if (pathname.startsWith(ADMIN_PREFIX) && session.platformRole !== "ADMIN") {
+    if (
+      pathname.startsWith(ADMIN_PREFIX) &&
+      session.platformRole !== "ADMIN" &&
+      session.platformRole !== "SUPER_ADMIN"
+    ) {
       return handleUnauthorizedRedirect(request, session, origin);
     }
-    if (pathname.startsWith(VENDOR_PREFIX) && session.platformRole !== "VENDOR") {
+
+    if (
+      pathname.startsWith(VENDOR_PREFIX) &&
+      session.platformRole !== "VENDOR"
+    ) {
       return handleUnauthorizedRedirect(request, session, origin);
     }
   }
@@ -168,7 +176,10 @@ function handleUnauthorizedRedirect(
     );
   }
   // FIXED: session.role → session.platformRole
-  if (session.platformRole === "ADMIN")
+  if (
+    session.platformRole === "ADMIN" ||
+    session.platformRole === "SUPER_ADMIN"
+  )
     return NextResponse.redirect(new URL(ADMIN_PREFIX, origin));
   if (session.platformRole === "VENDOR")
     return NextResponse.redirect(new URL(VENDOR_PREFIX, origin));
