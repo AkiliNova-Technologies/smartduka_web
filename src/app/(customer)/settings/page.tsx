@@ -10,7 +10,7 @@ import {
   Loader2,
   LogOut,
 } from "lucide-react";
-import { useSettings } from "@/hooks/use-settings";
+import { useUserData } from "@/providers/UserDataProvider";
 import { useAuth } from "@/hooks/use-auth";
 import { Label } from "@/components/ui/label";
 import {
@@ -52,10 +52,10 @@ const DELIVERY_DISTRICTS = [
 ];
 
 interface SettingsFormContentProps {
-  settings: NonNullable<ReturnType<typeof useSettings>["settings"]>;
+  settings: NonNullable<ReturnType<typeof useUserData>["settings"]>;
   user: ReturnType<typeof useAuth>["user"];
   saving: boolean;
-  updateSettings: ReturnType<typeof useSettings>["updateSettings"];
+  updateSettings: ReturnType<typeof useUserData>["updateSettings"];
   logout: () => void;
   actionLoading: boolean;
   router: ReturnType<typeof useRouter>;
@@ -538,11 +538,10 @@ function SettingsFormContent({
 // ─── Page component ───
 export default function SettingsPage() {
   const { user, logout, actionLoading } = useAuth();
-  const { settings, loading, saving, updateSettings } = useSettings();
+  const { settings, settingsLoading, settingsSaving, updateSettings } = useUserData();
   const router = useRouter();
 
-  // All hooks called unconditionally here
-  if (loading || !settings) {
+  if (settingsLoading || !settings) {
     return (
       <div className="max-w-8xl mx-auto px-4 py-10 space-y-10">
         <div className="border-b border-border/60 pb-6">
@@ -573,7 +572,7 @@ export default function SettingsPage() {
       key={JSON.stringify(settings)}
       settings={settings}
       user={user}
-      saving={saving}
+      saving={settingsSaving}
       updateSettings={updateSettings}
       logout={logout}
       actionLoading={actionLoading}

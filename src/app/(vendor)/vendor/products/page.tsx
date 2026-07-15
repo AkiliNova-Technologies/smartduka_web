@@ -18,9 +18,9 @@ export default function VendorProductsPage() {
 
   const {
     products: apiProducts,
-    productsLoading,
+    isLoading: productsLoading,
     error,
-    refreshProducts,
+    refresh: refreshProducts,
   } = useProducts();
 
   // Combine loading states

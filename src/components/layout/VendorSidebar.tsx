@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { 
   LayoutDashboard, ShoppingCart, Package, FileChartColumn,
@@ -43,9 +42,7 @@ export function VendorSidebar({ ...props }: React.ComponentProps<typeof Sidebar>
   );
 
   // Derive store display values from real profile
-  const storeName = profile?.storeName || "My Store";
   const storeLocation = profile?.city || "Kampala";
-  const storeLogo = profile?.logoUrl || null;
 
   const operationsItems = [
     { name: "Overview", href: "/vendor", icon: LayoutDashboard },
@@ -67,17 +64,7 @@ export function VendorSidebar({ ...props }: React.ComponentProps<typeof Sidebar>
       {/* STORE IDENTITY HEADER — now reads real vendor profile */}
       <SidebarHeader className="p-4 flex flex-row items-center gap-3 select-none overflow-hidden h-18 border-b border-border/40">
         <div className="w-9 h-9 bg-primary text-primary-foreground rounded-xl flex items-center justify-center shadow-[0_16px_40px_-12px_rgba(0,0,0,0.02)] shrink-0 transition-transform duration-300 hover:rotate-6 overflow-hidden">
-          {storeLogo ? (
-            <Image
-              src={storeLogo}
-              alt={storeName}
-              width={36}
-              height={36}
-              className="w-full h-full object-cover"
-            />
-          ) : (
             <Store className="w-4 h-4 stroke-[2.5]" />
-          )}
         </div>
         {state === "expanded" && (
           <div className="flex flex-col gap-0.5 leading-none transition-fadeIn animate-in fade-in duration-200 min-w-0">
@@ -89,7 +76,7 @@ export function VendorSidebar({ ...props }: React.ComponentProps<typeof Sidebar>
             ) : (
               <>
                 <h1 className="font-bold text-sm tracking-tight text-zinc-900 dark:text-zinc-50 truncate max-w-[140px]">
-                  {storeName}
+                  My SmartDuka
                 </h1>
                 <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider truncate">
                   {storeLocation} Hub

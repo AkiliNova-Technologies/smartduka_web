@@ -1,6 +1,10 @@
 import { prisma } from "@/lib/prisma/client";
 import { VerificationStatus, Prisma } from "@prisma/client";
 
+// ==========================================
+// TYPES
+// ==========================================
+
 export interface VendorApplicationWithUser {
   id: string;
   userId: string;
@@ -45,30 +49,32 @@ export interface VendorApplicationWithUser {
   }[];
 }
 
-export const vendorService = {
+export interface VendorApplicationFilters {
+  status?: VerificationStatus;
+  search?: string;
+}
+
+// ==========================================
+// VENDOR SERVICE
+// ==========================================
+
+export class VendorService {
   /**
    * Get a user's vendor application by userId
    */
-  async getMyApplication(userId: string) {
-    const application = await prisma.vendorApplication.findUnique({
+  static async getMyApplication(userId: string) {
+    return prisma.vendorApplication.findUnique({
       where: { userId },
       include: {
-        documents: {
-          orderBy: { createdAt: "desc" },
-        },
+        documents: { orderBy: { createdAt: "desc" } },
       },
     });
-
-    return application;
-  },
+  }
 
   /**
    * Get all vendor applications (admin)
    */
-  async getAllApplications(filters?: {
-    status?: VerificationStatus;
-    search?: string;
-  }) {
+  static async getAllApplications(filters?: VendorApplicationFilters) {
     const where: Prisma.VendorApplicationWhereInput = {};
 
     if (filters?.status) {
@@ -79,11 +85,13 @@ export const vendorService = {
       where.OR = [
         { storeName: { contains: filters.search, mode: "insensitive" } },
         { storeSlug: { contains: filters.search, mode: "insensitive" } },
-        { businessEmail: { contains: filters.search, mode: "insensitive" } },
+        {
+          businessEmail: { contains: filters.search, mode: "insensitive" },
+        },
       ];
     }
 
-    const applications = await prisma.vendorApplication.findMany({
+    return prisma.vendorApplication.findMany({
       where,
       include: {
         user: {
@@ -95,24 +103,20 @@ export const vendorService = {
             avatarUrl: true,
           },
         },
-        documents: {
-          orderBy: { createdAt: "desc" },
-        },
+        documents: { orderBy: { createdAt: "desc" } },
       },
       orderBy: { createdAt: "desc" },
-    });
-
-    return applications as VendorApplicationWithUser[];
-  },
+    }) as Promise<VendorApplicationWithUser[]>;
+  }
 
   /**
    * Update application status (admin)
    */
-  async updateApplicationStatus(
+  static async updateApplicationStatus(
     applicationId: string,
     status: VerificationStatus,
     reviewerNotes?: string,
-    reviewedBy?: string,
+    reviewedBy?: string
   ) {
     const application = await prisma.vendorApplication.update({
       where: { id: applicationId },
@@ -188,12 +192,12 @@ export const vendorService = {
     }
 
     return application;
-  },
+  }
 
   /**
    * Get vendor profile by ID
    */
-  async getVendorProfile(vendorId: string) {
+  static async getVendorProfile(vendorId: string) {
     return prisma.vendorProfile.findUnique({
       where: { id: vendorId },
       include: {
@@ -205,46 +209,34 @@ export const vendorService = {
             avatarUrl: true,
           },
         },
-        _count: {
-          select: {
-            products: true,
-            subOrders: true,
-          },
-        },
+        _count: { select: { products: true, subOrders: true } },
       },
     });
-  },
+  }
 
   /**
    * Get vendor profile by owner userId
    */
-  async getVendorProfileByOwner(userId: string) {
+  static async getVendorProfileByOwner(userId: string) {
     return prisma.vendorProfile.findUnique({
       where: { ownerId: userId },
       include: {
-        _count: {
-          select: {
-            products: true,
-            subOrders: true,
-          },
-        },
+        _count: { select: { products: true, subOrders: true } },
       },
     });
-  },
+  }
 
   /**
    * Get all active vendor profiles for the public brands/stores listing page
    */
-  async getPublicStoreListings() {
-    const vendorProfiles = await prisma.vendorProfile.findMany({
+  static async getPublicStoreListings() {
+    return prisma.vendorProfile.findMany({
       where: {
         status: "ACTIVE",
         deletedAt: null,
       },
       include: {
-        _count: {
-          select: { products: true },
-        },
+        _count: { select: { products: true } },
         products: {
           take: 1,
           orderBy: { createdAt: "desc" },
@@ -260,7 +252,5 @@ export const vendorService = {
       },
       orderBy: { createdAt: "desc" },
     });
-
-    return vendorProfiles;
-  },
-};
+  }
+}

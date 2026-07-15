@@ -20,12 +20,11 @@ import { cn } from "@/lib/utils";
 import { useProducts } from "@/hooks/use-products";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Product } from "@/types/marketplace";
+import Image from "next/image";
 
-// ─── Loading skeleton that mirrors the product detail layout ───
 function ProductDetailSkeleton() {
   return (
     <div className="space-y-6 w-full max-w-8xl mx-auto">
-      {/* Header skeleton */}
       <div className="flex items-center justify-between border-b border-border/40 pb-4">
         <div className="flex items-center gap-3">
           <Skeleton className="w-10 h-10 rounded-xl" />
@@ -42,10 +41,7 @@ function ProductDetailSkeleton() {
           <Skeleton className="h-9 w-28 rounded-full" />
         </div>
       </div>
-
-      {/* Content grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left column */}
         <div className="lg:col-span-4 space-y-4">
           <div className="bg-card border border-border/60 rounded-2xl p-4">
             <Skeleton className="aspect-square w-full rounded-xl" />
@@ -55,8 +51,6 @@ function ProductDetailSkeleton() {
             <Skeleton className="h-24 rounded-2xl" />
           </div>
         </div>
-
-        {/* Right column */}
         <div className="lg:col-span-8 space-y-4">
           <div className="bg-card border border-border/60 rounded-2xl p-5 space-y-4">
             <Skeleton className="h-5 w-20 rounded-md" />
@@ -79,7 +73,6 @@ function ProductDetailSkeleton() {
   );
 }
 
-// ─── Error state ───
 function ErrorState({ error }: { error: string }) {
   return (
     <div className="py-20 flex flex-col items-center justify-center text-center space-y-4">
@@ -87,9 +80,7 @@ function ErrorState({ error }: { error: string }) {
         <AlertTriangle className="w-8 h-8 text-amber-500" />
       </div>
       <div className="space-y-1">
-        <h3 className="text-sm font-bold text-foreground">
-          Error Loading Product
-        </h3>
+        <h3 className="text-sm font-bold text-foreground">Error Loading Product</h3>
         <p className="text-xs text-muted-foreground max-w-sm">{error}</p>
       </div>
       <Link
@@ -102,7 +93,6 @@ function ErrorState({ error }: { error: string }) {
   );
 }
 
-// ─── Not found state ───
 function NotFoundState() {
   return (
     <div className="py-20 flex flex-col items-center justify-center text-center space-y-4">
@@ -125,7 +115,6 @@ function NotFoundState() {
   );
 }
 
-// ─── Page component ───
 export default function VendorProductPreviewPage() {
   const params = useParams();
   const productId = typeof params.id === "string" ? params.id : null;
@@ -138,8 +127,7 @@ export default function VendorProductPreviewPage() {
   const fetchedRef = React.useRef(false);
 
   React.useEffect(() => {
-    if (!productId || fetchedRef.current) return;
-
+    if (!productId || fetchedRef.current || !fetchProductById) return;
     fetchedRef.current = true;
 
     const fetchData = async () => {
@@ -149,59 +137,54 @@ export default function VendorProductPreviewPage() {
         const data = await fetchProductById(productId);
         setProduct(data);
       } catch (err: unknown) {
-        setError(
-          err instanceof Error ? err.message : "Failed to load product.",
-        );
+        setError(err instanceof Error ? err.message : "Failed to load product.");
       } finally {
         setLoading(false);
       }
     };
 
     fetchData();
-  }, [productId, fetchProductById]); 
+  }, [productId, fetchProductById]);
 
-  // Missing product ID
+  if (!fetchProductById) {
+    return (
+      <div className="py-20 text-center">
+        <p className="text-sm text-muted-foreground">
+          Product management requires VendorCatalogProvider.
+        </p>
+      </div>
+    );
+  }
+
   if (!productId) {
     return <NotFoundState />;
   }
 
-  // Loading state
   if (loading) {
     return <ProductDetailSkeleton />;
   }
 
-  // Error state
   if (error) {
     return <ErrorState error={error} />;
   }
 
-  // Not found state
   if (!product) {
     return <NotFoundState />;
   }
 
-  // ─── Product display ───
-  // ─── Product display ───
-  const basePrice: number = Number(product.basePrice) ?? 0;
-  const compareAtPrice: number | undefined = product.compareAtPrice
-    ? Number(product.compareAtPrice)
-    : undefined;
-  const productName: string = product.name ?? "";
-  const inventoryCount: number = product.inventoryCount ?? 0;
-  const rating: number = product.rating ?? 0;
-  const reviews: number = product.reviews ?? 0;
-  const brand: string = product.brand ?? "Independent Manufacturer";
-  const sku: string = product.sku ?? product.id?.slice(0, 8) ?? "N/A";
-
-  // Real data from the product
+  const basePrice = Number(product.basePrice) ?? 0;
+  const compareAtPrice = product.compareAtPrice ? Number(product.compareAtPrice) : undefined;
+  const productName = product.name ?? "";
+  const inventoryCount = product.inventoryCount ?? 0;
+  const rating = product.rating ?? 0;
+  const reviews = product.reviews ?? 0;
+  const brand = product.brand ?? "Independent Manufacturer";
+  const sku = product.sku ?? product.id?.slice(0, 8) ?? "N/A";
   const productDescription = product.description || "No description provided.";
   const productSizes = product.sizes || [];
   const productColors = product.colors || [];
   const productTags = product.tags || [];
-  const productSpecs = (product.specs || []) as {
-    name: string;
-    value: string;
-  }[];
+  const productSpecs = (product.specs || []) as { name: string; value: string }[];
   const categoryName = product.category?.name || "Uncategorized";
   const subCategoryName = product.subCategory?.name || null;
   const storeName = product.vendor?.storeName || "Main Store";
@@ -215,7 +198,6 @@ export default function VendorProductPreviewPage() {
 
   return (
     <div className="space-y-6 max-w-8xl mx-auto animate-in fade-in duration-300">
-      {/* ACTION TOP HEADER */}
       <div className="flex items-center justify-between border-b border-border/40 pb-4 select-none">
         <div className="flex items-center gap-3">
           <Link
@@ -225,9 +207,7 @@ export default function VendorProductPreviewPage() {
           </Link>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-xl font-medium tracking-tight text-foreground">
-                {productName}
-              </h1>
+              <h1 className="text-xl font-medium tracking-tight text-foreground">{productName}</h1>
               <span
                 className={cn(
                   "text-[10px] font-medium px-2 py-0.5 rounded-full border",
@@ -237,20 +217,14 @@ export default function VendorProductPreviewPage() {
                       ? "bg-amber-500/5 border-amber-500/10 text-amber-600"
                       : "bg-emerald-500/5 border-emerald-500/10 text-emerald-600",
                 )}>
-                {isOutOfStock
-                  ? "Out of Stock"
-                  : isLowStock
-                    ? "Low Stock"
-                    : "In Stock"}
+                {isOutOfStock ? "Out of Stock" : isLowStock ? "Low Stock" : "In Stock"}
               </span>
             </div>
             <p className="text-xs text-muted-foreground font-medium mt-0.5">
-              Product ID:{" "}
-              <code className="font-mono text-[11px]">{product.id}</code>
+              Product ID: <code className="font-mono text-[11px]">{product.id}</code>
             </p>
           </div>
         </div>
-
         <div className="flex items-center gap-2">
           <Link
             href={`/products/${product.id}`}
@@ -267,19 +241,11 @@ export default function VendorProductPreviewPage() {
         </div>
       </div>
 
-      {/* MAIN CONTENT GRID */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* LEFT COLUMN - Image & Quick Stats */}
         <div className="lg:col-span-4 space-y-4">
-          {/* Product Image */}
           <div className="bg-card border border-border/60 rounded-2xl p-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.02)]">
             <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-muted border border-border/40">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={product.image}
-                alt={productName}
-                className="w-full h-full object-cover"
-              />
+              <Image src={product.image} alt={productName} fill className="w-full h-full object-cover" />
               {markdownPercentage > 0 && (
                 <span className="absolute top-3 left-3 bg-orange-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider">
                   -{markdownPercentage}% OFF
@@ -287,268 +253,151 @@ export default function VendorProductPreviewPage() {
               )}
             </div>
           </div>
-
-          {/* Quick Stats Cards */}
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-card border border-border/60 rounded-2xl p-4 space-y-1">
               <div className="flex items-center gap-1.5 text-muted-foreground">
                 <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                <span className="text-[10px] font-medium uppercase tracking-wider">
-                  Rating
-                </span>
+                <span className="text-[10px] font-medium uppercase tracking-wider">Rating</span>
               </div>
               <p className="text-lg font-medium text-foreground">
-                {rating}{" "}
-                <span className="text-xs text-muted-foreground">/ 5.0</span>
+                {rating} <span className="text-xs text-muted-foreground">/ 5.0</span>
               </p>
-              <p className="text-[10px] text-muted-foreground">
-                {reviews} reviews
-              </p>
+              <p className="text-[10px] text-muted-foreground">{reviews} reviews</p>
             </div>
-
             <div className="bg-card border border-border/60 rounded-2xl p-4 space-y-1">
               <div className="flex items-center gap-1.5 text-muted-foreground">
                 <Box className="w-3.5 h-3.5" />
-                <span className="text-[10px] font-medium uppercase tracking-wider">
-                  Stock
-                </span>
+                <span className="text-[10px] font-medium uppercase tracking-wider">Stock</span>
               </div>
-              <p
-                className={cn(
-                  "text-lg font-medium",
-                  isOutOfStock
-                    ? "text-rose-500"
-                    : isLowStock
-                      ? "text-amber-500"
-                      : "text-foreground",
-                )}>
+              <p className={cn("text-lg font-medium", isOutOfStock ? "text-rose-500" : isLowStock ? "text-amber-500" : "text-foreground")}>
                 {inventoryCount}
               </p>
-              <p className="text-[10px] text-muted-foreground">
-                units available
-              </p>
+              <p className="text-[10px] text-muted-foreground">units available</p>
             </div>
           </div>
         </div>
 
-        {/* RIGHT COLUMN - Product Details */}
         <div className="lg:col-span-8 space-y-4">
-          {/* Pricing & Brand Card */}
           <div className="bg-card border border-border/60 rounded-2xl p-5 space-y-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.02)]">
             <div className="space-y-1">
-              <span className="text-[10px] font-bold text-primary bg-primary/5 px-2 py-0.5 rounded-md uppercase tracking-wider inline-block">
-                {brand}
-              </span>
-              <h2 className="text-lg font-medium text-foreground tracking-tight pt-1">
-                {productName}
-              </h2>
+              <span className="text-[10px] font-bold text-primary bg-primary/5 px-2 py-0.5 rounded-md uppercase tracking-wider inline-block">{brand}</span>
+              <h2 className="text-lg font-medium text-foreground tracking-tight pt-1">{productName}</h2>
             </div>
-
             <div className="border-t border-border/40 pt-3 flex items-baseline gap-3 flex-wrap">
-              <span className="text-2xl font-extrabold text-foreground tracking-tight">
-                UGX {basePrice.toLocaleString()}
-              </span>
+              <span className="text-2xl font-extrabold text-foreground tracking-tight">UGX {basePrice.toLocaleString()}</span>
               {compareAtPrice && (
                 <>
-                  <span className="text-sm text-muted-foreground font-medium line-through">
-                    UGX {compareAtPrice.toLocaleString()}
-                  </span>
+                  <span className="text-sm text-muted-foreground font-medium line-through">UGX {compareAtPrice.toLocaleString()}</span>
                   <span className="inline-flex items-center gap-1 text-[10px] bg-emerald-500/5 text-emerald-600 font-extrabold border border-emerald-500/10 px-2 py-0.5 rounded-full">
-                    <TrendingDown className="w-2.5 h-2.5" />
-                    Save {markdownPercentage}%
+                    <TrendingDown className="w-2.5 h-2.5" /> Save {markdownPercentage}%
                   </span>
                 </>
               )}
             </div>
-
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 border-t border-border/40">
               <div className="space-y-0.5">
-                <span className="text-[9px] font-medium text-muted-foreground uppercase tracking-wider">
-                  SKU
-                </span>
-                <p className="text-xs font-mono font-medium text-foreground">
-                  {sku}
-                </p>
+                <span className="text-[9px] font-medium text-muted-foreground uppercase tracking-wider">SKU</span>
+                <p className="text-xs font-mono font-medium text-foreground">{sku}</p>
               </div>
               <div className="space-y-0.5">
-                <span className="text-[9px] font-medium text-muted-foreground uppercase tracking-wider">
-                  Category
-                </span>
-                <p
-                  className="text-xs font-medium text-foreground truncate"
-                  title={
-                    subCategoryName
-                      ? `${categoryName} › ${subCategoryName}`
-                      : categoryName
-                  }>
+                <span className="text-[9px] font-medium text-muted-foreground uppercase tracking-wider">Category</span>
+                <p className="text-xs font-medium text-foreground truncate" title={subCategoryName ? `${categoryName} › ${subCategoryName}` : categoryName}>
                   {subCategoryName || categoryName}
                 </p>
               </div>
               <div className="space-y-0.5">
-                <span className="text-[9px] font-medium text-muted-foreground uppercase tracking-wider">
-                  Store
-                </span>
-                <p className="text-xs font-medium text-foreground truncate">
-                  {storeName}
-                </p>
+                <span className="text-[9px] font-medium text-muted-foreground uppercase tracking-wider">Store</span>
+                <p className="text-xs font-medium text-foreground truncate">{storeName}</p>
               </div>
               <div className="space-y-0.5">
-                <span className="text-[9px] font-medium text-muted-foreground uppercase tracking-wider">
-                  Status
-                </span>
-                <span
-                  className={cn(
-                    "text-[10px] font-medium px-2 py-0.5 rounded-full border",
-                    isOutOfStock
-                      ? "bg-rose-500/5 border-rose-500/10 text-rose-600"
-                      : isLowStock
-                        ? "bg-amber-500/5 border-amber-500/10 text-amber-600"
-                        : "bg-emerald-500/5 border-emerald-500/10 text-emerald-600",
-                  )}>
-                  {isOutOfStock
-                    ? "Out of Stock"
-                    : isLowStock
-                      ? "Low Stock"
-                      : "Active"}
+                <span className="text-[9px] font-medium text-muted-foreground uppercase tracking-wider">Status</span>
+                <span className={cn("text-[10px] font-medium px-2 py-0.5 rounded-full border", isOutOfStock ? "bg-rose-500/5 border-rose-500/10 text-rose-600" : isLowStock ? "bg-amber-500/5 border-amber-500/10 text-amber-600" : "bg-emerald-500/5 border-emerald-500/10 text-emerald-600")}>
+                  {isOutOfStock ? "Out of Stock" : isLowStock ? "Low Stock" : "Active"}
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Variants & Specifications Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Variants Card */}
             <div className="bg-card border border-border/60 rounded-2xl p-5 space-y-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.02)]">
               <div className="flex items-center gap-2">
                 <Ruler className="w-4 h-4 text-muted-foreground" />
-                <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                  Variants
-                </h3>
+                <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Variants</h3>
               </div>
-
               {productSizes.length > 0 && (
                 <div className="space-y-2">
-                  <span className="text-[10px] font-medium text-muted-foreground">
-                    Available Sizes
-                  </span>
+                  <span className="text-[10px] font-medium text-muted-foreground">Available Sizes</span>
                   <div className="flex flex-wrap gap-1.5">
                     {productSizes.map((size) => (
-                      <span
-                        key={size}
-                        className="px-2.5 py-1 bg-muted/50 border border-border/40 rounded-md text-[11px] font-medium text-foreground">
-                        {size}
-                      </span>
+                      <span key={size} className="px-2.5 py-1 bg-muted/50 border border-border/40 rounded-md text-[11px] font-medium text-foreground">{size}</span>
                     ))}
                   </div>
                 </div>
               )}
-
               {productColors.length > 0 && (
                 <div className="space-y-2">
-                  <span className="text-[10px] font-medium text-muted-foreground">
-                    Available Colors
-                  </span>
+                  <span className="text-[10px] font-medium text-muted-foreground">Available Colors</span>
                   <div className="flex flex-wrap gap-1.5">
                     {productColors.map((color) => (
-                      <span
-                        key={color}
-                        className="px-2.5 py-1 bg-muted/50 border border-border/40 rounded-md text-[11px] font-medium text-foreground">
-                        {color}
-                      </span>
+                      <span key={color} className="px-2.5 py-1 bg-muted/50 border border-border/40 rounded-md text-[11px] font-medium text-foreground">{color}</span>
                     ))}
                   </div>
                 </div>
               )}
-
               {productSizes.length === 0 && productColors.length === 0 && (
-                <p className="text-[11px] text-muted-foreground italic">
-                  No variants configured
-                </p>
+                <p className="text-[11px] text-muted-foreground italic">No variants configured</p>
               )}
             </div>
 
-            {/* Specifications Card */}
             <div className="bg-card border border-border/60 rounded-2xl p-5 space-y-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.02)]">
               <div className="flex items-center gap-2">
                 <FileText className="w-4 h-4 text-muted-foreground" />
-                <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                  Specifications
-                </h3>
+                <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Specifications</h3>
               </div>
-
               {productSpecs.length > 0 ? (
                 <div className="space-y-2">
                   {productSpecs.map((spec, index) => (
-                    <div
-                      key={index}
-                      className={cn(
-                        "flex justify-between items-center py-1.5 px-2 rounded-lg text-xs",
-                        index % 2 === 0 ? "bg-muted/20" : "",
-                      )}>
-                      <span className="text-muted-foreground font-medium">
-                        {spec.name}
-                      </span>
-                      <span className="font-medium text-foreground text-right max-w-[140px] truncate">
-                        {spec.value}
-                      </span>
+                    <div key={index} className={cn("flex justify-between items-center py-1.5 px-2 rounded-lg text-xs", index % 2 === 0 ? "bg-muted/20" : "")}>
+                      <span className="text-muted-foreground font-medium">{spec.name}</span>
+                      <span className="font-medium text-foreground text-right max-w-[140px] truncate">{spec.value}</span>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-[11px] text-muted-foreground italic">
-                  No specifications provided
-                </p>
+                <p className="text-[11px] text-muted-foreground italic">No specifications provided</p>
               )}
             </div>
           </div>
 
-          {/* Description & Tags */}
           <div className="bg-card border border-border/60 rounded-2xl p-5 space-y-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.02)]">
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <FileText className="w-4 h-4 text-muted-foreground" />
-                <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                  Description
-                </h3>
+                <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Description</h3>
               </div>
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                {productDescription}
-              </p>
+              <p className="text-xs text-muted-foreground leading-relaxed">{productDescription}</p>
             </div>
-
             {productTags.length > 0 && (
               <div className="space-y-2 pt-2 border-t border-border/40">
                 <div className="flex items-center gap-2">
                   <Tag className="w-4 h-4 text-muted-foreground" />
-                  <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    Tags
-                  </h3>
+                  <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Tags</h3>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {productTags.map((tag) => (
-                    <span
-                      key={tag}
-                      className="px-2.5 py-1 bg-primary/5 border border-primary/10 rounded-full text-[10px] font-medium text-primary">
-                      #{tag}
-                    </span>
+                    <span key={tag} className="px-2.5 py-1 bg-primary/5 border border-primary/10 rounded-full text-[10px] font-medium text-primary">#{tag}</span>
                   ))}
                 </div>
               </div>
             )}
           </div>
 
-          {/* Stock Health Alert */}
           {isLowStock && (
             <div className="bg-amber-500/5 border border-amber-500/20 rounded-2xl p-4 flex items-start gap-3">
               <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
               <div className="space-y-1">
-                <p className="text-xs font-medium text-amber-600">
-                  Low Stock Warning
-                </p>
-                <p className="text-[11px] text-amber-500/80">
-                  Only {inventoryCount} units remaining. Consider restocking
-                  soon to avoid missing sales.
-                </p>
+                <p className="text-xs font-medium text-amber-600">Low Stock Warning</p>
+                <p className="text-[11px] text-amber-500/80">Only {inventoryCount} units remaining. Consider restocking soon.</p>
               </div>
             </div>
           )}
@@ -557,13 +406,8 @@ export default function VendorProductPreviewPage() {
             <div className="bg-rose-500/5 border border-rose-500/20 rounded-2xl p-4 flex items-start gap-3">
               <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
               <div className="space-y-1">
-                <p className="text-xs font-medium text-rose-600">
-                  Out of Stock
-                </p>
-                <p className="text-[11px] text-rose-500/80">
-                  This product is currently unavailable. Update inventory to
-                  make it visible to customers again.
-                </p>
+                <p className="text-xs font-medium text-rose-600">Out of Stock</p>
+                <p className="text-[11px] text-rose-500/80">This product is currently unavailable. Update inventory to make it visible again.</p>
               </div>
             </div>
           )}

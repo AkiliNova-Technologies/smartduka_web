@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { vendorService } from "@/services/vendor";
+import { VendorService } from "@/services/vendor";
 import { VerificationStatus } from "@prisma/client";
 
 export async function PATCH(
@@ -23,7 +23,7 @@ export async function PATCH(
       );
     }
 
-    const application = await vendorService.updateApplicationStatus(
+    const application = await VendorService.updateApplicationStatus(
       id,
       status as VerificationStatus,
       reviewerNotes || null,

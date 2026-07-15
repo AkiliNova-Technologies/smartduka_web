@@ -1,11 +1,33 @@
-// import { PlatformRole, UserStatus, VendorStatus, VendorUserRole, ProductStatus, SubOrderStatus, PaymentGateway, WebhookProcessStatus, NotificationType, DocumentType } from "@prisma/client";
+// ==========================================
+// STANDARDIZED API RESPONSE TYPES
+// ==========================================
+
+export type ApiSuccessResponse<T> = {
+  success: true;
+  data: T;
+};
+
+export type ApiErrorResponse = {
+  success: false;
+  error: string;
+  code?: string;
+};
+
+export type ApiResponse<T> = ApiSuccessResponse<T> | ApiErrorResponse;
+
+export type PaginatedData<T> = {
+  items: T[];
+  total: number;
+  page: number;
+  limit: number;
+};
 
 // ==========================================
 // USER & SETTINGS TYPE PROFILES
 // ==========================================
 
 export interface UserProfile {
-  id: string; 
+  id: string;
   name: string;
   email: string;
   avatar: string;
@@ -17,15 +39,15 @@ export interface UserSettingsProfile {
   email: string;
   phoneNumber: string;
   avatarUrl: string;
-  
+
   currency: "UGX" | "USD" | "KES";
-  deliveryDistrict: string; 
+  deliveryDistrict: string;
   primaryLanguage: string;
-  
+
   momoNumber: string;
   momoNetwork: "MTN" | "Airtel";
   buyerProtectionEnabled: boolean;
-  
+
   orderAlertsEmail: boolean;
   orderAlertsPush: boolean;
   marketingNewsletter: boolean;
@@ -34,23 +56,23 @@ export interface UserSettingsProfile {
 
 export interface RegionalSettings {
   id: string;
-  userId: string; 
+  userId: string;
   primaryCurrency: "UGX" | "USD" | "KES" | "EUR";
   systemLanguage: "en" | "fr" | "sw";
 }
 
 export interface NotificationPreferences {
-  id: string; 
-  userId: string; 
-  emailAlerts: boolean; 
-  smsAlerts: boolean; 
-  marketingAlerts: boolean; 
+  id: string;
+  userId: string;
+  emailAlerts: boolean;
+  smsAlerts: boolean;
+  marketingAlerts: boolean;
 }
 
 export interface SecuritySettings {
-  id: string; 
-  userId: string; 
-  twoFactorEnabled: boolean; 
+  id: string;
+  userId: string;
+  twoFactorEnabled: boolean;
 }
 
 // ==========================================
@@ -60,10 +82,10 @@ export interface SecuritySettings {
 export interface Store {
   id: string;
   vendorId?: string;
-  name: string; 
-  slug: string; 
-  logo: string; 
-  rating?: number; 
+  name: string;
+  slug: string;
+  logo: string;
+  rating?: number;
   verified: boolean;
   subscriptionPlan?: "Premium Tier" | "Standard Tier" | "Basic Tier";
 }
@@ -74,18 +96,17 @@ export interface Coupon {
   vendor: string;
 }
 
-
 // ==========================================
 // COMMERCE CATALOG & CLASSIFICATIONS
 // ==========================================
 
 export interface Category {
-  id: string; 
-  name: string; 
-  slug: string; 
-  description: string;           
-  image: string;                 
-  parentId: string | null; 
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  image: string;
+  parentId: string | null;
   _count?: {
     products: number;
     subCategories: number;
@@ -152,19 +173,19 @@ export interface ProductVariant {
   id: string;
   productId: string;
   sku: string;
-  name: string;                       
+  name: string;
   price: number;
   inventoryCount: number;
-  options: Record<string, string>;    
+  options: Record<string, string>;
 }
 
 export interface ProductSpec {
-  name: string;                        
-  value: string;                       
+  name: string;
+  value: string;
 }
 
 export interface ProductFormData {
-  title: string;                       
+  title: string;
   slug?: string;
   brand: string;
   description: string;
@@ -174,8 +195,8 @@ export interface ProductFormData {
   subCategoryId?: string;
   inventoryCount: number;
   sku?: string;
-  image: string;                       
-  images: string[];                    
+  image: string;
+  images: string[];
   sizes: string[];
   colors: string[];
   specs: ProductSpec[];
@@ -186,7 +207,7 @@ export interface ProductFormData {
 export interface ProductCampaign {
   id: string;
   tag: string;
-  title: string; 
+  title: string;
   description: string;
   image: string;
   ctaText: string;
@@ -219,12 +240,16 @@ export interface Collection {
   volume: string;
   name: string;
   description: string;
-  curatorName: string; 
+  curatorName: string;
   isMerchantCurated: boolean;
   itemCount: number;
   coverImage: string;
   mediaGallery: CollectionMedia[];
 }
+
+// ==========================================
+// ORDER & TRANSACTION TYPES
+// ==========================================
 
 export interface OrderItem {
   productId: string;
@@ -265,7 +290,7 @@ export interface ProductReview {
   userName: string;
   rating: number;
   comment: string;
-  createdAt: string; 
+  createdAt: string;
 }
 
 // ==========================================
@@ -283,5 +308,5 @@ export interface MockDatabaseSchema {
   promos: PromoCampaign[];
   collections: Collection[];
   reviews: ProductReview[];
-  orders: Order[]
+  orders: Order[];
 }

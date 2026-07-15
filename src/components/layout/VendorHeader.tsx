@@ -14,7 +14,6 @@ export function VendorHeader() {
 
   const storeName = profile?.storeName || "My Store";
   const storeLogo = profile?.logoUrl || null;
-  const storeSlug = profile?.slug || "";
 
   // Dynamic heading resolver — maps all vendor paths to contextual labels
   const getHeaderTitle = () => {
@@ -79,13 +78,6 @@ export function VendorHeader() {
 
         {/* RIGHT PANEL: Alerts Hub & Profile Snapshot */}
         <div className="flex items-center gap-2.5 sm:gap-3 ml-4 shrink-0">
-          
-          {/* Store Slug Badge (hidden on mobile) */}
-          {storeSlug && !vendorLoading && (
-            <span className="hidden lg:inline-flex text-[10px] font-bold text-muted-foreground bg-muted/50 border border-border/30 px-2.5 py-1 rounded-full">
-              /{storeSlug}
-            </span>
-          )}
 
           {/* Notifications Trigger Button */}
           <button className="p-2.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full relative transition-all active:scale-95 group cursor-pointer">

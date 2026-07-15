@@ -1,15 +1,16 @@
-import { NextResponse } from "next/server";
-import { vendorService } from "@/services/vendor";
+import { VendorService } from "@/services/vendor";
+import {
+  successResponse,
+  errorResponse,
+  getErrorMessage,
+} from "@/lib/api-utils";
 
 export async function GET() {
   try {
-    const stores = await vendorService.getPublicStoreListings();
-    return NextResponse.json({ stores });
-  } catch (error) {
-    console.error("Failed to fetch public stores:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch stores" },
-      { status: 500 }
-    );
+    const stores = await VendorService.getPublicStoreListings();
+    return successResponse(stores);
+  } catch (error: unknown) {
+    console.error("[Public Vendors API]", error);
+    return errorResponse(getErrorMessage(error));
   }
 }

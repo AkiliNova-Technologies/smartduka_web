@@ -1,5 +1,6 @@
-import { headers } from "next/headers";
+import { headers, cookies } from "next/headers";
 import { PlatformRole, VendorUserRole } from "@prisma/client";
+import { verifyToken } from "@/lib/auth/jwt";
 
 export interface AuthenticatedUserSession {
   userId: string;
@@ -11,7 +12,8 @@ export interface AuthenticatedUserSession {
 
 /**
  * Fast-access server context utility. Extracts the authenticated marketplace context
- * injected directly by the edge gateway shield OR authorizes background cron workers.
+ * injected directly by the edge gateway shield, reads the session cookie for server actions,
+ * OR authorizes background cron workers.
  */
 export async function getAuthenticatedSession(): Promise<AuthenticatedUserSession | null> {
   const requestHeaders = await headers();
@@ -29,20 +31,41 @@ export async function getAuthenticatedSession(): Promise<AuthenticatedUserSessio
     };
   }
 
+  // Primary: proxy-injected headers
   const userId = requestHeaders.get("x-marketplace-user-id");
   const email = requestHeaders.get("x-marketplace-email");
 
-  if (!userId || !email) {
-    return null;
+  if (userId && email) {
+    return {
+      userId,
+      email,
+      vendorId: requestHeaders.get("x-marketplace-vendor-id"),
+      vendorRole: requestHeaders.get("x-marketplace-vendor-role") as VendorUserRole | null,
+      platformRole: requestHeaders.get("x-marketplace-platform-role") as PlatformRole | null,
+    };
   }
 
-  return {
-    userId,
-    email,
-    vendorId: requestHeaders.get("x-marketplace-vendor-id"),
-    vendorRole: requestHeaders.get("x-marketplace-vendor-role") as VendorUserRole | null,
-    platformRole: requestHeaders.get("x-marketplace-platform-role") as PlatformRole | null,
-  };
+  // Fallback for server actions: read session cookie directly
+  try {
+    const cookieStore = await cookies();
+    const sessionCookie = cookieStore.get("session");
+    if (sessionCookie) {
+      const session = await verifyToken(sessionCookie.value);
+      if (session) {
+        return {
+          userId: session.userId,
+          email: session.email,
+          vendorId: session.vendorId,
+          vendorRole: session.vendorRole,
+          platformRole: session.platformRole,
+        };
+      }
+    }
+  } catch {
+    // cookies() can throw in some contexts — ignore
+  }
+
+  return null;
 }
 
 /**

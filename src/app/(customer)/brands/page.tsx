@@ -155,7 +155,7 @@ function ErrorState({
 // ─── Empty state ───
 function EmptyState() {
   return (
-    <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-12 selection:bg-emerald-500/10 selection:text-emerald-700">
+    <div className="max-w-8xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-12 selection:bg-emerald-500/10 selection:text-emerald-700">
       <div className="border-b border-border/60 pb-6 space-y-1">
         <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
           Browse Trusted Dukas
@@ -166,7 +166,7 @@ function EmptyState() {
         </p>
       </div>
 
-      <div className="max-w-lg mx-auto">
+      <div className="max-w-8xl w-full mx-auto">
         <div className="bg-card border border-border/60 rounded-[24px] shadow-[0_16px_40px_-12px_rgba(0,0,0,0.03)] dark:border-zinc-800/80 dark:shadow-none overflow-hidden">
           <div className="p-8 flex flex-col items-center text-center space-y-3">
             <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center">
@@ -215,7 +215,7 @@ export default function BrandsPage() {
   }, [rawStores]);
 
   // Loading state — skeleton grid matching card layout
-  if (isLoading) return <LoadingState />;
+  if (isLoading && rawStores.length === 0 ) return <LoadingState />;
 
   // Error state — branded card with retry
   if (error) {

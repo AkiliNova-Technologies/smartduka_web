@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma/client";
 import { DocumentType } from "@prisma/client";
+import { successResponse, errorResponse, getErrorMessage } from "@/lib/api-utils";
 
 interface DocumentPayload {
   name: string;
@@ -12,22 +13,23 @@ export async function POST(
   { params }: { params: Promise<{ vendorId: string }> }
 ) {
   try {
-    const { vendorId } = await params; // params is a Promise, must await
+    const { vendorId } = await params;
+    const { documents } = (await req.json()) as {
+      documents: Record<string, DocumentPayload>;
+    };
 
-    const { documents } = await req.json() as { documents: Record<string, DocumentPayload> };
-
-    // Verify vendor exists and is APPROVED
+    // Verify vendor exists
     const vendor = await prisma.vendorProfile.findUnique({
       where: { id: vendorId },
       include: { vendorApplication: true },
     });
 
     if (!vendor) {
-      return NextResponse.json({ error: "Vendor not found." }, { status: 404 });
+      return errorResponse("Vendor not found.", 404);
     }
 
     if (!vendor.vendorApplication) {
-      return NextResponse.json({ error: "No linked application found." }, { status: 400 });
+      return errorResponse("No linked application found.", 400);
     }
 
     // Create document records
@@ -51,12 +53,9 @@ export async function POST(
       data: { status: "UNDER_REVIEW" },
     });
 
-    return NextResponse.json({ success: true, documents: documentRecords });
-  } catch (error) {
-    console.error("Verification upload error:", error);
-    return NextResponse.json(
-      { error: "Failed to process verification documents." },
-      { status: 500 }
-    );
+    return successResponse({ documents: documentRecords });
+  } catch (error: unknown) {
+    console.error("[Verification Upload API]", error);
+    return errorResponse(getErrorMessage(error));
   }
 }

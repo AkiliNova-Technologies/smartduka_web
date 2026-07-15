@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { adminAuth } from "@/lib/firebase/admin";
 import { prisma } from "@/lib/prisma/client";
 import { PlatformRole, UserStatus } from "@prisma/client";
+import { successResponse, errorResponse, getErrorMessage } from "@/lib/api-utils";
 
 export async function POST(req: NextRequest) {
   try {
@@ -14,14 +15,14 @@ export async function POST(req: NextRequest) {
     }
 
     if (!idToken) {
-      return NextResponse.json({ error: "Unauthorized: Missing identity token." }, { status: 401 });
+      return errorResponse("Unauthorized: Missing identity token.", 401);
     }
 
     const decodedToken = await adminAuth.verifyIdToken(idToken);
     const { uid, email, name, picture, email_verified } = decodedToken;
 
     if (!email) {
-      return NextResponse.json({ error: "Email missing from token." }, { status: 400 });
+      return errorResponse("Email missing from token.", 400);
     }
 
     const user = await prisma.user.upsert({
@@ -45,10 +46,12 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    return NextResponse.json({ success: true, user: { id: user.id, role: user.platformRole } });
+    return successResponse({
+      id: user.id,
+      platformRole: user.platformRole,
+    });
   } catch (error: unknown) {
-    console.error("Auth Sync Error:", error);
-    const message = error instanceof Error ? error.message : "Authentication sync failed";
-    return NextResponse.json({ error: message }, { status: 401 });
+    console.error("[Auth Sync API]", error);
+    return errorResponse(getErrorMessage(error), 401);
   }
 }

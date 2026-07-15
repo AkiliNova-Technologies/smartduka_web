@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { vendorService } from "@/services/vendor";
+import { VendorService } from "@/services/vendor";
 import { VerificationStatus } from "@prisma/client";
 
 export async function GET(req: NextRequest) {
@@ -8,7 +8,7 @@ export async function GET(req: NextRequest) {
     const status = url.searchParams.get("status") as VerificationStatus | null;
     const search = url.searchParams.get("search") || undefined;
 
-    const applications = await vendorService.getAllApplications({
+    const applications = await VendorService.getAllApplications({
       status: status || undefined,
       search,
     });

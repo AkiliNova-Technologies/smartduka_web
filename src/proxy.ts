@@ -10,7 +10,7 @@ const CHECKOUT_PREFIX = "/checkout";
 // API routes that authenticate via x-marketplace-user-id header
 const HEADER_AUTH_API_PREFIXES = [
   "/api/settings",
-  "/api/wishlist",
+  "/api/orders",
   "/api/user-profile",
 ];
 

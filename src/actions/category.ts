@@ -6,64 +6,61 @@ import {
   CreateCategoryInput,
   UpdateCategoryInput,
 } from "@/services/category";
+import { withErrorHandling, validateRequiredFields } from "@/lib/api-utils";
 
 export async function getCategoryDetailsAction(id: string) {
-  try {
+  return withErrorHandling(async () => {
     const category = await CategoryService.getCategoryById(id);
-    if (!category)
-      return { success: false, error: "Category record not found." };
-    return { success: true, data: category };
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Internal read operation failure.";
-    return { success: false, error: message };
-  }
+    if (!category) throw new Error("Category record not found.");
+    return category;
+  }, "getCategoryDetailsAction");
+}
+
+export async function getCategoryBySlugAction(slug: string) {
+  return withErrorHandling(async () => {
+    const category = await CategoryService.getCategoryBySlug(slug);
+    if (!category) throw new Error("Category not found.");
+    return category;
+  }, "getCategoryBySlugAction");
+}
+
+export async function getProductsByCategorySlugAction(slug: string, sort?: string) {
+  return withErrorHandling(
+    () => CategoryService.getProductsByCategorySlug(slug, { sort }),
+    "getProductsByCategorySlugAction"
+  );
 }
 
 export async function createCategoryAction(formData: CreateCategoryInput) {
-  try {
-    if (!formData.name || !formData.slug) {
-      return {
-        success: false,
-        error: "Required parameters missing structural values.",
-      };
-    }
-
-    await CategoryService.createCategoryWithSubs(formData);
-
-    revalidatePath("/admin/categories");
-    return { success: true };
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Internal mutation execution engine error.";
-    return { success: false, error: message };
+  const validationError = validateRequiredFields(formData, ["name", "slug"]);
+  if (validationError) {
+    return { success: false as const, error: validationError };
   }
+
+  return withErrorHandling(async () => {
+    await CategoryService.createCategoryWithSubs(formData);
+    revalidatePath("/admin/categories");
+    return { created: true };
+  }, "createCategoryAction");
 }
 
 export async function deleteCategoryAction(id: string) {
-  try {
+  return withErrorHandling(async () => {
     await CategoryService.deleteCategory(id);
     revalidatePath("/admin/categories");
-    return { success: true };
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Failed to remove requested category configuration node.";
-    return { success: false, error: message };
-  }
+    return { deleted: true };
+  }, "deleteCategoryAction");
 }
 
 export async function updateCategoryAction(formData: UpdateCategoryInput) {
-  try {
-    if (!formData.id || !formData.name || !formData.slug) {
-      return {
-        success: false,
-        error: "Missing required transactional identity records.",
-      };
-    }
-
-    await CategoryService.updateCategory(formData);
-
-    revalidatePath("/admin/categories");
-    return { success: true };
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Failed to commit node updates.";
-    return { success: false, error: message };
+  const validationError = validateRequiredFields(formData, ["id", "name", "slug"]);
+  if (validationError) {
+    return { success: false as const, error: validationError };
   }
+
+  return withErrorHandling(async () => {
+    await CategoryService.updateCategory(formData);
+    revalidatePath("/admin/categories");
+    return { updated: true };
+  }, "updateCategoryAction");
 }

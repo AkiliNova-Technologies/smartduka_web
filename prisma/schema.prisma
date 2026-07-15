@@ -195,37 +195,39 @@ model VerificationToken {
 // ==========================================
 
 model User {
-  id              String        @id @default(uuid())
-  name            String
-  email           String        @unique
-  phone           String?
-  passwordHash    String?
-  avatarUrl       String?
-  status          UserStatus    @default(PENDING)
-  platformRole    PlatformRole?
+  id           String        @id @default(uuid())
+  name         String
+  email        String        @unique
+  phone        String?
+  passwordHash String?
+  avatarUrl    String?
+  status       UserStatus    @default(PENDING)
+  platformRole PlatformRole?
 
   emailVerifiedAt DateTime?
   lastLoginAt     DateTime?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
   deletedAt       DateTime?
 
-  vendorId        String?
-  vendorRole      VendorUserRole?
-  vendorProfile   VendorProfile? @relation("VendorEmployees", fields: [vendorId], references: [id], onDelete: SetNull)
-  ownedVendor     VendorProfile? @relation("VendorOwner")
+  vendorId      String?
+  vendorRole    VendorUserRole?
+  vendorProfile VendorProfile?  @relation("VendorEmployees", fields: [vendorId], references: [id], onDelete: SetNull)
+  ownedVendor   VendorProfile?  @relation("VendorOwner")
 
-  settings        UserSettings?
+  settings UserSettings?
 
-  accounts        Account[]
-  sessions        Session[]
+  accounts Account[]
+  sessions Session[]
 
   vendorApplications VendorApplication[]
 
-  customerOrders  Order[]        @relation("CustomerOrders")
-  reviewsWritten  ProductReview[]
-  auditLogs       AuditLog[]
-  notifications   Notification[]
+  wishlistItems  WishlistItem[]
+  recentlyViewed  RecentlyViewed[]
+  customerOrders Order[]         @relation("CustomerOrders")
+  reviewsWritten ProductReview[]
+  auditLogs      AuditLog[]
+  notifications  Notification[]
 
   @@index([status])
   @@index([vendorId])
@@ -237,31 +239,31 @@ model User {
 // ==========================================
 
 model UserSettings {
-  id                    String    @id @default(uuid())
-  userId                String    @unique
-  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(uuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  fullName              String?
-  phoneNumber           String?
-  avatarUrl             String?
+  fullName    String?
+  phoneNumber String?
+  avatarUrl   String?
 
-  currency              String    @default("UGX")
-  primaryLanguage       String    @default("en")
-  deliveryDistrict      String?
+  currency         String  @default("UGX")
+  primaryLanguage  String  @default("en")
+  deliveryDistrict String?
 
-  momoNetwork           String?
-  momoNumber            String?
+  momoNetwork String?
+  momoNumber  String?
 
-  orderAlertsEmail      Boolean   @default(true)
-  orderAlertsPush       Boolean   @default(true)
-  securityAlertsSMS     Boolean   @default(true)
-  marketingNewsletter   Boolean   @default(false)
+  orderAlertsEmail    Boolean @default(true)
+  orderAlertsPush     Boolean @default(true)
+  securityAlertsSMS   Boolean @default(true)
+  marketingNewsletter Boolean @default(false)
 
-  twoFactorEnabled      Boolean   @default(false)
-  buyerProtectionEnabled Boolean  @default(true)
+  twoFactorEnabled       Boolean @default(false)
+  buyerProtectionEnabled Boolean @default(true)
 
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([userId])
 }
@@ -271,57 +273,57 @@ model UserSettings {
 // ==========================================
 
 model VendorApplication {
-  id              String             @id @default(uuid())
-  userId          String
-  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   // Business Info
-  storeName       String
-  storeSlug       String             @unique
-  businessType    String             
+  storeName          String
+  storeSlug          String  @unique
+  businessType       String
   registrationNumber String?
-  taxId           String?
-  
+  taxId              String?
+
   // Contact
-  businessEmail   String
-  businessPhone   String
-  website         String?
-  
+  businessEmail String
+  businessPhone String
+  website       String?
+
   // Address
-  streetAddress   String
-  city            String             @default("Kampala")
-  district        String?
-  country         String             @default("Uganda")
-  postalCode      String?
-  
+  streetAddress String
+  city          String  @default("Kampala")
+  district      String?
+  country       String  @default("Uganda")
+  postalCode    String?
+
   // Operations
-  productCategories String[]         @default([])
-  expectedMonthlyVolume String?      
-  hasPhysicalStore  Boolean          @default(false)
-  storeLocation     String?
-  
+  productCategories     String[] @default([])
+  expectedMonthlyVolume String?
+  hasPhysicalStore      Boolean  @default(false)
+  storeLocation         String?
+
   // Payment Setup
-  momoNetwork     String?            
-  momoNumber      String?
-  bankName        String?
-  bankAccountName String?
+  momoNetwork       String?
+  momoNumber        String?
+  bankName          String?
+  bankAccountName   String?
   bankAccountNumber String?
 
   // Status
-  status          VerificationStatus @default(PENDING)
-  reviewerNotes   String?
-  reviewedBy      String?
-  reviewedAt      DateTime?
-  
+  status        VerificationStatus @default(PENDING)
+  reviewerNotes String?
+  reviewedBy    String?
+  reviewedAt    DateTime?
+
   // Link to created vendor profile after approval
-  vendorProfileId String?           @unique
-  vendorProfile   VendorProfile?     @relation(fields: [vendorProfileId], references: [id], onDelete: SetNull)
-  
+  vendorProfileId String?        @unique
+  vendorProfile   VendorProfile? @relation(fields: [vendorProfileId], references: [id], onDelete: SetNull)
+
   // Documents
-  documents       VendorDocument[]
-  
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
+  documents VendorDocument[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([userId])
   @@index([status])
@@ -329,20 +331,20 @@ model VendorApplication {
 }
 
 model VendorDocument {
-  id              String             @id @default(uuid())
-  applicationId   String
-  application     VendorApplication  @relation(fields: [applicationId], references: [id], onDelete: Cascade)
-  
-  type            DocumentType
-  name            String
-  url             String
-  mimeType        String?
-  size            Int?
-  
-  status          VerificationStatus @default(PENDING)
-  notes           String?
-  
-  createdAt       DateTime           @default(now())
+  id            String            @id @default(uuid())
+  applicationId String
+  application   VendorApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  type     DocumentType
+  name     String
+  url      String
+  mimeType String?
+  size     Int?
+
+  status VerificationStatus @default(PENDING)
+  notes  String?
+
+  createdAt DateTime @default(now())
 
   @@index([applicationId])
 }
@@ -352,10 +354,10 @@ model VendorDocument {
 // ==========================================
 
 model VendorProfile {
-  id                 String       @id @default(uuid())
-  ownerId            String       @unique
-  owner              User         @relation("VendorOwner", fields: [ownerId], references: [id], onDelete: Cascade)
-  
+  id      String @id @default(uuid())
+  ownerId String @unique
+  owner   User   @relation("VendorOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
   storeName          String
   slug               String       @unique
   registrationNumber String?
@@ -371,30 +373,31 @@ model VendorProfile {
   currency           String       @default("UGX")
   timezone           String       @default("Africa/Kampala")
   status             VendorStatus @default(PENDING)
+  isVerified         Boolean      @default(false)
 
-  momoMerchantCode   String?
-  bankAccountName    String?
-  bankAccountNumber  String?
-  bankName           String?
+  momoMerchantCode  String?
+  bankAccountName   String?
+  bankAccountNumber String?
+  bankName          String?
 
-  trialEndsAt        DateTime?
-  activatedAt        DateTime?
-  suspendedAt        DateTime?
-  createdAt          DateTime     @default(now())
-  updatedAt          DateTime     @updatedAt
-  deletedAt          DateTime?
+  trialEndsAt DateTime?
+  activatedAt DateTime?
+  suspendedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
 
   // Relations
-  employees          User[]                  @relation("VendorEmployees")
-  products           Product[]
-  subOrders          SubOrder[]
-  ledgerEntries      FinancialLedger[]
-  payouts            VendorPayout[]
-  subscriptions      VendorSubscription[]
-  notifications      Notification[]
-  auditLogs          AuditLog[]
-  documents          Document[]
-  vendorApplication  VendorApplication?      
+  employees         User[]               @relation("VendorEmployees")
+  products          Product[]
+  subOrders         SubOrder[]
+  ledgerEntries     FinancialLedger[]
+  payouts           VendorPayout[]
+  subscriptions     VendorSubscription[]
+  notifications     Notification[]
+  auditLogs         AuditLog[]
+  documents         Document[]
+  vendorApplication VendorApplication?
 
   @@index([status])
   @@index([createdAt])
@@ -405,61 +408,63 @@ model VendorProfile {
 // ==========================================
 
 model ProductCategory {
-  id          String   @id @default(uuid())
+  id          String  @id @default(uuid())
   name        String
-  slug        String   @unique
-  description String?  
-  image       String?   
-  
-  parentId    String?
-  parent      ProductCategory?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
-  children    ProductCategory[] @relation("CategoryHierarchy")
-  
+  slug        String  @unique
+  description String?
+  image       String?
+
+  parentId String?
+  parent   ProductCategory?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children ProductCategory[] @relation("CategoryHierarchy")
+
   products    Product[] @relation("CategoryProducts")
   subProducts Product[] @relation("ProductSubCategory")
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([parentId])
 }
 
 model Product {
-  id              String          @id @default(uuid())
-  vendorId        String
-  vendor          VendorProfile   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  categoryId      String?
-  category        ProductCategory? @relation("CategoryProducts", fields: [categoryId], references: [id], onDelete: SetNull)
-  subCategoryId   String?        
-  subCategory     ProductCategory? @relation("ProductSubCategory", fields: [subCategoryId], references: [id], onDelete: SetNull)
+  id            String           @id @default(uuid())
+  vendorId      String
+  vendor        VendorProfile    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  categoryId    String?
+  category      ProductCategory? @relation("CategoryProducts", fields: [categoryId], references: [id], onDelete: SetNull)
+  subCategoryId String?
+  subCategory   ProductCategory? @relation("ProductSubCategory", fields: [subCategoryId], references: [id], onDelete: SetNull)
 
-  name            String
-  slug            String          @unique
-  brand           String?         
-  description     String?         @db.Text
+  name        String
+  slug        String  @unique
+  brand       String?
+  description String? @db.Text
 
-  basePrice       Decimal         @db.Decimal(18, 2)
-  compareAtPrice  Decimal?        @db.Decimal(18, 2) 
+  basePrice      Decimal  @db.Decimal(18, 2)
+  compareAtPrice Decimal? @db.Decimal(18, 2)
 
-  inventoryCount  Int             @default(0) 
-  sku             String?
-  status          ProductStatus   @default(DRAFT)
+  inventoryCount Int           @default(0)
+  sku            String?
+  status         ProductStatus @default(DRAFT)
 
-  sizes           String[]        @default([]) 
-  colors          String[]        @default([]) 
+  sizes  String[] @default([])
+  colors String[] @default([])
 
-  specs           Json?           
+  specs Json?
 
-  tags            String[]        @default([]) 
+  tags String[] @default([])
 
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
-  deletedAt       DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
-  images          ProductImage[]
-  variants        ProductVariant[]
-  orderItems      OrderItem[]
-  reviews         ProductReview[]
+  images        ProductImage[]
+  variants      ProductVariant[]
+  orderItems    OrderItem[]
+  reviews       ProductReview[]
+  wishlistItems WishlistItem[]
+  recentlyViewed  RecentlyViewed[]
 
   @@unique([vendorId, slug])
   @@index([vendorId])
@@ -481,41 +486,66 @@ model ProductImage {
 }
 
 model ProductVariant {
-  id             String      @id @default(uuid())
-  productId      String
-  product        Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
-  
-  sku            String      @unique
-  name           String      
-  price          Decimal     @db.Decimal(18, 2)
-  inventoryCount Int         @default(0)
-  options        Json        
-  
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  id        String  @id @default(uuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
-  orderItems     OrderItem[]
+  sku            String  @unique
+  name           String
+  price          Decimal @db.Decimal(18, 2)
+  inventoryCount Int     @default(0)
+  options        Json
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orderItems OrderItem[]
 
   @@index([productId])
 }
 
 model ProductReview {
-  id              String    @id @default(uuid())
-  productId       String
-  product         Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
-  userId          String
-  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  rating          Int       @default(5)
-  comment         String?   @db.Text
-  reply           String?   
-  replyAt         DateTime?
-  verifiedPurchase Boolean  @default(false)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id               String    @id @default(uuid())
+  productId        String
+  product          Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  userId           String
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rating           Int       @default(5)
+  comment          String?   @db.Text
+  reply            String?
+  replyAt          DateTime?
+  verifiedPurchase Boolean   @default(false)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   @@unique([productId, userId])
   @@index([productId])
   @@index([userId])
+}
+
+model WishlistItem {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, productId])
+  @@index([userId])
+  @@index([productId])
+}
+
+model RecentlyViewed {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  viewedAt  DateTime @default(now()) @updatedAt
+
+  @@unique([userId, productId])
+  @@index([userId, viewedAt])
 }
 
 // ==========================================
@@ -523,31 +553,31 @@ model ProductReview {
 // ==========================================
 
 model Order {
-  id                String         @id @default(uuid())
-  customerId        String
-  customer          User           @relation("CustomerOrders", fields: [customerId], references: [id])
-  
-  orderNumber       String         @unique
-  totalAmount       Decimal        @db.Decimal(18, 2)
-  subTotal          Decimal        @db.Decimal(18, 2)
-  totalShipping     Decimal        @db.Decimal(18, 2)
-  taxAmount         Decimal        @default(0.00) @db.Decimal(18, 2)
-  
-  status            OrderStatus    @default(PENDING)
-  paymentGateway    PaymentGateway
-  paymentStatus     PaymentStatus  @default(PENDING)
-  
-  gatewayReference  String?        @unique 
-  shippingAddress   String
-  shippingPhone     String
-  shippingEmail     String
-  notes             String?
+  id         String @id @default(uuid())
+  customerId String
+  customer   User   @relation("CustomerOrders", fields: [customerId], references: [id])
 
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
+  orderNumber   String  @unique
+  totalAmount   Decimal @db.Decimal(18, 2)
+  subTotal      Decimal @db.Decimal(18, 2)
+  totalShipping Decimal @db.Decimal(18, 2)
+  taxAmount     Decimal @default(0.00) @db.Decimal(18, 2)
 
-  subOrders         SubOrder[]
-  orderItems        OrderItem[]
+  status         OrderStatus    @default(PENDING)
+  paymentGateway PaymentGateway
+  paymentStatus  PaymentStatus  @default(PENDING)
+
+  gatewayReference String? @unique
+  shippingAddress  String
+  shippingPhone    String
+  shippingEmail    String
+  notes            String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  subOrders  SubOrder[]
+  orderItems OrderItem[]
 
   @@index([customerId])
   @@index([status])
@@ -555,25 +585,25 @@ model Order {
 }
 
 model SubOrder {
-  id                String         @id @default(uuid())
-  orderId           String
-  order             Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  vendorId          String
-  vendor            VendorProfile  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  id       String        @id @default(uuid())
+  orderId  String
+  order    Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  vendorId String
+  vendor   VendorProfile @relation(fields: [vendorId], references: [id], onDelete: Cascade)
 
-  subOrderNumber    String         @unique 
-  vendorSubTotal    Decimal        @db.Decimal(18, 2)
-  vendorShipping    Decimal        @db.Decimal(18, 2) 
-  vendorTotal       Decimal        @db.Decimal(18, 2)
-  platformCommission Decimal       @db.Decimal(18, 2) 
+  subOrderNumber     String  @unique
+  vendorSubTotal     Decimal @db.Decimal(18, 2)
+  vendorShipping     Decimal @db.Decimal(18, 2)
+  vendorTotal        Decimal @db.Decimal(18, 2)
+  platformCommission Decimal @db.Decimal(18, 2)
 
-  status            SubOrderStatus @default(PENDING)
-  notes             String?
-  
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
+  status SubOrderStatus @default(PENDING)
+  notes  String?
 
-  items             OrderItem[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items OrderItem[]
 
   @@index([orderId])
   @@index([vendorId])
@@ -581,22 +611,22 @@ model SubOrder {
 }
 
 model OrderItem {
-  id              String          @id @default(uuid())
-  orderId         String
-  order           Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  subOrderId      String
-  subOrder        SubOrder        @relation(fields: [subOrderId], references: [id], onDelete: Cascade)
-  productId       String
-  product         Product         @relation(fields: [productId], references: [id])
-  variantId       String?
-  variant         ProductVariant? @relation(fields: [variantId], references: [id])
+  id         String          @id @default(uuid())
+  orderId    String
+  order      Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  subOrderId String
+  subOrder   SubOrder        @relation(fields: [subOrderId], references: [id], onDelete: Cascade)
+  productId  String
+  product    Product         @relation(fields: [productId], references: [id])
+  variantId  String?
+  variant    ProductVariant? @relation(fields: [variantId], references: [id])
 
-  quantity        Int             @default(1)
-  priceAtPurchase Decimal         @db.Decimal(18, 2)
-  totalPrice      Decimal         @db.Decimal(18, 2)
+  quantity        Int     @default(1)
+  priceAtPurchase Decimal @db.Decimal(18, 2)
+  totalPrice      Decimal @db.Decimal(18, 2)
 
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([orderId])
   @@index([subOrderId])
@@ -608,16 +638,16 @@ model OrderItem {
 // ==========================================
 
 model FinancialLedger {
-  id              String                @id @default(uuid())
-  vendorId        String
-  vendor          VendorProfile         @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  
-  type            LedgerTransactionType
-  amount          Decimal               @db.Decimal(18, 2)
-  reference       String?               
-  description     String?
-  
-  createdAt       DateTime              @default(now())
+  id       String        @id @default(uuid())
+  vendorId String
+  vendor   VendorProfile @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  type        LedgerTransactionType
+  amount      Decimal               @db.Decimal(18, 2)
+  reference   String?
+  description String?
+
+  createdAt DateTime @default(now())
 
   @@index([vendorId])
   @@index([type])
@@ -625,19 +655,19 @@ model FinancialLedger {
 }
 
 model VendorPayout {
-  id              String        @id @default(uuid())
-  vendorId        String
-  vendor          VendorProfile @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  
-  amount          Decimal       @db.Decimal(18, 2)
-  gateway         PaymentGateway
-  reference       String?       
-  status          PayoutStatus  @default(PENDING)
-  errorMessage    String?
-  
-  processedAt     DateTime?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  id       String        @id @default(uuid())
+  vendorId String
+  vendor   VendorProfile @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  amount       Decimal        @db.Decimal(18, 2)
+  gateway      PaymentGateway
+  reference    String?
+  status       PayoutStatus   @default(PENDING)
+  errorMessage String?
+
+  processedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   @@index([vendorId])
   @@index([status])
@@ -648,33 +678,33 @@ model VendorPayout {
 // ==========================================
 
 model SubscriptionPlan {
-  id                 String             @id @default(uuid())
-  name               String             @unique
-  slug               String             @unique
-  description        String?
-  price              Decimal            @db.Decimal(18, 2)
-  currency           String             @default("UGX")
-  billingCycle       BillingCycle       @default(MONTHLY)
+  id           String       @id @default(uuid())
+  name         String       @unique
+  slug         String       @unique
+  description  String?
+  price        Decimal      @db.Decimal(18, 2)
+  currency     String       @default("UGX")
+  billingCycle BillingCycle @default(MONTHLY)
 
-  maxProducts        Int?
-  commissionRate     Decimal            @db.Decimal(5, 2)
-  hasPremiumThemes   Boolean            @default(false)
-  hasAdvancedCharts  Boolean            @default(false)
-  isActive           Boolean            @default(true)
+  maxProducts       Int?
+  commissionRate    Decimal @db.Decimal(5, 2)
+  hasPremiumThemes  Boolean @default(false)
+  hasAdvancedCharts Boolean @default(false)
+  isActive          Boolean @default(true)
 
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  subscriptions      VendorSubscription[]
+  subscriptions VendorSubscription[]
 }
 
 model VendorSubscription {
-  id                 String             @id @default(uuid())
-  vendorId           String
-  vendor             VendorProfile      @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  planId             String
-  plan               SubscriptionPlan   @relation(fields: [planId], references: [id])
-  
+  id       String           @id @default(uuid())
+  vendorId String
+  vendor   VendorProfile    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  planId   String
+  plan     SubscriptionPlan @relation(fields: [planId], references: [id])
+
   status             SubscriptionStatus @default(TRIAL)
   startedAt          DateTime           @default(now())
   currentPeriodStart DateTime?
@@ -682,8 +712,8 @@ model VendorSubscription {
   cancelledAt        DateTime?
   gracePeriodEndsAt  DateTime?
 
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([vendorId])
   @@index([status])
@@ -694,17 +724,17 @@ model VendorSubscription {
 // ==========================================
 
 model Notification {
-  id              String           @id @default(uuid())
-  vendorId        String?
-  vendor          VendorProfile?   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  userId          String?
-  user            User?            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id       String         @id @default(uuid())
+  vendorId String?
+  vendor   VendorProfile? @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  userId   String?
+  user     User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  type            NotificationType @default(INFO)
-  title           String
-  message         String
-  readAt          DateTime?
-  createdAt       DateTime         @default(now())
+  type      NotificationType @default(INFO)
+  title     String
+  message   String
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
 
   @@index([vendorId])
   @@index([userId])
@@ -712,35 +742,35 @@ model Notification {
 }
 
 model Document {
-  id              String       @id @default(uuid())
-  vendorId        String?
-  vendor          VendorProfile? @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  id       String         @id @default(uuid())
+  vendorId String?
+  vendor   VendorProfile? @relation(fields: [vendorId], references: [id], onDelete: Cascade)
 
-  type            DocumentType @default(OTHER)
-  name            String
-  url             String
-  mimeType        String?
-  size            Int?
-  createdAt       DateTime     @default(now())
+  type      DocumentType @default(OTHER)
+  name      String
+  url       String
+  mimeType  String?
+  size      Int?
+  createdAt DateTime     @default(now())
 
   @@index([vendorId])
 }
 
 model AuditLog {
-  id              String         @id @default(uuid())
-  vendorId        String?
-  vendor          VendorProfile? @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  userId          String?
-  user            User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  id       String         @id @default(uuid())
+  vendorId String?
+  vendor   VendorProfile? @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  userId   String?
+  user     User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
 
-  action          String
-  entity          String
-  entityId        String?
-  oldValues       Json?
-  newValues       Json?
-  ipAddress       String?
-  userAgent       String?
-  createdAt       DateTime       @default(now())
+  action    String
+  entity    String
+  entityId  String?
+  oldValues Json?
+  newValues Json?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
 
   @@index([vendorId])
   @@index([userId])
@@ -761,15 +791,15 @@ model PesapalIpnRegistry {
 }
 
 model PaymentGatewayWebhookLog {
-  id              String               @id @default(uuid())
-  gateway         PaymentGateway
-  trackingId      String
-  reference       String
-  eventType       String?
-  payload         Json
-  status          WebhookProcessStatus @default(UNPROCESSED)
-  errorMessage    String?
-  createdAt       DateTime             @default(now())
+  id           String               @id @default(uuid())
+  gateway      PaymentGateway
+  trackingId   String
+  reference    String
+  eventType    String?
+  payload      Json
+  status       WebhookProcessStatus @default(UNPROCESSED)
+  errorMessage String?
+  createdAt    DateTime             @default(now())
 
   @@index([trackingId])
   @@index([reference])

@@ -1,13 +1,20 @@
 "use client";
 
-import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from "react";
-import { useAuth } from "@/hooks/use-auth";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useEffect,
+  useRef,
+} from "react";
+import { useAuth } from "@/providers/AuthProvider";
+import { getMyVendorApplication, getMyVendorProfile } from "@/actions/vendor";
 import { getMyFullVendorProfile } from "@/actions/vendor-settings";
+import { fetchApi, authHeaders } from "@/lib/providers/useProviderFetch";
 import type { VerificationStatus, Document } from "@prisma/client";
 
-// ─── Types ───
-
-interface VendorDocument {
+export interface VendorDocument {
   id: string;
   type: string;
   name: string;
@@ -15,7 +22,7 @@ interface VendorDocument {
   status: string;
 }
 
-interface VendorApplication {
+export interface VendorApplication {
   id: string;
   userId: string;
   storeName: string;
@@ -38,7 +45,7 @@ interface VendorApplication {
   documents: VendorDocument[];
 }
 
-interface VendorProfile {
+export interface VendorProfile {
   id: string;
   storeName: string;
   slug: string;
@@ -69,6 +76,18 @@ export interface PublicStore {
   products: { images: { url: string }[]; categoryId: string | null }[];
 }
 
+interface VendorSubOrder {
+  id: string;
+  subOrderNumber: string;
+  status: string;
+  vendorTotal: number;
+  customerName: string;
+  customerPhone: string;
+  deliveryAddress: string;
+  createdAt: string;
+  items: { name: string; quantity: number; price: number }[];
+}
+
 interface VendorDataContextType {
   application: VendorApplication | null;
   profile: VendorProfile | null;
@@ -76,105 +95,196 @@ interface VendorDataContextType {
   loading: boolean;
   fullProfileLoading: boolean;
   error: string | null;
-  refetch: () => Promise<void>;
-  refetchFullProfile: () => Promise<void>;
+  refetch: () => void;
+  refetchFullProfile: () => void;
   hasApplied: boolean;
   isPending: boolean;
   isApproved: boolean;
   isRejected: boolean;
   isUnderReview: boolean;
+  vendorOrders: VendorSubOrder[];
+  vendorOrdersLoading: boolean;
+  refreshVendorOrders: () => Promise<void>;
+  updateSubOrderStatus: (subOrderId: string, status: string) => Promise<void>;
 }
 
-// ─── Context ───
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return "An unexpected error occurred";
+}
 
-const VendorDataContext = createContext<VendorDataContextType | undefined>(undefined);
+const VendorDataContext = createContext<VendorDataContextType | undefined>(
+  undefined,
+);
 
-export function VendorDataProvider({ children }: { children: React.ReactNode }) {
+export function VendorDataProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const { uid, isAuthenticated, loading: authLoading } = useAuth();
-  const [application, setApplication] = useState<VendorApplication | null>(null);
+
+  const [application, setApplication] = useState<VendorApplication | null>(
+    null,
+  );
   const [profile, setProfile] = useState<VendorProfile | null>(null);
   const [fullProfile, setFullProfile] = useState<VendorProfile | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [hasFetched, setHasFetched] = useState(false);
   const [fullProfileFetched, setFullProfileFetched] = useState(false);
   const [fullProfileLoading, setFullProfileLoading] = useState(false);
+  const [vendorOrders, setVendorOrders] = useState<VendorSubOrder[]>([]);
+  const [vendorOrdersLoading, setVendorOrdersLoading] = useState(false);
+
   const fetchingRef = useRef(false);
-  const fullProfileFetchingRef = useRef(false);
 
   const loading = authLoading || (isAuthenticated && !hasFetched);
+  const hasApplied = !!application;
+  const isPending = application?.status === "PENDING";
+  const isApproved = application?.status === "APPROVED" || !!profile;
+  const isRejected = application?.status === "REJECTED";
+  const isUnderReview = application?.status === "UNDER_REVIEW";
 
   const fetchVendorData = useCallback(async () => {
-    if (!uid || fetchingRef.current) return;
+    if (!uid || fetchingRef.current || hasFetched) return;
+
     fetchingRef.current = true;
     setError(null);
 
     try {
-      const response = await fetch(`/api/vendors/apply?userId=${uid}`, {
-        headers: { "x-marketplace-user-id": uid },
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setApplication(data.application || null);
-        setProfile(data.profile || null);
-      } else if (response.status === 404) {
-        setApplication(null);
-        setProfile(null);
+      const [app, prof] = await Promise.all([
+        getMyVendorApplication(),
+        getMyVendorProfile(),
+      ]);
+
+      if (app.success) {
+        setApplication(app.data as unknown as VendorApplication);
       } else {
-        throw new Error("Failed to fetch vendor data");
+        setApplication(null);
       }
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "An unexpected error occurred");
-    } finally {
+
+      if (prof.success) {
+        setProfile(prof.data as unknown as VendorProfile);
+      } else {
+        setProfile(null);
+      }
+
       setHasFetched(true);
+    } catch (err: unknown) {
+      setError(getErrorMessage(err));
+    } finally {
       fetchingRef.current = false;
     }
-  }, [uid]);
+  }, [uid, hasFetched]);
 
-  // Fetch full profile (with documents) — lazy, only when basic profile is available
+  const refetch = useCallback(() => {
+    setHasFetched(false);
+  }, []);
+
   const fetchFullProfile = useCallback(async () => {
-    if (!profile || fullProfileFetchingRef.current || fullProfileFetched) return;
-    fullProfileFetchingRef.current = true;
+    if (!profile || fullProfileFetched) return;
     setFullProfileLoading(true);
-
     try {
       const result = await getMyFullVendorProfile();
       if (result.success && result.data) {
         setFullProfile(result.data as unknown as VendorProfile);
       }
     } catch {
-      // silent
+      // Silent
     } finally {
       setFullProfileFetched(true);
       setFullProfileLoading(false);
-      fullProfileFetchingRef.current = false;
     }
   }, [profile, fullProfileFetched]);
 
-  const refetchFullProfile = useCallback(async () => {
+  const refetchFullProfile = useCallback(() => {
     setFullProfileFetched(false);
-    fullProfileFetchingRef.current = false;
   }, []);
 
-  // Determine if we are ready to fetch basic vendor data
+  const refreshVendorOrdersRef = useRef<() => Promise<void>>(async () => {});
+
+  useEffect(() => {
+    refreshVendorOrdersRef.current = async () => {
+      if (!profile?.id || !uid) return;
+      setVendorOrdersLoading(true);
+      try {
+        const data = await fetchApi<{ orders: VendorSubOrder[] }>(
+          `/api/vendors/orders?vendorId=${profile.id}`,
+          { headers: authHeaders(uid) },
+        );
+        setVendorOrders(data.orders || []);
+      } catch {
+        // Silent
+      } finally {
+        setVendorOrdersLoading(false);
+      }
+    };
+  }, [profile, uid]);
+
+  const refreshVendorOrders = useCallback(async () => {
+    await refreshVendorOrdersRef.current();
+  }, []);
+
+  const updateSubOrderStatus = useCallback(
+    async (subOrderId: string, status: string) => {
+      if (!uid) return;
+      try {
+        await fetch(`/api/vendors/orders/${subOrderId}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            "x-marketplace-user-id": uid,
+          },
+          body: JSON.stringify({ status }),
+        });
+        await refreshVendorOrdersRef.current();
+      } catch {
+        // Silent
+      }
+    },
+    [uid],
+  );
+
   const authReady = !authLoading && isAuthenticated && !!uid && !hasFetched;
 
-  // Trigger basic fetch safely after render
   useEffect(() => {
-    if (authReady) {
+    if (authReady && !fetchingRef.current) {
       queueMicrotask(() => {
         fetchVendorData();
       });
     }
   }, [authReady, fetchVendorData]);
 
-  // Trigger full profile fetch when basic profile becomes available
   useEffect(() => {
-    if (profile && !fullProfileFetched && !fullProfileFetchingRef.current) {
+    if (profile && !fullProfileFetched) {
       queueMicrotask(() => {
         fetchFullProfile();
       });
     }
   }, [profile, fullProfileFetched, fetchFullProfile]);
+
+  useEffect(() => {
+    if (profile?.id) {
+      refreshVendorOrdersRef.current();
+    }
+  }, [profile?.id]);
+
+  const prevAuthRef = useRef(isAuthenticated);
+
+  useEffect(() => {
+    const wasAuthenticated = prevAuthRef.current;
+    prevAuthRef.current = isAuthenticated;
+
+    if (!isAuthenticated && wasAuthenticated) {
+      setApplication(null);
+      setProfile(null);
+      setFullProfile(null);
+      setVendorOrders([]);
+      setHasFetched(false);
+      setFullProfileFetched(false);
+      setError(null);
+    }
+  }, [isAuthenticated]);
 
   return (
     <VendorDataContext.Provider
@@ -185,15 +295,18 @@ export function VendorDataProvider({ children }: { children: React.ReactNode }) 
         loading,
         fullProfileLoading,
         error,
-        refetch: fetchVendorData,
+        refetch,
         refetchFullProfile,
-        hasApplied: !!application,
-        isPending: application?.status === "PENDING",
-        isApproved: application?.status === "APPROVED" || !!profile,
-        isRejected: application?.status === "REJECTED",
-        isUnderReview: application?.status === "UNDER_REVIEW",
-      }}
-    >
+        hasApplied,
+        isPending,
+        isApproved,
+        isRejected,
+        isUnderReview,
+        vendorOrders,
+        vendorOrdersLoading,
+        refreshVendorOrders,
+        updateSubOrderStatus,
+      }}>
       {children}
     </VendorDataContext.Provider>
   );
@@ -208,54 +321,78 @@ export function useVendorData() {
 }
 
 // ==========================================
-// PUBLIC STORES HOOK
+// PUBLIC STORES HOOK (Session-Cached)
 // ==========================================
 
 let cachedStores: PublicStore[] | null = null;
-let cachedError: string | null = null;
-let fetchPromise: Promise<void> | null = null;
+let cachedStoresError: string | null = null;
+let storesFetchPromise: Promise<PublicStore[]> | null = null;
+
+function getSessionStores(): PublicStore[] | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const stored = sessionStorage.getItem("smartduka-public-stores");
+    return stored ? JSON.parse(stored) : null;
+  } catch {
+    return null;
+  }
+}
+
+function setSessionStores(stores: PublicStore[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.setItem("smartduka-public-stores", JSON.stringify(stores));
+  } catch {
+    // Storage full
+  }
+}
 
 export function usePublicStores() {
-  const [stores, setStores] = useState<PublicStore[]>(() => cachedStores || []);
-  const [isLoading, setIsLoading] = useState(() => !cachedStores);
-  const [error, setError] = useState<string | null>(() => cachedError);
+  const [stores, setStores] = useState<PublicStore[]>(() => {
+    return cachedStores || getSessionStores() || [];
+  });
+  const [isLoading, setIsLoading] = useState(() => {
+    return !cachedStores && !getSessionStores();
+  });
+  const [error, setError] = useState<string | null>(() => cachedStoresError);
 
   useEffect(() => {
+    let cancelled = false;
+
     if (cachedStores) return;
 
-    if (fetchPromise) {
-      let cancelled = false;
-      fetchPromise.then(() => {
+    if (storesFetchPromise) {
+      storesFetchPromise.then((result) => {
         if (!cancelled) {
-          setStores(cachedStores || []);
-          setError(cachedError);
+          setStores(result);
           setIsLoading(false);
         }
       });
       return () => { cancelled = true; };
     }
 
-    // Start new fetch
-    let cancelled = false;
-
-    fetchPromise = (async () => {
+    storesFetchPromise = (async () => {
       try {
         const response = await fetch("/api/vendors/public");
         if (!response.ok) throw new Error("Failed to fetch stores");
-        const data = await response.json();
-        cachedStores = data.stores || [];
-        cachedError = null;
+        const json = await response.json();
+        const storesList = json.success ? json.data : json.stores || [];
+        cachedStores = storesList;
+        setSessionStores(storesList);
+        cachedStoresError = null;
+        return storesList;
       } catch (err) {
-        cachedError = err instanceof Error ? err.message : "Failed to load stores";
+        cachedStoresError = err instanceof Error ? err.message : "Failed to load stores";
+        return [];
       } finally {
-        fetchPromise = null;
+        storesFetchPromise = null;
       }
     })();
 
-    fetchPromise.then(() => {
+    storesFetchPromise.then((result) => {
       if (!cancelled) {
-        setStores(cachedStores || []);
-        setError(cachedError);
+        setStores(result);
+        setError(cachedStoresError);
         setIsLoading(false);
       }
     });

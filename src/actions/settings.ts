@@ -1,18 +1,19 @@
 "use server";
 
-import { settingsService, UserSettingsPayload } from "@/services/settings";
+import { SettingsService, UserSettingsPayload } from "@/services/settings";
 import { getCurrentUserId } from "@/lib/auth/session";
+import { withErrorHandling } from "@/lib/api-utils";
 
 export async function getUserSettings() {
-  const userId = await getCurrentUserId();
-  if (!userId) throw new Error("Unauthorized");
-
-  return settingsService.getSettings(userId);
+  return withErrorHandling(async () => {
+    const userId = await getCurrentUserId();
+    return SettingsService.getSettings(userId);
+  }, "getUserSettings");
 }
 
 export async function updateUserSettings(data: UserSettingsPayload) {
-  const userId = await getCurrentUserId();
-  if (!userId) throw new Error("Unauthorized");
-
-  return settingsService.updateSettings(userId, data);
+  return withErrorHandling(async () => {
+    const userId = await getCurrentUserId();
+    return SettingsService.updateSettings(userId, data);
+  }, "updateUserSettings");
 }

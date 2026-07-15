@@ -37,6 +37,17 @@ interface SubCategoryFormState {
   image: string;
 }
 
+const fallbackImage =
+  "https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&w=600&q=80";
+
+function generateSlug(val: string) {
+  return val
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-");
+}
+
 export default function AdminCategoriesPage() {
   const {
     categories,
@@ -45,10 +56,9 @@ export default function AdminCategoriesPage() {
     createCategory,
     updateCategory,
     deleteCategory,
-    categoriesLoading,
+    isLoading,
   } = useCategories();
 
-  // Delete dialog hook
   const {
     isOpen: isDeleteOpen,
     isDeleting,
@@ -57,36 +67,21 @@ export default function AdminCategoriesPage() {
     closeDeleteDialog,
     handleDelete,
   } = useDeleteDialog(async (id) => {
+    if (!deleteCategory) return { success: false, error: "Delete not available" };
     const result = await deleteCategory(id);
     return { success: !result.error, error: result.error };
   });
 
   const [drawerOpen, setDrawerOpen] = React.useState(false);
-  const [editingCategory, setEditingCategory] = React.useState<Category | null>(
-    null,
-  );
-
-  // Step 1 States (Main Category)
+  const [editingCategory, setEditingCategory] = React.useState<Category | null>(null);
   const [name, setName] = React.useState("");
   const [slug, setSlug] = React.useState("");
   const [description, setDescription] = React.useState("");
   const [image, setImage] = React.useState("");
-
-  // Step 2 States (Subcategories Configuration)
   const [step, setStep] = React.useState<1 | 2>(1);
-  const [subCategories, setSubCategories] = React.useState<
-    SubCategoryFormState[]
-  >([]);
+  const [subCategories, setSubCategories] = React.useState<SubCategoryFormState[]>([]);
   const [newSubName, setNewSubName] = React.useState("");
   const [newSubImage, setNewSubImage] = React.useState("");
-
-  const generateSlug = (val: string) => {
-    return val
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9\s-]/g, "")
-      .replace(/\s+/g, "-");
-  };
 
   const handleSheetOpenChange = (open: boolean) => {
     setDrawerOpen(open);
@@ -107,7 +102,6 @@ export default function AdminCategoriesPage() {
     setEditingCategory(null);
   };
 
-  // Open sheet for editing
   const handleEditCategory = React.useCallback(
     (category: Category) => {
       setEditingCategory(category);
@@ -116,7 +110,6 @@ export default function AdminCategoriesPage() {
       setDescription(category.description || "");
       setImage(category.image || "");
 
-      // Find existing subcategories (children of this category)
       const children = categories.filter((c) => c.parentId === category.id);
       setSubCategories(
         children.map((child) => ({
@@ -156,17 +149,15 @@ export default function AdminCategoriesPage() {
     setSubCategories(subCategories.filter((_, i) => i !== index));
   };
 
-  const fallbackImage =
-    "https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&w=600&q=80";
-
   const handleSaveCategory = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !slug) return;
 
+    if (!createCategory || !updateCategory) return;
+
     let result;
 
     if (editingCategory) {
-      // Update existing category
       result = await updateCategory({
         id: editingCategory.id,
         name,
@@ -175,11 +166,7 @@ export default function AdminCategoriesPage() {
         image: image || fallbackImage,
         parentId: editingCategory.parentId || null,
       });
-
-      // TODO: Handle subcategory updates here
-      // You might want to create new subcategories and delete removed ones
     } else {
-      // Create new category
       result = await createCategory({
         name,
         slug,
@@ -198,9 +185,6 @@ export default function AdminCategoriesPage() {
     }
   };
 
-  // ==========================================
-  // COLUMNS DEFINITION
-  // ==========================================
   const columns = React.useMemo<ColumnDef<Category, unknown>[]>(
     () => [
       {
@@ -298,6 +282,16 @@ export default function AdminCategoriesPage() {
     [categories, openDeleteDialog, handleEditCategory],
   );
 
+  if (!createCategory || !updateCategory || !deleteCategory) {
+    return (
+      <div className="w-full py-20 text-center">
+        <p className="text-sm text-muted-foreground">
+          Category management requires VendorCatalogProvider. Ensure the admin layout is wrapped correctly.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full space-y-6 animate-in fade-in duration-300">
       <div className="space-y-1 select-none">
@@ -320,7 +314,7 @@ export default function AdminCategoriesPage() {
         columns={columns}
         data={categories}
         getRowId={(row) => row.id}
-        isLoading={categoriesLoading}
+        isLoading={isLoading}
         renderTabs={
           <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground select-none flex items-center gap-2">
             <span>Marketplace Catalog Structure</span>
@@ -362,7 +356,6 @@ export default function AdminCategoriesPage() {
                   </SheetDescription>
                 </SheetHeader>
 
-                {/* STEP 1: MAIN DETAILS WITH DESCRIPTION */}
                 {step === 1 && (
                   <div className="space-y-4">
                     <div className="space-y-1.5">
@@ -413,7 +406,6 @@ export default function AdminCategoriesPage() {
                   </div>
                 )}
 
-                {/* STEP 2: MULTIPLE SUBCATEGORIES WITH INDIVIDUAL IMAGES */}
                 {step === 2 && (
                   <div className="space-y-4">
                     <div className="p-3 bg-muted/40 border border-border/50 rounded-2xl space-y-3">
@@ -499,7 +491,6 @@ export default function AdminCategoriesPage() {
                 )}
               </div>
 
-              {/* CONTROLS */}
               <div className="flex gap-3 border-t border-border/40 pt-4 mt-auto">
                 {step === 1 ? (
                   <>
@@ -515,9 +506,7 @@ export default function AdminCategoriesPage() {
                       disabled={!name.trim()}
                       onClick={() => setStep(2)}
                       className="flex-1 h-10 rounded-full text-xs font-medium bg-primary hover:bg-emerald-600 text-white cursor-pointer disabled:opacity-50">
-                      {editingCategory
-                        ? "Edit Subcategories"
-                        : "Add SubCategories"}
+                      {editingCategory ? "Edit Subcategories" : "Add SubCategories"}
                     </Button>
                   </>
                 ) : (
@@ -548,7 +537,6 @@ export default function AdminCategoriesPage() {
         }
       />
 
-      {/* Delete Dialog */}
       <DeleteDialog
         open={isDeleteOpen}
         onOpenChange={(open) => !open && closeDeleteDialog()}

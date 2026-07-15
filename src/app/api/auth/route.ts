@@ -1,9 +1,10 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { adminAuth } from "@/lib/firebase/admin";
 import { prisma } from "@/lib/prisma/client";
 import { PlatformRole, UserStatus } from "@prisma/client";
 import { cookies } from "next/headers";
 import { createToken } from "@/lib/auth/jwt";
+import { successResponse, errorResponse, getErrorMessage } from "@/lib/api-utils";
 
 export async function POST(req: NextRequest) {
   try {
@@ -16,10 +17,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (!idToken) {
-      return NextResponse.json(
-        { error: "Unauthorized: Missing identity token." },
-        { status: 401 }
-      );
+      return errorResponse("Unauthorized: Missing identity token.", 401);
     }
 
     // Verify Firebase identity
@@ -27,10 +25,7 @@ export async function POST(req: NextRequest) {
     const { uid, email, name, picture, email_verified } = decodedToken;
 
     if (!email) {
-      return NextResponse.json(
-        { error: "Missing email profile property" },
-        { status: 400 }
-      );
+      return errorResponse("Missing email profile property", 400);
     }
 
     // Upsert user in database
@@ -63,7 +58,7 @@ export async function POST(req: NextRequest) {
       vendorId: user.vendorId ?? null,
     });
 
-    // Set the marketplace JWT as the session cookie (not the raw Firebase idToken)
+    // Set session cookie for browser requests
     const isBrowserRequest =
       req.headers.get("sec-ch-ua") ||
       req.headers.get("user-agent")?.includes("Mozilla");
@@ -79,28 +74,24 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    return NextResponse.json({
-      success: true,
-      user: {
-        id: user.id,
-        role: user.platformRole,
-        name: user.name,
-      },
+    return successResponse({
+      id: user.id,
+      platformRole: user.platformRole,
+      name: user.name,
     });
   } catch (error: unknown) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : "Authentication token handling failure";
-    return NextResponse.json({ error: message }, { status: 401 });
+    console.error("[Auth API]", error);
+    return errorResponse(getErrorMessage(error), 401);
   }
 }
 
 export async function DELETE() {
-  const cookieStore = await cookies();
-  cookieStore.delete("session");
-  return NextResponse.json({
-    success: true,
-    message: "Logged out completely.",
-  });
+  try {
+    const cookieStore = await cookies();
+    cookieStore.delete("session");
+    return successResponse({ message: "Logged out completely." });
+  } catch (error: unknown) {
+    console.error("[Auth API DELETE]", error);
+    return errorResponse(getErrorMessage(error));
+  }
 }

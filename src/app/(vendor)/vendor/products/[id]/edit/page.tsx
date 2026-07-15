@@ -40,8 +40,7 @@ import { useCategories } from "@/hooks/use-categories";
 import { useProducts } from "@/hooks/use-products";
 import { useVendor } from "@/hooks/use-vendor";
 import type { CategoryTree, Product, ProductSpec } from "@/types/marketplace";
-
-// ─── Types ───
+import Image from "next/image";
 
 interface SubCategoryItem {
   id: string;
@@ -76,8 +75,6 @@ interface ProductFormData {
   outsole: string;
 }
 
-// ─── Loading skeleton ───
-
 function EditFormSkeleton() {
   return (
     <div className="space-y-8 w-full max-w-8xl mx-auto">
@@ -110,8 +107,6 @@ function EditFormSkeleton() {
   );
 }
 
-// ─── Empty form factory ───
-
 const emptyFormData = (): ProductFormData => ({
   title: "",
   slug: "",
@@ -138,7 +133,88 @@ const emptyFormData = (): ProductFormData => ({
   outsole: "",
 });
 
-// ─── Page component ───
+const extractImageUrl = (img: unknown): string => {
+  if (!img) return "";
+  if (typeof img === "string") return img;
+  if (typeof img === "object" && img !== null && "url" in img) {
+    return (img as { url: string }).url || "";
+  }
+  return "";
+};
+
+const extractSpecValue = (
+  specs: ProductSpec[] | undefined,
+  name: string,
+): string => {
+  if (!specs || !Array.isArray(specs)) return "";
+  return specs.find((s) => s.name === name)?.value || "";
+};
+
+const extractStringArray = (value: unknown): string[] => {
+  if (Array.isArray(value))
+    return value.filter((v): v is string => typeof v === "string");
+  if (typeof value === "string")
+    return value
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+  return [];
+};
+
+const buildFormDataFromProduct = (product: Product | null): ProductFormData => {
+  if (!product) return emptyFormData();
+
+  const primaryImage =
+    product.image ||
+    (product.images && product.images.length > 0
+      ? extractImageUrl(product.images[0])
+      : "");
+
+  const galleryImages = product.images?.length
+    ? [
+        ...product.images.map(extractImageUrl),
+        ...Array(Math.max(0, 4 - (product.images?.length || 0))).fill(""),
+      ].slice(0, 4)
+    : ["", "", "", ""];
+
+  const specs = (product.specs as ProductSpec[] | undefined) || [];
+
+  return {
+    title: product.name || "",
+    slug: product.slug || "",
+    brand: product.brand || "",
+    price: String(product.basePrice || ""),
+    compareAtPrice: product.compareAtPrice
+      ? String(product.compareAtPrice)
+      : "",
+    image: primaryImage,
+    images: galleryImages,
+    categoryId: product.categoryId || "",
+    subCategoryId: product.subCategoryId || "",
+    tags: extractStringArray(product.tags),
+    tagInput: "",
+    inventoryCount: String(product.inventoryCount ?? 0),
+    sku: product.sku || "",
+    description: product.description || "",
+    sizes: extractStringArray(product.sizes),
+    colors: extractStringArray(product.colors),
+    colorInput: "",
+    manufacturer: extractSpecValue(specs, "Manufacturer"),
+    material: extractSpecValue(specs, "Primary Material"),
+    cushioning: extractSpecValue(specs, "Cushioning Tech"),
+    origin: extractSpecValue(specs, "Origin"),
+    weight: extractSpecValue(specs, "Weight"),
+    outsole: extractSpecValue(specs, "Outsole Grip"),
+  };
+};
+
+const generateSlug = (val: string) =>
+  val
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-");
 
 export default function VendorProductEditPage() {
   const router = useRouter();
@@ -153,18 +229,18 @@ export default function VendorProductEditPage() {
 
   const [currentStep, setCurrentStep] = React.useState(1);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
-  const [existingProduct, setExistingProduct] = React.useState<Product | null>(null);
+  const [existingProduct, setExistingProduct] = React.useState<Product | null>(
+    null,
+  );
   const [formData, setFormData] = React.useState<ProductFormData | null>(null);
   const fetchedRef = React.useRef(false);
 
-  // Fetch product in edit mode
   React.useEffect(() => {
     if (!isEditMode || !productId || fetchedRef.current) return;
     fetchedRef.current = true;
-
     (async () => {
       try {
-        const product = await fetchProductById(productId);
+        const product = await fetchProductById!(productId);
         setExistingProduct(product);
       } catch {
         toast.error("Failed to load product data");
@@ -172,87 +248,20 @@ export default function VendorProductEditPage() {
     })();
   }, [isEditMode, productId, fetchProductById]);
 
-  // Helper: extract image URL
-  const extractImageUrl = (img: unknown): string => {
-    if (!img) return "";
-    if (typeof img === "string") return img;
-    if (typeof img === "object" && img !== null && "url" in img) {
-      return (img as { url: string }).url || "";
-    }
-    return "";
-  };
-
-  // Helper: extract spec
-  const extractSpecValue = (specs: ProductSpec[] | undefined, name: string): string => {
-    if (!specs || !Array.isArray(specs)) return "";
-    return specs.find((s) => s.name === name)?.value || "";
-  };
-
-  // Helper: extract string array
-  const extractStringArray = (value: unknown): string[] => {
-    if (Array.isArray(value)) return value.filter((v): v is string => typeof v === "string");
-    if (typeof value === "string") return value.split(",").map((s) => s.trim()).filter(Boolean);
-    return [];
-  };
-
-  // Build form data from product — stabilized with useCallback
-  const buildFormData = React.useCallback((product: Product | null): ProductFormData => {
-    if (!product) return emptyFormData();
-
-    const primaryImage =
-      product.image ||
-      (product.images && product.images.length > 0
-        ? extractImageUrl(product.images[0])
-        : "");
-
-    const galleryImages = product.images?.length
-      ? [
-          ...product.images.map(extractImageUrl),
-          ...Array(Math.max(0, 4 - (product.images?.length || 0))).fill(""),
-        ].slice(0, 4)
-      : ["", "", "", ""];
-
-    const specs = (product.specs as ProductSpec[] | undefined) || [];
-
-    return {
-      title: product.name || "",
-      slug: product.slug || "",
-      brand: product.brand || "",
-      price: String(product.basePrice || ""),
-      compareAtPrice: product.compareAtPrice ? String(product.compareAtPrice) : "",
-      image: primaryImage,
-      images: galleryImages,
-      categoryId: product.categoryId || "",
-      subCategoryId: product.subCategoryId || "",
-      tags: extractStringArray(product.tags),
-      tagInput: "",
-      inventoryCount: String(product.inventoryCount ?? 0),
-      sku: product.sku || "",
-      description: product.description || "",
-      sizes: extractStringArray(product.sizes),
-      colors: extractStringArray(product.colors),
-      colorInput: "",
-      manufacturer: extractSpecValue(specs, "Manufacturer"),
-      material: extractSpecValue(specs, "Primary Material"),
-      cushioning: extractSpecValue(specs, "Cushioning Tech"),
-      origin: extractSpecValue(specs, "Origin"),
-      weight: extractSpecValue(specs, "Weight"),
-      outsole: extractSpecValue(specs, "Outsole Grip"),
-    };
-  }, []);
-
-  // Initialize form when data is ready — deferred via queueMicrotask
   React.useEffect(() => {
     queueMicrotask(() => {
       if (!isEditMode) {
         setFormData(emptyFormData());
-      } else if (existingProduct && categories && (categories as CategoryTree[]).length > 0) {
-        setFormData(buildFormData(existingProduct));
+      } else if (
+        existingProduct &&
+        categories &&
+        (categories as CategoryTree[]).length > 0
+      ) {
+        setFormData(buildFormDataFromProduct(existingProduct));
       }
     });
-  }, [isEditMode, existingProduct, categories, buildFormData]);
+  }, [isEditMode, existingProduct, categories]);
 
-  // Computed subcategories — extract categoryId first to satisfy React Compiler
   const categoryId = formData?.categoryId;
 
   const availableSubCategories = React.useMemo<SubCategoryItem[]>(() => {
@@ -263,20 +272,19 @@ export default function VendorProductEditPage() {
     return (selectedCategory?.subCategories as SubCategoryItem[]) || [];
   }, [categoryId, categories]);
 
-  const generateSlug = (val: string) =>
-    val
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9\s-]/g, "")
-      .replace(/\s+/g, "-")
-      .replace(/-+/g, "-");
+  if (!fetchProductById || !createProduct || !updateProduct) {
+    return (
+      <div className="py-20 text-center">
+        <p className="text-sm text-muted-foreground">
+          Product management requires VendorCatalogProvider.
+        </p>
+      </div>
+    );
+  }
 
-  // ─── Guard: show skeleton until form is ready ───
   if (!formData) {
     return <EditFormSkeleton />;
   }
-
-  // ─── Handlers ───
 
   const updateField = (field: string, value: string | string[]) => {
     setFormData((prev) => {
@@ -321,10 +329,7 @@ export default function VendorProductEditPage() {
   const removeColor = (index: number) => {
     setFormData((prev) => {
       if (!prev) return prev;
-      return {
-        ...prev,
-        colors: prev.colors.filter((_, i) => i !== index),
-      };
+      return { ...prev, colors: prev.colors.filter((_, i) => i !== index) };
     });
   };
 
@@ -343,15 +348,15 @@ export default function VendorProductEditPage() {
   const removeTag = (index: number) => {
     setFormData((prev) => {
       if (!prev) return prev;
-      return {
-        ...prev,
-        tags: prev.tags.filter((_, i) => i !== index),
-      };
+      return { ...prev, tags: prev.tags.filter((_, i) => i !== index) };
     });
   };
 
   const handleNextStep = () => {
-    if (currentStep === 1 && (!formData.title || !formData.price || !formData.categoryId)) {
+    if (
+      currentStep === 1 &&
+      (!formData.title || !formData.price || !formData.categoryId)
+    ) {
       toast.error("Please fill in product title, price, and category.");
       return;
     }
@@ -362,23 +367,27 @@ export default function VendorProductEditPage() {
     setCurrentStep((prev) => Math.min(prev + 1, 4));
   };
 
-  // ─── Submit ───
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!isEditMode && !vendorId) {
       toast.error("Vendor profile not loaded.");
       return;
     }
-
     setIsSubmitting(true);
-
     try {
       const specs = [
-        formData.manufacturer && { name: "Manufacturer", value: formData.manufacturer },
-        formData.material && { name: "Primary Material", value: formData.material },
-        formData.cushioning && { name: "Cushioning Tech", value: formData.cushioning },
+        formData.manufacturer && {
+          name: "Manufacturer",
+          value: formData.manufacturer,
+        },
+        formData.material && {
+          name: "Primary Material",
+          value: formData.material,
+        },
+        formData.cushioning && {
+          name: "Cushioning Tech",
+          value: formData.cushioning,
+        },
         formData.origin && { name: "Origin", value: formData.origin },
         formData.weight && { name: "Weight", value: formData.weight },
         formData.outsole && { name: "Outsole Grip", value: formData.outsole },
@@ -387,18 +396,27 @@ export default function VendorProductEditPage() {
       const images = [
         { url: formData.image, isFeatured: true, sortOrder: 0 },
         ...formData.images
-          .filter((img): img is string => typeof img === "string" && img.trim() !== "")
-          .map((url, index) => ({ url, isFeatured: false, sortOrder: index + 1 })),
+          .filter(
+            (img): img is string =>
+              typeof img === "string" && img.trim() !== "",
+          )
+          .map((url, index) => ({
+            url,
+            isFeatured: false,
+            sortOrder: index + 1,
+          })),
       ];
 
       if (isEditMode && productId) {
-        const result = await updateProduct(productId, {
+        const result = await updateProduct!(productId, {
           name: formData.title,
           slug: formData.slug,
           brand: formData.brand,
           description: formData.description,
           basePrice: Number(formData.price),
-          compareAtPrice: formData.compareAtPrice ? Number(formData.compareAtPrice) : null,
+          compareAtPrice: formData.compareAtPrice
+            ? Number(formData.compareAtPrice)
+            : null,
           categoryId: formData.categoryId,
           subCategoryId: formData.subCategoryId || null,
           inventoryCount: Number(formData.inventoryCount),
@@ -408,7 +426,6 @@ export default function VendorProductEditPage() {
           specs,
           tags: formData.tags,
         });
-
         if (result.success) {
           toast.success("Product updated successfully!");
           router.push("/vendor/products");
@@ -416,14 +433,16 @@ export default function VendorProductEditPage() {
           toast.error(result.error || "Failed to update product.");
         }
       } else {
-        const result = await createProduct({
+        const result = await createProduct!({
           vendorId: vendorId!,
           name: formData.title,
           slug: formData.slug || generateSlug(formData.title),
           brand: formData.brand,
           description: formData.description,
           basePrice: Number(formData.price),
-          compareAtPrice: formData.compareAtPrice ? Number(formData.compareAtPrice) : undefined,
+          compareAtPrice: formData.compareAtPrice
+            ? Number(formData.compareAtPrice)
+            : undefined,
           categoryId: formData.categoryId,
           subCategoryId: formData.subCategoryId || undefined,
           inventoryCount: Number(formData.inventoryCount),
@@ -435,7 +454,6 @@ export default function VendorProductEditPage() {
           tags: formData.tags,
           images,
         });
-
         if (result.success) {
           toast.success("Product published successfully!");
           router.push("/vendor/products");
@@ -450,10 +468,8 @@ export default function VendorProductEditPage() {
     }
   };
 
-
   return (
     <div className="space-y-8 max-w-6xl mx-auto animate-in fade-in duration-300">
-      {/* HEADER */}
       <div className="flex items-center justify-between border-b border-border/40 pb-4 select-none">
         <div className="flex items-center gap-3">
           <Link
@@ -479,7 +495,6 @@ export default function VendorProductEditPage() {
         )}
       </div>
 
-      {/* STEPPER */}
       <div className="bg-muted/10 border border-border/40 rounded-full p-4 flex items-center justify-center select-none">
         <div className="flex items-center gap-4 max-w-3xl w-full justify-between">
           {[
@@ -538,12 +553,10 @@ export default function VendorProductEditPage() {
         </div>
       </div>
 
-      {/* MAIN FORM */}
       <form
         onSubmit={handleSubmit}
         className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         <div className="lg:col-span-7 bg-card border border-border/60 rounded-2xl p-6 space-y-6 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.02)]">
-          {/* STEP 1: BASIC INFORMATION */}
           {currentStep === 1 && (
             <div className="space-y-5 animate-in fade-in duration-200">
               <div className="space-y-2">
@@ -557,7 +570,6 @@ export default function VendorProductEditPage() {
                   className="h-10 border-border/60 rounded-full bg-background font-medium text-xs"
                 />
               </div>
-
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
@@ -574,15 +586,19 @@ export default function VendorProductEditPage() {
                   <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                     Main Category *
                   </Label>
-                  {/* Main Category Select */}
-                  <Select value={formData.categoryId} onValueChange={handleCategoryChange}>
+                  <Select
+                    value={formData.categoryId}
+                    onValueChange={handleCategoryChange}>
                     <SelectTrigger className="w-full h-10 rounded-full text-xs font-semibold border-border/60 bg-background">
                       <SelectValue placeholder="Select Main Category" />
                     </SelectTrigger>
                     <SelectContent className="rounded-xl border-border/60 p-1">
                       <SelectGroup>
                         {(categories as CategoryTree[]).map((cat) => (
-                          <SelectItem key={cat.id} value={cat.id} className="rounded-lg text-xs font-medium py-2">
+                          <SelectItem
+                            key={cat.id}
+                            value={cat.id}
+                            className="rounded-lg text-xs font-medium py-2">
                             {cat.name}
                           </SelectItem>
                         ))}
@@ -591,29 +607,30 @@ export default function VendorProductEditPage() {
                   </Select>
                 </div>
               </div>
-
               {availableSubCategories.length > 0 && (
                 <div className="space-y-2">
                   <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                     Subcategory *
                   </Label>
-                  {/* Subcategory Select */}
-                  <Select value={formData.subCategoryId} onValueChange={(val) => updateField("subCategoryId", val)}>
+                  <Select
+                    value={formData.subCategoryId}
+                    onValueChange={(val) => updateField("subCategoryId", val)}>
                     <SelectTrigger className="w-full h-10 rounded-full text-xs font-semibold border-border/60 bg-background">
                       <SelectValue placeholder="Select Subcategory" />
                     </SelectTrigger>
                     <SelectContent className="rounded-xl border-border/60 p-1">
                       <SelectGroup>
                         {availableSubCategories.map((sub) => (
-                          <SelectItem key={sub.id} value={sub.id} className="rounded-lg text-xs font-medium py-2">
+                          <SelectItem
+                            key={sub.id}
+                            value={sub.id}
+                            className="rounded-lg text-xs font-medium py-2">
                             {sub.name}
                           </SelectItem>
                         ))}
                       </SelectGroup>
                     </SelectContent>
                   </Select>
-
-                  {/* Visual hierarchy indicator */}
                   <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-muted/50 border border-border/40 rounded-full">
                       <FolderTree className="w-3 h-3" />
@@ -631,8 +648,6 @@ export default function VendorProductEditPage() {
                   </div>
                 </div>
               )}
-
-              {/* If category has no subcategories, product is directly under main category */}
               {formData.categoryId && availableSubCategories.length === 0 && (
                 <div className="flex items-center gap-2 p-3 bg-muted/30 border border-border/40 rounded-xl">
                   <Info className="w-3.5 h-3.5 text-muted-foreground" />
@@ -648,7 +663,6 @@ export default function VendorProductEditPage() {
                   </span>
                 </div>
               )}
-
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
@@ -677,7 +691,6 @@ export default function VendorProductEditPage() {
                   />
                 </div>
               </div>
-
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
@@ -696,11 +709,6 @@ export default function VendorProductEditPage() {
                 <div className="space-y-2">
                   <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground flex items-center justify-between">
                     <span>SKU Code</span>
-                    {formData.sku && (
-                      <span className="text-[9px] font-normal normal-case text-muted-foreground/60">
-                        Auto-generated from product info
-                      </span>
-                    )}
                   </Label>
                   <div className="relative">
                     <Input
@@ -716,7 +724,6 @@ export default function VendorProductEditPage() {
                       <button
                         type="button"
                         onClick={() => {
-                          // Regenerate SKU
                           const brandPrefix = formData.brand
                             .replace(/[^a-zA-Z0-9]/g, "")
                             .substring(0, 3)
@@ -726,8 +733,10 @@ export default function VendorProductEditPage() {
                             .substring(0, 4)
                             .toUpperCase();
                           const timestamp = Date.now().toString().slice(-4);
-                          const newSku = `${brandPrefix}-${titlePrefix}-${timestamp}`;
-                          updateField("sku", newSku);
+                          updateField(
+                            "sku",
+                            `${brandPrefix}-${titlePrefix}-${timestamp}`,
+                          );
                           toast.success("SKU regenerated");
                         }}
                         className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 hover:bg-muted rounded-full transition-colors cursor-pointer"
@@ -738,8 +747,6 @@ export default function VendorProductEditPage() {
                   </div>
                 </div>
               </div>
-
-              {/* Tags */}
               <div className="space-y-2">
                 <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                   Search Tags
@@ -779,7 +786,6 @@ export default function VendorProductEditPage() {
                   </div>
                 )}
               </div>
-
               <div className="pt-4 border-t border-border/40 flex justify-end">
                 <button
                   type="button"
@@ -792,7 +798,6 @@ export default function VendorProductEditPage() {
             </div>
           )}
 
-          {/* STEP 2: MEDIA */}
           {currentStep === 2 && (
             <div className="space-y-5 animate-in fade-in duration-200">
               <div className="space-y-2">
@@ -807,7 +812,6 @@ export default function VendorProductEditPage() {
                   maxSizeInMB={5}
                 />
               </div>
-
               <div className="space-y-2">
                 <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                   Gallery Images (Up to 4)
@@ -829,7 +833,6 @@ export default function VendorProductEditPage() {
                   ))}
                 </div>
               </div>
-
               <div className="pt-4 border-t border-border/40 flex justify-between">
                 <button
                   type="button"
@@ -848,14 +851,11 @@ export default function VendorProductEditPage() {
             </div>
           )}
 
-          {/* STEP 3: VARIANTS */}
           {currentStep === 3 && (
             <div className="space-y-5 animate-in fade-in duration-200">
-              {/* Sizes */}
               <div className="space-y-2.5">
                 <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                  <Ruler className="w-3.5 h-3.5" />
-                  Available Sizes
+                  <Ruler className="w-3.5 h-3.5" /> Available Sizes
                 </Label>
                 <div className="flex flex-wrap gap-2">
                   {[
@@ -895,12 +895,9 @@ export default function VendorProductEditPage() {
                   })}
                 </div>
               </div>
-
-              {/* Colors */}
               <div className="space-y-2.5">
                 <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                  <Palette className="w-3.5 h-3.5" />
-                  Available Colors
+                  <Palette className="w-3.5 h-3.5" /> Available Colors
                 </Label>
                 <div className="flex gap-2">
                   <Input
@@ -937,7 +934,6 @@ export default function VendorProductEditPage() {
                   </div>
                 )}
               </div>
-
               <div className="pt-4 border-t border-border/40 flex justify-between">
                 <button
                   type="button"
@@ -956,7 +952,6 @@ export default function VendorProductEditPage() {
             </div>
           )}
 
-          {/* STEP 4: SPECIFICATIONS */}
           {currentStep === 4 && (
             <div className="space-y-5 animate-in fade-in duration-200">
               <div className="space-y-2">
@@ -967,82 +962,66 @@ export default function VendorProductEditPage() {
                   rows={4}
                   value={formData.description}
                   onChange={(e) => updateField("description", e.target.value)}
-                  placeholder="Describe the product in detail - fit, texture, care instructions, and key features..."
+                  placeholder="Describe the product in detail..."
                   className="w-full border border-border/60 rounded-2xl p-3 text-xs font-medium bg-background resize-none"
                 />
               </div>
-
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    Manufacturer
-                  </Label>
-                  <Input
-                    value={formData.manufacturer}
-                    onChange={(e) =>
-                      updateField("manufacturer", e.target.value)
-                    }
-                    placeholder="e.g. Nike International"
-                    className="h-10 border-border/60 rounded-full bg-background font-medium text-xs"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    Primary Material
-                  </Label>
-                  <Input
-                    value={formData.material}
-                    onChange={(e) => updateField("material", e.target.value)}
-                    placeholder="e.g. Dura-Mesh Fabric"
-                    className="h-10 border-border/60 rounded-full bg-background font-medium text-xs"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    Cushioning Tech
-                  </Label>
-                  <Input
-                    value={formData.cushioning}
-                    onChange={(e) => updateField("cushioning", e.target.value)}
-                    placeholder="e.g. Air Max Alpha Foam"
-                    className="h-10 border-border/60 rounded-full bg-background font-medium text-xs"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    Origin
-                  </Label>
-                  <Input
-                    value={formData.origin}
-                    onChange={(e) => updateField("origin", e.target.value)}
-                    placeholder="e.g. Made in Vietnam"
-                    className="h-10 border-border/60 rounded-full bg-background font-medium text-xs"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    Weight
-                  </Label>
-                  <Input
-                    value={formData.weight}
-                    onChange={(e) => updateField("weight", e.target.value)}
-                    placeholder="e.g. 340g per unit"
-                    className="h-10 border-border/60 rounded-full bg-background font-medium text-xs"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    Outsole Grip
-                  </Label>
-                  <Input
-                    value={formData.outsole}
-                    onChange={(e) => updateField("outsole", e.target.value)}
-                    placeholder="e.g. High-traction rubber"
-                    className="h-10 border-border/60 rounded-full bg-background font-medium text-xs"
-                  />
-                </div>
+                {[
+                  {
+                    field: "manufacturer" as const,
+                    label: "Manufacturer",
+                    placeholder: "e.g. Nike International",
+                  },
+                  {
+                    field: "material" as const,
+                    label: "Primary Material",
+                    placeholder: "e.g. Dura-Mesh Fabric",
+                  },
+                  {
+                    field: "cushioning" as const,
+                    label: "Cushioning Tech",
+                    placeholder: "e.g. Air Max Alpha Foam",
+                  },
+                  {
+                    field: "origin" as const,
+                    label: "Origin",
+                    placeholder: "e.g. Made in Vietnam",
+                  },
+                  {
+                    field: "weight" as const,
+                    label: "Weight",
+                    placeholder: "e.g. 340g per unit",
+                  },
+                  {
+                    field: "outsole" as const,
+                    label: "Outsole Grip",
+                    placeholder: "e.g. High-traction rubber",
+                  },
+                ].map(({ field, label, placeholder }) => {
+                  const valueMap: Record<string, string> = {
+                    manufacturer: formData.manufacturer,
+                    material: formData.material,
+                    cushioning: formData.cushioning,
+                    origin: formData.origin,
+                    weight: formData.weight,
+                    outsole: formData.outsole,
+                  };
+                  return (
+                    <div key={field} className="space-y-2">
+                      <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                        {label}
+                      </Label>
+                      <Input
+                        value={valueMap[field]}
+                        onChange={(e) => updateField(field, e.target.value)}
+                        placeholder={placeholder}
+                        className="h-10 border-border/60 rounded-full bg-background font-medium text-xs"
+                      />
+                    </div>
+                  );
+                })}
               </div>
-
               <div className="pt-4 border-t border-border/40 flex justify-between">
                 <button
                   type="button"
@@ -1067,10 +1046,8 @@ export default function VendorProductEditPage() {
           )}
         </div>
 
-        {/* RIGHT COLUMN: PREVIEW */}
         <div className="lg:col-span-5 space-y-4 select-none">
           <div className="bg-card border border-border/60 rounded-2xl p-5 space-y-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.02)] sticky top-6">
-            {/* Preview Header */}
             <div className="flex items-center justify-between">
               <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                 Live Preview
@@ -1081,20 +1058,16 @@ export default function VendorProductEditPage() {
                 </span>
               )}
             </div>
-
-            {/* Main Image - Smaller, more appropriate size */}
-
             <div className="flex flex-row items-center">
               <div className="relative aspect-square w-full max-w-[280px] mx-auto rounded-2xl overflow-hidden bg-muted border border-border/40 group">
                 {formData.image ? (
                   <>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
+                    <Image
                       src={formData.image}
                       alt="Product preview"
+                      fill
                       className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                     />
-                    {/* Discount badge if original price exists */}
                     {formData.compareAtPrice &&
                       formData.price &&
                       Number(formData.compareAtPrice) >
@@ -1123,8 +1096,6 @@ export default function VendorProductEditPage() {
                   </div>
                 )}
               </div>
-
-              {/* Gallery Thumbnails - Show when additional images exist */}
               {formData.images.some((img) => img) && (
                 <div className="flex flex-col justify-center gap-2">
                   {formData.images
@@ -1134,16 +1105,13 @@ export default function VendorProductEditPage() {
                       <div
                         key={i}
                         className="relative w-14 h-14 rounded-xl overflow-hidden border-2 border-border/60 bg-muted hover:border-primary/50 transition-all cursor-pointer">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
+                        <Image
                           src={typeof img === "string" ? img : ""}
                           alt={`Preview ${i + 2}`}
                           className="w-full h-full object-cover"
                         />
                       </div>
                     ))}
-
-                  {/* Placeholder slots */}
                   {Array.from({
                     length: Math.max(
                       0,
@@ -1159,10 +1127,7 @@ export default function VendorProductEditPage() {
                 </div>
               )}
             </div>
-
-            {/* Product Details Card - Compact & Informative */}
             <div className="bg-muted/30 border border-border/40 rounded-xl p-4 space-y-3">
-              {/* Title & Brand */}
               <div className="space-y-1">
                 {formData.brand && (
                   <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
@@ -1179,8 +1144,6 @@ export default function VendorProductEditPage() {
                   </h3>
                 )}
               </div>
-
-              {/* Rating Preview (static for preview) */}
               {formData.title && (
                 <div className="flex items-center gap-1.5">
                   <div className="flex items-center gap-0.5">
@@ -1196,8 +1159,6 @@ export default function VendorProductEditPage() {
                   </span>
                 </div>
               )}
-
-              {/* Price Section */}
               <div className="flex items-baseline gap-2 pt-1 border-t border-border/30">
                 {formData.price ? (
                   <>
@@ -1216,8 +1177,6 @@ export default function VendorProductEditPage() {
                   </span>
                 )}
               </div>
-
-              {/* Size & Color Pills */}
               <div className="space-y-2">
                 {formData.sizes.length > 0 && (
                   <div className="space-y-1">
@@ -1232,15 +1191,9 @@ export default function VendorProductEditPage() {
                           {size}
                         </span>
                       ))}
-                      {formData.sizes.length > 5 && (
-                        <span className="px-2 py-0.5 bg-background border border-border/60 rounded-md text-[10px] font-medium text-muted-foreground">
-                          +{formData.sizes.length - 5} more
-                        </span>
-                      )}
                     </div>
                   </div>
                 )}
-
                 {formData.colors.length > 0 && (
                   <div className="space-y-1">
                     <span className="text-[9px] font-medium text-muted-foreground uppercase tracking-wider">
@@ -1254,17 +1207,10 @@ export default function VendorProductEditPage() {
                           {color}
                         </span>
                       ))}
-                      {formData.colors.length > 3 && (
-                        <span className="px-2 py-0.5 bg-background border border-border/60 rounded-md text-[10px] font-medium text-muted-foreground">
-                          +{formData.colors.length - 3} more
-                        </span>
-                      )}
                     </div>
                   </div>
                 )}
               </div>
-
-              {/* Stock & Category */}
               <div className="grid grid-cols-2 gap-2 pt-1 border-t border-border/30">
                 {formData.inventoryCount && (
                   <div className="space-y-1">
@@ -1297,8 +1243,6 @@ export default function VendorProductEditPage() {
                   </div>
                 )}
               </div>
-
-              {/* Tags Preview */}
               {formData.tags.length > 0 && (
                 <div className="space-y-1 pt-1 border-t border-border/30">
                   <span className="text-[9px] font-medium text-muted-foreground uppercase tracking-wider">
@@ -1312,17 +1256,10 @@ export default function VendorProductEditPage() {
                         #{tag}
                       </span>
                     ))}
-                    {formData.tags.length > 3 && (
-                      <span className="text-[10px] text-muted-foreground">
-                        +{formData.tags.length - 3}
-                      </span>
-                    )}
                   </div>
                 </div>
               )}
             </div>
-
-            {/* Completeness Indicator */}
             <div className="space-y-2">
               <div className="flex items-center justify-between text-xs">
                 <span className="text-muted-foreground font-medium">
@@ -1343,21 +1280,11 @@ export default function VendorProductEditPage() {
                 <div
                   className="h-full bg-primary rounded-full transition-all duration-500"
                   style={{
-                    width: `${
-                      [
-                        formData.title,
-                        formData.price,
-                        formData.image,
-                        formData.categoryId,
-                        formData.description,
-                      ].filter(Boolean).length * 20
-                    }%`,
+                    width: `${[formData.title, formData.price, formData.image, formData.categoryId, formData.description].filter(Boolean).length * 20}%`,
                   }}
                 />
               </div>
             </div>
-
-            {/* Info Tip */}
             <div className="bg-muted/40 rounded-xl p-3 border border-border/40 flex items-start gap-2">
               <Info className="w-3.5 h-3.5 text-muted-foreground shrink-0 mt-0.5" />
               <p className="text-[10px] text-muted-foreground font-medium leading-relaxed">

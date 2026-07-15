@@ -1,8 +1,9 @@
-import { NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { ProductService } from "@/services/product";
+import { successResponse, errorResponse, getErrorMessage } from "@/lib/api-utils";
 
 export async function GET(
-  request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -10,62 +11,42 @@ export async function GET(
     const product = await ProductService.getProductById(id);
 
     if (!product) {
-      return NextResponse.json(
-        { success: false, error: "Product not found" },
-        { status: 404 }
-      );
+      return errorResponse("Product not found", 404);
     }
 
-    return NextResponse.json({ success: true, data: product });
+    return successResponse(product);
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Failed to fetch product.";
-    console.error("Product API Error:", error);
-    return NextResponse.json(
-      { success: false, error: message },
-      { status: 500 }
-    );
+    console.error("[Product API GET]", error);
+    return errorResponse(getErrorMessage(error));
   }
 }
 
 export async function PUT(
-  request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
     const body = await request.json();
 
-    const product = await ProductService.updateProduct({
-      id,
-      ...body,
-    });
-
-    return NextResponse.json({ success: true, data: product });
+    const product = await ProductService.updateProduct({ id, ...body });
+    return successResponse(product);
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Failed to update product.";
-    console.error("Product API Error:", error);
-    return NextResponse.json(
-      { success: false, error: message },
-      { status: 500 }
-    );
+    console.error("[Product API PUT]", error);
+    return errorResponse(getErrorMessage(error));
   }
 }
 
 export async function DELETE(
-  request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
     await ProductService.deleteProduct(id);
-
-    return NextResponse.json({ success: true, message: "Product deleted" });
+    return successResponse({ message: "Product deleted" });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Failed to delete product.";
-    console.error("Product API Error:", error);
-    return NextResponse.json(
-      { success: false, error: message },
-      { status: 500 }
-    );
+    console.error("[Product API DELETE]", error);
+    return errorResponse(getErrorMessage(error));
   }
 }

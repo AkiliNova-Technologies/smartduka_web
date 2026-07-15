@@ -55,12 +55,8 @@ export function LoginForm({
   const handleLogin = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     try {
-      const result = await loginWithEmail(email, password);
-      if (result.success) {
-        toast.success("Welcome back to SmartDuka!");
-      } else {
-        toast.error(getFriendlyErrorMessage(result.error || ""));
-      }
+      await loginWithEmail(email, password);
+      toast.success("Welcome back to SmartDuka!");
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "";
       toast.error(getFriendlyErrorMessage(message));
@@ -69,12 +65,8 @@ export function LoginForm({
 
   const handleGoogleSignIn = async () => {
     try {
-      const result = await loginWithGoogle();
-      if (result.success) {
-        toast.success(`Logged in successfully!`);
-      } else {
-        toast.error(getFriendlyErrorMessage(result.error || ""));
-      }
+      await loginWithGoogle();
+      toast.success("Logged in successfully!");
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "";
       toast.error(getFriendlyErrorMessage(message));
@@ -184,7 +176,6 @@ export function LoginForm({
           Sign up
         </Link>
       </div>
-
     </div>
   );
 }

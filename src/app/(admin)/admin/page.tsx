@@ -24,20 +24,20 @@ import { Category } from "@/types/marketplace";
 
 type ActiveTab = "categories" | "vendors";
 
+const fallbackImage =
+  "https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&w=600&q=80";
 
 export default function AdminDashboardPage() {
   const [activeTab, setActiveTab] = React.useState<ActiveTab>("categories");
 
-  // Use real categories from API
   const {
     categories,
-    categoriesLoading,
+    isLoading,
     error: categoriesError,
-    refreshCategories,
+    refresh,
     deleteCategory,
   } = useCategories();
 
-  // Delete dialog hook
   const {
     isOpen,
     isDeleting,
@@ -46,14 +46,11 @@ export default function AdminDashboardPage() {
     closeDeleteDialog,
     handleDelete,
   } = useDeleteDialog(async (id) => {
+    if (!deleteCategory) return { success: false, error: "Delete not available" };
     const result = await deleteCategory(id);
-    return { 
-      success: !result.error, 
-      error: result.error 
-    };
+    return { success: !result.error, error: result.error };
   });
 
-  // Calculate stats from real data
   const totalCategories = categories.length;
   const parentCategories = categories.filter((c) => !c.parentId).length;
   const childCategories = categories.filter((c) => c.parentId).length;
@@ -62,12 +59,6 @@ export default function AdminDashboardPage() {
     0,
   );
 
-  const fallbackImage =
-    "https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&w=600&q=80";
-
-  // ==========================================
-  // 1. TANSTACK COLUMN CONTRACT: CATEGORIES
-  // ==========================================
   const categoryColumns = React.useMemo<ColumnDef<Category, unknown>[]>(
     () => [
       {
@@ -147,11 +138,13 @@ export default function AdminDashboardPage() {
               <Eye className="size-3.5" />
             </Link>
             <button
-              onClick={() => openDeleteDialog(row.original.id, {
-                itemName: row.original.name,
-                itemType: "category",
-                title: "Delete Category",
-              })}
+              onClick={() =>
+                openDeleteDialog(row.original.id, {
+                  itemName: row.original.name,
+                  itemType: "category",
+                  title: "Delete Category",
+                })
+              }
               className="p-1.5 text-muted-foreground hover:text-rose-500 rounded-md border border-border/40 hover:bg-rose-500/5 transition-colors cursor-pointer"
               title="Delete Category">
               <Trash2 className="size-3.5" />
@@ -163,9 +156,6 @@ export default function AdminDashboardPage() {
     [categories, openDeleteDialog],
   );
 
-  // ==========================================
-  // 3. RENDER SUB-ELEMENTS FOR THE DATA TABLE
-  // ==========================================
   const renderTabSwitcher = (
     <div className="flex items-center gap-5 select-none">
       {[
@@ -191,9 +181,18 @@ export default function AdminDashboardPage() {
     </div>
   );
 
+  if (!deleteCategory) {
+    return (
+      <div className="max-w-8xl mx-auto py-20 text-center">
+        <p className="text-sm text-muted-foreground">
+          Admin dashboard requires VendorCatalogProvider.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-8xl mx-auto space-y-8 animate-in fade-in duration-300 w-full min-w-0">
-      {/* MANAGEMENT SCREEN HEADER */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/40 pb-6">
         <div className="space-y-1">
           <h1 className="text-2xl sm:text-3xl font-medium tracking-tight text-foreground flex items-center gap-2.5">
@@ -206,33 +205,12 @@ export default function AdminDashboardPage() {
         </div>
       </div>
 
-      {/* OVERVIEW KPI STATS GRID */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         {[
-          {
-            label: "Total Categories",
-            value: totalCategories,
-            icon: LayoutGrid,
-            desc: "All taxonomy segments",
-          },
-          {
-            label: "Parent Groups",
-            value: parentCategories,
-            icon: FolderTree,
-            desc: "Main category groups",
-          },
-          {
-            label: "Child Categories",
-            value: childCategories,
-            icon: Layers,
-            desc: "Nested subcategories",
-          },
-          {
-            label: "Total Products",
-            value: totalProducts,
-            icon: Package,
-            desc: "Across all categories",
-          },
+          { label: "Total Categories", value: totalCategories, icon: LayoutGrid, desc: "All taxonomy segments" },
+          { label: "Parent Groups", value: parentCategories, icon: FolderTree, desc: "Main category groups" },
+          { label: "Child Categories", value: childCategories, icon: Layers, desc: "Nested subcategories" },
+          { label: "Total Products", value: totalProducts, icon: Package, desc: "Across all categories" },
         ].map((stat, i) => (
           <div
             key={i}
@@ -255,32 +233,25 @@ export default function AdminDashboardPage() {
         ))}
       </div>
 
-      {/* Error Display */}
       {categoriesError && (
         <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 text-xs font-medium flex items-center justify-between">
           <span>{categoriesError}</span>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={refreshCategories}
-            className="h-7 text-xs rounded-lg">
+          <Button size="sm" variant="outline" onClick={refresh} className="h-7 text-xs rounded-lg">
             Retry
           </Button>
         </div>
       )}
 
-      {/* CATEGORIES TABLE */}
       {activeTab === "categories" && (
         <DataTable
           columns={categoryColumns}
           data={categories}
           getRowId={(row) => row.id}
-          isLoading={categoriesLoading}
+          isLoading={isLoading}
           renderTabs={renderTabSwitcher}
-          />
+        />
       )}
 
-      {/* VENDORS TABLE (Placeholder) */}
       {activeTab === "vendors" && (
         <DataTable
           columns={[]}
@@ -290,7 +261,6 @@ export default function AdminDashboardPage() {
         />
       )}
 
-      {/* Delete Dialog */}
       <DeleteDialog
         open={isOpen}
         onOpenChange={(open) => !open && closeDeleteDialog()}

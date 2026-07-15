@@ -1,5 +1,9 @@
 import { prisma } from "@/lib/prisma/client";
 
+// ==========================================
+// TYPES
+// ==========================================
+
 export interface UserSettingsPayload {
   fullName?: string;
   phoneNumber?: string;
@@ -17,12 +21,15 @@ export interface UserSettingsPayload {
   buyerProtectionEnabled?: boolean;
 }
 
-export const settingsService = {
-  async getSettings(userId: string) {
-    if (!prisma) {
-      throw new Error("Database client not initialized");
-    }
+// ==========================================
+// SETTINGS SERVICE
+// ==========================================
 
+export class SettingsService {
+  /**
+   * Get user settings — creates defaults if none exist
+   */
+  static async getSettings(userId: string) {
     let settings = await prisma.userSettings.findUnique({
       where: { userId },
     });
@@ -44,14 +51,13 @@ export const settingsService = {
     }
 
     return settings;
-  },
+  }
 
-  async updateSettings(userId: string, data: UserSettingsPayload) {
-    if (!prisma) {
-      throw new Error("Database client not initialized");
-    }
-
-    const settings = await prisma.userSettings.upsert({
+  /**
+   * Update user settings — upsert to handle missing records
+   */
+  static async updateSettings(userId: string, data: UserSettingsPayload) {
+    return prisma.userSettings.upsert({
       where: { userId },
       update: {
         ...data,
@@ -75,7 +81,5 @@ export const settingsService = {
         buyerProtectionEnabled: data.buyerProtectionEnabled ?? true,
       },
     });
-
-    return settings;
-  },
-};
+  }
+}

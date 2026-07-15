@@ -1,11 +1,18 @@
 "use server";
 
 import { prisma } from "@/lib/prisma/client";
-import { PaymentGateway, OrderStatus, PaymentStatus, SubOrderStatus } from "@prisma/client";
+import {
+  PaymentGateway,
+  OrderStatus,
+  PaymentStatus,
+  SubOrderStatus,
+} from "@prisma/client";
 import { Decimal } from "@prisma/client/runtime/client";
+import { getCurrentUserId } from "@/lib/auth/session";
+import { withErrorHandling } from "@/lib/api-utils";
 
 // ==========================================
-// INTERFACES FOR INPUT & INTERNAL DATA SHAPES
+// TYPES
 // ==========================================
 
 interface CartItemInput {
@@ -24,31 +31,19 @@ interface CheckoutInput {
   notes?: string;
 }
 
-// Define the exact structural shape of the items grouped per vendor
-interface ComputedVendorLineItem {
+interface SimpleCheckoutItem {
   productId: string;
-  variantId: string | null;
   quantity: number;
-  priceAtPurchase: number;
-  totalPrice: number;
-}
-
-// Define the structural shape of a compiled vendor split-order
-interface ComputedVendorSubOrder {
+  price: number;
   vendorId: string;
-  subOrderNumber: string;
-  vendorSubTotal: number;
-  vendorShipping: number;
-  vendorTotal: number;
-  platformCommission: number;
-  items: ComputedVendorLineItem[];
+  variantId?: string | null;
 }
 
-/**
- * Validates, compiles, and splits a multi-vendor shopping cart into isolated 
- * sub-orders per vendor with dynamic subscription-based platform commission calculation.
- */
-export async function processMultiVendorCheckout(input: CheckoutInput) {
+// ==========================================
+// CORE CHECKOUT ENGINE
+// ==========================================
+
+async function processMultiVendorCheckout(input: CheckoutInput) {
   const {
     customerId,
     cartItems,
@@ -60,13 +55,11 @@ export async function processMultiVendorCheckout(input: CheckoutInput) {
   } = input;
 
   if (!cartItems || cartItems.length === 0) {
-    throw new Error("Checkout Failure: Your shopping cart cannot be empty.");
+    throw new Error("Your shopping cart cannot be empty.");
   }
 
-  // Execute inside an isolated database interactive transaction
-  return await prisma.$transaction(async (tx) => {
-    
-    // 1. Resolve and validate all products and variants from the DB
+  return prisma.$transaction(async (tx) => {
+    // 1. Resolve products
     const productIds = cartItems.map((item) => item.productId);
     const dbProducts = await tx.product.findMany({
       where: { id: { in: productIds }, status: "ACTIVE" },
@@ -84,61 +77,58 @@ export async function processMultiVendorCheckout(input: CheckoutInput) {
       },
     });
 
-    // Create a fast lookup map for our items
     const productMap = new Map(dbProducts.map((p) => [p.id, p]));
 
-    // 2. Group cart items into vendor-specific structures
+    // 2. Group by vendor with pricing & commission
     const vendorBuckets: Record<
       string,
       {
         vendorId: string;
         commissionRate: number;
-        items: ComputedVendorLineItem[];
+        items: {
+          productId: string;
+          variantId: string | null;
+          quantity: number;
+          priceAtPurchase: number;
+          totalPrice: number;
+        }[];
       }
     > = {};
 
     for (const item of cartItems) {
       const dbProduct = productMap.get(item.productId);
       if (!dbProduct) {
-        throw new Error(`Checkout Failure: Product with ID ${item.productId} is unavailable or unverified.`);
+        throw new Error(`Product ${item.productId} is unavailable.`);
       }
 
       let targetPrice = Number(dbProduct.basePrice);
-      
-      // Handle variant configuration if applicable
+
       if (item.variantId) {
         const variant = dbProduct.variants.find((v) => v.id === item.variantId);
         if (!variant) {
-          throw new Error(`Checkout Failure: Selected variant configuration was not found for item: ${dbProduct.name}`);
+          throw new Error(`Variant not found for ${dbProduct.name}`);
         }
         if (variant.inventoryCount < item.quantity) {
-          throw new Error(`Inventory Deficit: Only ${variant.inventoryCount} items left for variant "${variant.name}" of "${dbProduct.name}".`);
+          throw new Error(
+            `Only ${variant.inventoryCount} left for "${variant.name}"`
+          );
         }
         targetPrice = Number(variant.price);
 
-        // Track and decrement inventory stock values safely inside the current database node
         await tx.productVariant.update({
           where: { id: item.variantId },
           data: { inventoryCount: { decrement: item.quantity } },
         });
-      } else {
-        if (dbProduct.status !== "ACTIVE") {
-          throw new Error(`Inventory Deficit: "${dbProduct.name}" is currently out of stock.`);
-        }
       }
 
       const vendorId = dbProduct.vendorId;
-
-      // Extract vendor platform commission rate dynamically from their subscription profile
       const activeSub = dbProduct.vendor.subscriptions[0];
-      const commissionRate = activeSub ? Number(activeSub.plan.commissionRate) : 10.00;
+      const commissionRate = activeSub
+        ? Number(activeSub.plan.commissionRate)
+        : 10.0;
 
       if (!vendorBuckets[vendorId]) {
-        vendorBuckets[vendorId] = {
-          vendorId,
-          commissionRate,
-          items: [],
-        };
+        vendorBuckets[vendorId] = { vendorId, commissionRate, items: [] };
       }
 
       vendorBuckets[vendorId].items.push({
@@ -150,33 +140,45 @@ export async function processMultiVendorCheckout(input: CheckoutInput) {
       });
     }
 
-    // 3. Compute structural totals for Master Order & Vendor Sub-Orders
+    // 3. Compute totals
     let globalSubTotal = 0;
     let globalShippingTotal = 0;
-    
-    // Hard type applied to the sub-orders calculation array instead of any[]
-    const computedVendorSubOrders: ComputedVendorSubOrder[] = [];
-
     const orderTimestamp = Date.now();
-    const cleanMasterOrderNumber = `SD-${orderTimestamp}`;
+    const masterOrderNumber = `SD-${orderTimestamp}`;
+
+    const subOrders: {
+      vendorId: string;
+      subOrderNumber: string;
+      vendorSubTotal: number;
+      vendorShipping: number;
+      vendorTotal: number;
+      platformCommission: number;
+      items: {
+        productId: string;
+        variantId: string | null;
+        quantity: number;
+        priceAtPurchase: number;
+        totalPrice: number;
+      }[];
+    }[] = [];
 
     let vendorIndex = 1;
     for (const vendorId in vendorBuckets) {
       const bucket = vendorBuckets[vendorId];
-      
-      const vendorSubTotal = bucket.items.reduce((sum, item) => sum + item.totalPrice, 0);
-      const vendorShipping = 3500; // Flat UGX 3,500 shipping fee per vendor warehouse split
+      const vendorSubTotal = bucket.items.reduce(
+        (sum, item) => sum + item.totalPrice,
+        0
+      );
+      const vendorShipping = 3500;
       const vendorTotal = vendorSubTotal + vendorShipping;
-      
-      // platformCommission cut formula matching subscription plan criteria
       const platformCommission = (vendorSubTotal * bucket.commissionRate) / 100;
 
       globalSubTotal += vendorSubTotal;
       globalShippingTotal += vendorShipping;
 
-      computedVendorSubOrders.push({
+      subOrders.push({
         vendorId,
-        subOrderNumber: `${cleanMasterOrderNumber}-V${vendorIndex++}`,
+        subOrderNumber: `${masterOrderNumber}-V${vendorIndex++}`,
         vendorSubTotal,
         vendorShipping,
         vendorTotal,
@@ -185,17 +187,16 @@ export async function processMultiVendorCheckout(input: CheckoutInput) {
       });
     }
 
-    const globalTaxAmount = 0.00; 
-    const globalTotalAmount = globalSubTotal + globalShippingTotal + globalTaxAmount;
+    const globalTotalAmount = globalSubTotal + globalShippingTotal;
 
-    // 4. Persist Tier 1: Create Global Master Order
+    // 4. Create master order
     const masterOrder = await tx.order.create({
       data: {
         customerId,
-        orderNumber: cleanMasterOrderNumber,
+        orderNumber: masterOrderNumber,
         subTotal: new Decimal(globalSubTotal),
         totalShipping: new Decimal(globalShippingTotal),
-        taxAmount: new Decimal(globalTaxAmount),
+        taxAmount: new Decimal(0),
         totalAmount: new Decimal(globalTotalAmount),
         status: OrderStatus.PENDING,
         paymentGateway,
@@ -207,8 +208,8 @@ export async function processMultiVendorCheckout(input: CheckoutInput) {
       },
     });
 
-    // 5. Persist Tier 2 & Tier 3: Create Vendor Sub-Orders and Line Items
-    for (const subOrderData of computedVendorSubOrders) {
+    // 5. Create sub-orders and items
+    for (const subOrderData of subOrders) {
       const subOrder = await tx.subOrder.create({
         data: {
           orderId: masterOrder.id,
@@ -222,7 +223,6 @@ export async function processMultiVendorCheckout(input: CheckoutInput) {
         },
       });
 
-      // Completely type-safe line item registration mapping
       await tx.orderItem.createMany({
         data: subOrderData.items.map((item) => ({
           orderId: masterOrder.id,
@@ -239,13 +239,12 @@ export async function processMultiVendorCheckout(input: CheckoutInput) {
         data: {
           vendorId: subOrderData.vendorId,
           type: "ORDER_PLACED",
-          title: "New Incoming Split Order Received",
-          message: `Order reference ${subOrderData.subOrderNumber} containing items valued at UGX ${subOrderData.vendorSubTotal.toLocaleString()} requires validation and fulfillment dispatch.`,
+          title: "New Order Received",
+          message: `Order ${subOrderData.subOrderNumber} valued at UGX ${subOrderData.vendorSubTotal.toLocaleString()} requires fulfillment.`,
         },
       });
     }
 
-    // 6. Return compiled order variables ready to initialize merchant tokenization fields
     return {
       success: true,
       masterOrderId: masterOrder.id,
@@ -255,4 +254,37 @@ export async function processMultiVendorCheckout(input: CheckoutInput) {
       phone: masterOrder.shippingPhone,
     };
   });
+}
+
+// ==========================================
+// PUBLIC ACTION
+// ==========================================
+
+export async function placeOrderAction(input: {
+  items: SimpleCheckoutItem[];
+  shippingAddress: string;
+  shippingPhone: string;
+  shippingEmail?: string;
+  paymentGateway: PaymentGateway;
+  notes?: string;
+}) {
+  return withErrorHandling(async () => {
+    const userId = await getCurrentUserId();
+
+    const result = await processMultiVendorCheckout({
+      customerId: userId,
+      cartItems: input.items.map((item) => ({
+        productId: item.productId,
+        variantId: item.variantId || null, 
+        quantity: item.quantity,
+      })),
+      paymentGateway: input.paymentGateway,
+      shippingAddress: input.shippingAddress,
+      shippingPhone: input.shippingPhone,
+      shippingEmail: input.shippingEmail || "",
+      notes: input.notes,
+    });
+
+    return { order: result };
+  }, "placeOrderAction");
 }

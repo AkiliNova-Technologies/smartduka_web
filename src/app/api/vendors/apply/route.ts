@@ -1,37 +1,45 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma/client";
 import { VerificationStatus } from "@prisma/client";
-import { vendorService } from "@/services/vendor";
+import { VendorService } from "@/services/vendor";
+import {
+  successResponse,
+  errorResponse,
+  getErrorMessage,
+} from "@/lib/api-utils";
 
-export async function GET(req: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
-    const url = new URL(req.url);
-    const userId = url.searchParams.get("userId") || req.headers.get("x-marketplace-user-id");
+    const url = new URL(request.url);
+    const userId =
+      url.searchParams.get("userId") ||
+      request.headers.get("x-marketplace-user-id");
 
     if (!userId) {
-      return NextResponse.json({ error: "User ID is required." }, { status: 400 });
+      return errorResponse("User ID is required.", 400, "MISSING_USER_ID");
     }
 
-    const application = await vendorService.getMyApplication(userId);
-    const profile = await vendorService.getVendorProfileByOwner(userId);
+    const application = await VendorService.getMyApplication(userId);
+    const profile = await VendorService.getVendorProfileByOwner(userId);
 
     if (!application && !profile) {
-      return NextResponse.json(
-        { error: "No vendor application or profile found." },
-        { status: 404 }
+      return errorResponse(
+        "No vendor application or profile found.",
+        404,
+        "NOT_FOUND"
       );
     }
 
-    return NextResponse.json({ application, profile });
+    return successResponse({ application, profile });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Internal server error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("[Vendor Apply API GET]", error);
+    return errorResponse(getErrorMessage(error));
   }
 }
 
-export async function POST(req: NextRequest) {
+export async function POST(request: NextRequest) {
   try {
-    const body = await req.json();
+    const body = await request.json();
 
     const {
       userId,
@@ -55,20 +63,22 @@ export async function POST(req: NextRequest) {
       bankAccountNumber,
     } = body;
 
-    // Required core fields — financial fields are intentionally optional (COD-first era)
+    // Required core fields
     if (!userId || !storeName || !storeSlug || !businessEmail || !businessPhone) {
-      return NextResponse.json(
-        { error: "Missing required core application fields." },
-        { status: 400 }
+      return errorResponse(
+        "Missing required core application fields: userId, storeName, storeSlug, businessEmail, businessPhone.",
+        400,
+        "VALIDATION_ERROR"
       );
     }
 
     // Validate slug format
     const slugRegex = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
     if (!slugRegex.test(storeSlug)) {
-      return NextResponse.json(
-        { error: "Store slug must contain only lowercase letters, numbers, and hyphens." },
-        { status: 400 }
+      return errorResponse(
+        "Store slug must contain only lowercase letters, numbers, and hyphens.",
+        400,
+        "INVALID_SLUG"
       );
     }
 
@@ -78,9 +88,10 @@ export async function POST(req: NextRequest) {
     });
 
     if (existingSlug) {
-      return NextResponse.json(
-        { error: "This store name/slug is already taken by another merchant." },
-        { status: 409 }
+      return errorResponse(
+        "This store name/slug is already taken by another merchant.",
+        409,
+        "SLUG_TAKEN"
       );
     }
 
@@ -90,9 +101,10 @@ export async function POST(req: NextRequest) {
     });
 
     if (existingApp) {
-      return NextResponse.json(
-        { error: "You have already submitted a vendor application. Please wait for review." },
-        { status: 400 }
+      return errorResponse(
+        "You have already submitted a vendor application. Please wait for review.",
+        400,
+        "DUPLICATE_APPLICATION"
       );
     }
 
@@ -100,9 +112,10 @@ export async function POST(req: NextRequest) {
     if (momoNetwork && momoNumber) {
       const momoRegex = /^(07|\+2567|2567)\d{8}$/;
       if (!momoRegex.test(momoNumber.replace(/\s/g, ""))) {
-        return NextResponse.json(
-          { error: "Please provide a valid Ugandan mobile money number (e.g., 077XXXXXXX)." },
-          { status: 400 }
+        return errorResponse(
+          "Please provide a valid Ugandan mobile money number (e.g., 077XXXXXXX).",
+          400,
+          "INVALID_MOMO"
         );
       }
     }
@@ -124,7 +137,6 @@ export async function POST(req: NextRequest) {
         country: "Uganda",
         hasPhysicalStore: Boolean(hasPhysicalStore),
         storeLocation: storeLocation || null,
-        // Financial fields — optional in COD-first era
         momoNetwork: momoNetwork || null,
         momoNumber: momoNumber || null,
         bankName: bankName || null,
@@ -134,27 +146,32 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    return NextResponse.json({ 
-      success: true, 
-      application: {
+    return successResponse(
+      {
         id: application.id,
         storeName: application.storeName,
         status: application.status,
         createdAt: application.createdAt,
-      }
-    });
+      },
+      201
+    );
   } catch (error: unknown) {
-    console.error("KYC Application DB Insertion Error:", error);
-    
+    console.error("[Vendor Apply API POST]", error);
+
     // Handle Prisma unique constraint violations gracefully
-    if (typeof error === "object" && error !== null && "code" in error && (error as { code: string }).code === "P2002") {
-      return NextResponse.json(
-        { error: "A duplicate record was detected. This store slug or user may already have an application." },
-        { status: 409 }
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      (error as { code: string }).code === "P2002"
+    ) {
+      return errorResponse(
+        "A duplicate record was detected. This store slug or user may already have an application.",
+        409,
+        "DUPLICATE_RECORD"
       );
     }
 
-    const message = error instanceof Error ? error.message : "Internal server error. Please try again or contact support.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse(getErrorMessage(error));
   }
 }

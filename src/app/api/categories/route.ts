@@ -1,17 +1,18 @@
-import { NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { CategoryService } from "@/services/category";
 import { CategoryTree } from "@/types/marketplace";
+import { successResponse, errorResponse, getErrorMessage } from "@/lib/api-utils";
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
+    const { searchParams } = request.nextUrl;
     const mode = searchParams.get("mode");
 
     const allCategories = await CategoryService.getAllCategories();
 
     if (mode === "tree") {
-      const parentGroups = allCategories.filter(cat => !cat.parentId);
-      const categoryTree: CategoryTree[] = parentGroups.map(parent => ({
+      const parentGroups = allCategories.filter((cat) => !cat.parentId);
+      const categoryTree: CategoryTree[] = parentGroups.map((parent) => ({
         id: parent.id,
         name: parent.name,
         slug: parent.slug,
@@ -24,8 +25,8 @@ export async function GET(request: Request) {
           subCategories: parent._count?.subCategories || 0,
         },
         subCategories: allCategories
-          .filter(child => child.parentId === parent.id)
-          .map(child => ({
+          .filter((child) => child.parentId === parent.id)
+          .map((child) => ({
             id: child.id,
             name: child.name,
             slug: child.slug,
@@ -38,19 +39,15 @@ export async function GET(request: Request) {
               subCategories: 0,
             },
             subCategories: [],
-          }))
+          })),
       }));
 
-      return NextResponse.json({ success: true, data: categoryTree });
+      return successResponse(categoryTree);
     }
 
-    return NextResponse.json({ success: true, data: allCategories });
+    return successResponse(allCategories);
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Failed to retrieve catalog metadata.";
-    console.error("Categories API Error:", error);
-    return NextResponse.json(
-      { success: false, error: message },
-      { status: 500 }
-    );
+    console.error("[Categories API]", error);
+    return errorResponse(getErrorMessage(error));
   }
 }
