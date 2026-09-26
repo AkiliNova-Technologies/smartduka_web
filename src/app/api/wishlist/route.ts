@@ -1,11 +1,11 @@
 import { NextRequest } from "next/server";
-import { getCurrentUserId } from "@/lib/auth/session";
+import { AuthenticationRequiredError, requireActiveUserId } from "@/lib/auth/session";
 import { WishlistService } from "@/services/wishlist";
 import { successResponse, errorResponse, getErrorMessage } from "@/lib/api-utils";
 
 export async function GET() {
   try {
-    const userId = await getCurrentUserId();
+    const userId = await requireActiveUserId();
     const items = await WishlistService.getUserWishlist(userId);
 
     const serialized = items.map((item) => ({
@@ -27,13 +27,16 @@ export async function GET() {
     return successResponse({ items: serialized });
   } catch (error: unknown) {
     console.error("[Wishlist API GET]", error);
-    return errorResponse(getErrorMessage(error));
+    return errorResponse(
+      getErrorMessage(error),
+      error instanceof AuthenticationRequiredError ? 401 : 500,
+    );
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const userId = await getCurrentUserId();
+    const userId = await requireActiveUserId();
     const { productId } = await req.json();
 
     if (!productId) {
@@ -44,13 +47,16 @@ export async function POST(req: NextRequest) {
     return successResponse({ added: true });
   } catch (error: unknown) {
     console.error("[Wishlist API POST]", error);
-    return errorResponse(getErrorMessage(error));
+    return errorResponse(
+      getErrorMessage(error),
+      error instanceof AuthenticationRequiredError ? 401 : 500,
+    );
   }
 }
 
 export async function DELETE(req: NextRequest) {
   try {
-    const userId = await getCurrentUserId();
+    const userId = await requireActiveUserId();
     const { productId } = await req.json();
 
     if (!productId) {
@@ -61,6 +67,9 @@ export async function DELETE(req: NextRequest) {
     return successResponse({ removed: true });
   } catch (error: unknown) {
     console.error("[Wishlist API DELETE]", error);
-    return errorResponse(getErrorMessage(error));
+    return errorResponse(
+      getErrorMessage(error),
+      error instanceof AuthenticationRequiredError ? 401 : 500,
+    );
   }
 }

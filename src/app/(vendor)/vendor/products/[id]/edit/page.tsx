@@ -434,7 +434,6 @@ export default function VendorProductEditPage() {
         }
       } else {
         const result = await createProduct!({
-          vendorId: vendorId!,
           name: formData.title,
           slug: formData.slug || generateSlug(formData.title),
           brand: formData.brand,
@@ -1108,6 +1107,7 @@ export default function VendorProductEditPage() {
                         <Image
                           src={typeof img === "string" ? img : ""}
                           alt={`Preview ${i + 2}`}
+                          fill
                           className="w-full h-full object-cover"
                         />
                       </div>

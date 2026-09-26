@@ -272,6 +272,54 @@ export interface Order {
   items: OrderItem[];
 }
 
+export interface OrderRow {
+  id: string;
+  orderNumber: string;
+  customerName: string;
+  customerEmail: string;
+  storeName: string;
+  totalAmount: number;
+  paymentGateway: string;
+  status: string;
+  subOrderStatus: string;
+  deliveryLocation: string;
+  date: string;
+}
+
+
+// ==========================================
+// VENDOR STORE & DOCUMENT TYPES
+// ==========================================
+export interface VendorApplicationRow {
+  id: string;
+  storeName: string;
+  storeSlug: string;
+  businessType: string;
+  businessEmail: string;
+  businessPhone: string;
+  streetAddress: string;
+  city: string;
+  district: string | null;
+  hasPhysicalStore: boolean;
+  status: import("@prisma/client").VerificationStatus;
+  createdAt: string;
+  userName: string;
+  userEmail: string;
+  userPhone: string | null;
+  documentCount: number;
+  logoUrl: string | null;
+  bannerUrl: string | null;
+  documents: VendorDocument[];
+}
+
+export interface VendorDocument {
+  id: string;
+  type: string;
+  name: string;
+  url: string;
+  status: string;
+}
+
 // ==========================================
 // DOCUMENTATION & SUPPORT INFRASTRUCTURE
 // ==========================================

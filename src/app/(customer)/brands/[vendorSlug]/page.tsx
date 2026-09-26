@@ -22,15 +22,13 @@ export default async function StoreProfilePage({ params }: PageProps) {
         },
         orderBy: { createdAt: "desc" },
       },
-      documents: true,
       _count: { select: { products: true } },
     },
   });
 
   if (!vendorProfile) notFound();
 
-  // Derive verified status from documents
-  const isVerified = vendorProfile.documents.length > 0;
+  const isVerified = vendorProfile.isVerified;
 
   // Get unique categories from products for the filter bar
   const productCategories = Array.from(
@@ -82,7 +80,6 @@ export default async function StoreProfilePage({ params }: PageProps) {
     country: vendorProfile.country || "Uganda",
     totalProducts: vendorProfile._count.products,
     joinedAt: vendorProfile.createdAt.toISOString(),
-    documents: vendorProfile.documents.length,
   };
 
   return (

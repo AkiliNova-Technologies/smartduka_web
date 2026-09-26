@@ -3,7 +3,7 @@ import { adminAuth } from "@/lib/firebase/admin";
 import { prisma } from "@/lib/prisma/client";
 import { PlatformRole, UserStatus } from "@prisma/client";
 import { cookies } from "next/headers";
-import { createToken } from "@/lib/auth/jwt";
+import { createToken, SESSION_MAX_AGE_SECONDS } from "@/lib/auth/jwt";
 import { successResponse, errorResponse, getErrorMessage } from "@/lib/api-utils";
 
 export async function POST(req: NextRequest) {
@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
-        maxAge: 60 * 60 * 24 * 5, // 5 days
+        maxAge: SESSION_MAX_AGE_SECONDS,
         path: "/",
       });
     }
@@ -88,7 +88,9 @@ export async function POST(req: NextRequest) {
 export async function DELETE() {
   try {
     const cookieStore = await cookies();
-    cookieStore.delete("session");
+    for (const name of ["session", "marketplace_access_token"]) {
+      cookieStore.set(name, "", { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", maxAge: 0, path: "/" });
+    }
     return successResponse({ message: "Logged out completely." });
   } catch (error: unknown) {
     console.error("[Auth API DELETE]", error);

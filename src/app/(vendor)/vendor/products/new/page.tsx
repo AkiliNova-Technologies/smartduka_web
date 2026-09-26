@@ -242,7 +242,6 @@ export default function VendorProductFormPage() {
       ];
 
       const result = await createProduct!({
-        vendorId,
         name: formData.title,
         slug: formData.slug || generateSlug(formData.title),
         brand: formData.brand,
@@ -287,7 +286,7 @@ export default function VendorProductFormPage() {
   }
 
   return (
-    <div className="space-y-8 max-w-6xl mx-auto animate-in fade-in duration-300">
+    <div className="space-y-8 max-w-8xl w-full mx-auto animate-in fade-in duration-300">
       <div className="flex items-center justify-between border-b border-border/40 pb-4 select-none">
         <div className="flex items-center gap-3">
           <Link

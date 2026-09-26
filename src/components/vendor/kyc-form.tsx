@@ -28,7 +28,7 @@ import { cn } from "@/lib/utils";
 
 export function VendorKycForm() {
   const router = useRouter();
-  const { uid, isAuthenticated } = useAuth();
+  const { isAuthenticated } = useAuth();
 
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -76,7 +76,6 @@ export function VendorKycForm() {
     setLoading(true);
     try {
       const payload = {
-        userId: uid,
         storeName,
         storeSlug,
         businessType,

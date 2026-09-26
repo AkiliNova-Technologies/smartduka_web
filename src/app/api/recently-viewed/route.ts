@@ -1,22 +1,25 @@
 import { NextRequest } from "next/server";
-import { getCurrentUserId } from "@/lib/auth/session";
+import { AuthenticationRequiredError, requireActiveUserId } from "@/lib/auth/session";
 import { RecentlyViewedService } from "@/services/recently-viewed";
 import { successResponse, errorResponse, getErrorMessage } from "@/lib/api-utils";
 
 export async function GET() {
   try {
-    const userId = await getCurrentUserId();
+    const userId = await requireActiveUserId();
     const products = await RecentlyViewedService.getRecentlyViewed(userId);
     return successResponse(products);
   } catch (error: unknown) {
     console.error("[Recently Viewed API GET]", error);
-    return errorResponse(getErrorMessage(error));
+    return errorResponse(
+      getErrorMessage(error),
+      error instanceof AuthenticationRequiredError ? 401 : 500,
+    );
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const userId = await getCurrentUserId();
+    const userId = await requireActiveUserId();
     const { productId } = await req.json();
 
     if (!productId) {
@@ -27,6 +30,9 @@ export async function POST(req: NextRequest) {
     return successResponse({ tracked: true });
   } catch (error: unknown) {
     console.error("[Recently Viewed API POST]", error);
-    return errorResponse(getErrorMessage(error));
+    return errorResponse(
+      getErrorMessage(error),
+      error instanceof AuthenticationRequiredError ? 401 : 500,
+    );
   }
 }

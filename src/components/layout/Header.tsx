@@ -14,6 +14,7 @@ import { useSidebar } from "@/components/ui/sidebar";
 import { useAuth } from "@/hooks/use-auth";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useUserData } from "@/providers/UserDataProvider";
+import { NotificationsSheet } from "@/components/notifications/NotificationsSheet";
 
 function SearchInputFields() {
   const router = useRouter();
@@ -155,6 +156,32 @@ function CartButton() {
   );
 }
 
+function NotificationsButton() {
+  const { unreadCount } = useUserData();
+  const [sheetOpen, setSheetOpen] = useState(false);
+
+  return (
+    <>
+      <button
+        onClick={() => setSheetOpen(true)}
+        className="p-2.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full relative transition-all active:scale-95 group cursor-pointer"
+        aria-label="Open Notifications">
+        <Bell className="w-5 h-5 transition-transform group-hover:rotate-12" />
+        {unreadCount > 0 && (
+          <>
+            <span className="absolute top-1 right-1 min-w-[16px] h-4 bg-primary text-primary-foreground rounded-full text-[9px] font-bold flex items-center justify-center ring-2 ring-background px-1">
+              {unreadCount > 99 ? "99+" : unreadCount}
+            </span>
+            <span className="absolute top-1 right-1 min-w-[16px] h-4 bg-primary rounded-full animate-ping opacity-40" />
+          </>
+        )}
+      </button>
+
+      <NotificationsSheet open={sheetOpen} onOpenChange={setSheetOpen} />
+    </>
+  );
+}
+
 export function Header() {
   const { toggleSidebar, open } = useSidebar();
 
@@ -184,11 +211,7 @@ export function Header() {
         <div className="flex items-center gap-2.5 sm:gap-3 ml-4 shrink-0">
           <CartButton />
 
-          <button className="p-2.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full relative transition-all active:scale-95 group cursor-pointer">
-            <Bell className="w-5 h-5 transition-transform group-hover:rotate-12" />
-            <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-primary rounded-full ring-2 ring-background" />
-            <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-primary rounded-full animate-ping opacity-40" />
-          </button>
+          <NotificationsButton />
 
           <div className="h-5 w-[1px] bg-border mx-1.5 hidden sm:block" />
 

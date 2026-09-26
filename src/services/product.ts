@@ -47,7 +47,7 @@ export interface UpdateProductInput {
 export interface ProductQueryOptions {
   vendorId?: string;
   categoryId?: string;
-  status?: string;
+  status?: ProductStatus | ProductStatus[];
   search?: string;
   limit?: number;
   offset?: number;
@@ -86,7 +86,9 @@ export class ProductService {
     if (options?.vendorId) where.vendorId = options.vendorId;
     if (options?.categoryId) where.categoryId = options.categoryId;
     if (options?.status) {
-      where.status = options.status as ProductStatus;
+      where.status = Array.isArray(options.status)
+        ? { in: options.status }
+        : options.status;
     }
     if (options?.search) {
       where.OR = [
@@ -116,6 +118,19 @@ export class ProductService {
       orderBy: { createdAt: "desc" },
       take: options?.limit || 50,
       skip: options?.offset || 0,
+    });
+  }
+
+  /** Get a public product by ID (only active/published, non-deleted). */
+  static async getPublicProductById(id: string) {
+    return prisma.product.findFirst({
+      where: { id, status: { in: ["ACTIVE", "PUBLISHED"] }, deletedAt: null },
+      include: {
+        images: { orderBy: { sortOrder: "asc" } }, category: true, subCategory: true,
+        vendor: { select: { id: true, storeName: true, slug: true, logoUrl: true, isVerified: true } },
+        variants: true, reviews: { include: { user: { select: { id: true, name: true, avatarUrl: true } } }, orderBy: { createdAt: "desc" } },
+        _count: { select: { reviews: true, variants: true, orderItems: true } },
+      },
     });
   }
 

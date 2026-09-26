@@ -36,7 +36,6 @@ interface StoreData {
   country: string;
   totalProducts: number;
   joinedAt: string;
-  documents: number;
 }
 
 interface StoreProduct {

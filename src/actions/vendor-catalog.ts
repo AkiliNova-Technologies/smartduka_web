@@ -1,10 +1,10 @@
 "use server";
 
 import { prisma } from "@/lib/prisma/client";
-import { ProductStatus, VendorUserRole, Prisma } from "@prisma/client";
+import { ProductStatus, Prisma } from "@prisma/client";
 import { Decimal } from "@prisma/client/runtime/client";
+import { requireVendorContext } from "@/lib/auth/vendor-context";
 
-// Helper function to create safe URL slugs
 function generateSlug(text: string): string {
   return text
     .toLowerCase()
@@ -12,48 +12,12 @@ function generateSlug(text: string): string {
     .replace(/(^-|-$)+/g, "");
 }
 
-/**
- * Multi-Tenant Security Guard
- * Verifies if a user is authorized to perform catalog modifications for a specific vendor.
- */
-async function verifyVendorPermission(
-  vendorId: string,
-  userId: string,
-  allowedRoles: VendorUserRole[] = [
-    VendorUserRole.OWNER,
-    VendorUserRole.ADMIN,
-    VendorUserRole.MANAGER,
-  ],
-) {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { vendorId: true, vendorRole: true },
-  });
-
-  if (
-    !user ||
-    user.vendorId !== vendorId ||
-    !user.vendorRole ||
-    !allowedRoles.includes(user.vendorRole)
-  ) {
-    throw new Error(
-      "Access Denied: Unauthorized administrative operation for this shop partition.",
-    );
-  }
-
-  return user;
-}
-
-// ==========================================
-// INTERFACES FOR INPUT VALIDATION
-// ==========================================
-
 interface VariantInput {
   sku: string;
   name: string;
   price: number;
   inventoryCount: number;
-  options: Prisma.InputJsonValue; // 1. FIXED: Avoids 'any' for loose JSON / JSONB metadata types
+  options: Prisma.InputJsonValue;
 }
 
 interface ImageInput {
@@ -63,8 +27,6 @@ interface ImageInput {
 }
 
 interface CreateProductInput {
-  vendorId: string;
-  requestedByUserId: string;
   categoryId?: string;
   name: string;
   description?: string;
@@ -77,8 +39,6 @@ interface CreateProductInput {
 }
 
 interface UpdateProductInput {
-  vendorId: string;
-  requestedByUserId: string;
   categoryId?: string | null;
   name?: string;
   description?: string | null;
@@ -89,18 +49,9 @@ interface UpdateProductInput {
   images?: ImageInput[];
 }
 
-// ==========================================
-// SERVER ACTIONS
-// ==========================================
-
-/**
- * Secure Action: Asserts authorization boundaries and pushes a new product
- * along with its associated imagery and variants into the vendor sandbox.
- */
 export async function createVendorProduct(input: CreateProductInput) {
+  const context = await requireVendorContext("vendor:manage_products");
   const {
-    vendorId,
-    requestedByUserId,
     categoryId,
     name,
     description,
@@ -111,26 +62,18 @@ export async function createVendorProduct(input: CreateProductInput) {
     images = [],
     variants = [],
   } = input;
+  const { vendorId } = context;
 
-  // 1. Enforce multi-tenant access control
-  await verifyVendorPermission(vendorId, requestedByUserId);
-
-  // 2. Generate a scope-isolated unique slug matching @@unique([vendorId, slug])
   const baseSlug = generateSlug(name);
   let finalSlug = baseSlug;
   let counter = 1;
-
-  // Prevent internal slug collision within the merchant's sub-catalog
-  while (
-    await prisma.product.findUnique({
-      where: { vendorId_slug: { vendorId, slug: finalSlug } },
-    })
-  ) {
+  while (await prisma.product.findUnique({
+    where: { vendorId_slug: { vendorId, slug: finalSlug } },
+  })) {
     finalSlug = `${baseSlug}-${counter++}`;
   }
 
-  // 3. Persist catalog data safely inside an atomic transaction
-  return await prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx) => {
     const product = await tx.product.create({
       data: {
         vendorId,
@@ -142,40 +85,34 @@ export async function createVendorProduct(input: CreateProductInput) {
         compareAtPrice: compareAtPrice ? new Decimal(compareAtPrice) : null,
         status,
         sku: sku || null,
-
-        // Handle child relational updates cleanly using nested Prisma writes
         images: {
           createMany: {
-            data: images.map((img) => ({
-              url: img.url,
-              isFeatured: img.isFeatured,
-              sortOrder: img.sortOrder,
+            data: images.map((image) => ({
+              url: image.url,
+              isFeatured: image.isFeatured,
+              sortOrder: image.sortOrder,
             })),
           },
         },
         variants: {
           createMany: {
-            data: variants.map((v) => ({
-              sku: v.sku,
-              name: v.name,
-              price: new Decimal(v.price),
-              inventoryCount: v.inventoryCount,
-              options: v.options ?? Prisma.DbNull,
+            data: variants.map((variant) => ({
+              sku: variant.sku,
+              name: variant.name,
+              price: new Decimal(variant.price),
+              inventoryCount: variant.inventoryCount,
+              options: variant.options ?? Prisma.DbNull,
             })),
           },
         },
       },
-      include: {
-        images: true,
-        variants: true,
-      },
+      include: { images: true, variants: true },
     });
 
-    // 4. Record entry to the system AuditLog for compliance tracking
     await tx.auditLog.create({
       data: {
         vendorId,
-        userId: requestedByUserId,
+        userId: context.user.id,
         action: "PRODUCT_CREATED",
         entity: "Product",
         entityId: product.id,
@@ -187,28 +124,16 @@ export async function createVendorProduct(input: CreateProductInput) {
   });
 }
 
-/**
- * Secure Action: Mutates a product while verifying boundaries, logging
- * old versus new parameters in an audit trail.
- */
-export async function updateVendorProduct(
-  productId: string,
-  input: UpdateProductInput,
-) {
-  const { vendorId, requestedByUserId, images, ...mutations } = input;
-
-  // 1. Enforce validation bounds
-  await verifyVendorPermission(vendorId, requestedByUserId);
-
-  // 2. Retrieve old version to compile audit log variances
+export async function updateVendorProduct(productId: string, input: UpdateProductInput) {
+  const context = await requireVendorContext("vendor:manage_products");
+  const { vendorId } = context;
+  const { images, ...mutations } = input;
   const existingProduct = await prisma.product.findFirst({
     where: { id: productId, vendorId },
   });
 
   if (!existingProduct) {
-    throw new Error(
-      "Target resource not found or isolated outside your store boundary.",
-    );
+    throw new Error("Target resource not found or isolated outside your store boundary.");
   }
 
   const dataPayload: Prisma.ProductUncheckedUpdateInput = {
@@ -218,56 +143,42 @@ export async function updateVendorProduct(
     categoryId: mutations.categoryId,
     sku: mutations.sku,
   };
-
-  if (mutations.basePrice !== undefined) {
-    dataPayload.basePrice = new Decimal(mutations.basePrice);
-  }
+  if (mutations.basePrice !== undefined) dataPayload.basePrice = new Decimal(mutations.basePrice);
   if (mutations.compareAtPrice !== undefined) {
-    dataPayload.compareAtPrice = mutations.compareAtPrice
-      ? new Decimal(mutations.compareAtPrice)
-      : null;
+    dataPayload.compareAtPrice = mutations.compareAtPrice ? new Decimal(mutations.compareAtPrice) : null;
   }
 
   if (mutations.name) {
     const baseSlug = generateSlug(mutations.name);
     let finalSlug = baseSlug;
     let counter = 1;
-
-    while (
-      await prisma.product.findFirst({
-        where: { vendorId, slug: finalSlug, NOT: { id: productId } },
-      })
-    ) {
+    while (await prisma.product.findFirst({
+      where: { vendorId, slug: finalSlug, NOT: { id: productId } },
+    })) {
       finalSlug = `${baseSlug}-${counter++}`;
     }
     dataPayload.slug = finalSlug;
   }
 
-  return await prisma.$transaction(async (tx) => {
-    // Re-link structural images if updated
+  return prisma.$transaction(async (tx) => {
     if (images) {
       await tx.productImage.deleteMany({ where: { productId } });
       dataPayload.images = {
         createMany: {
-          data: images.map((img) => ({
-            url: img.url,
-            isFeatured: img.isFeatured,
-            sortOrder: img.sortOrder,
+          data: images.map((image) => ({
+            url: image.url,
+            isFeatured: image.isFeatured,
+            sortOrder: image.sortOrder,
           })),
         },
       };
     }
 
-    const updatedProduct = await tx.product.update({
-      where: { id: productId },
-      data: dataPayload,
-    });
-
-    // 3. Write complete state divergence log
+    const updatedProduct = await tx.product.update({ where: { id: productId }, data: dataPayload });
     await tx.auditLog.create({
       data: {
         vendorId,
-        userId: requestedByUserId,
+        userId: context.user.id,
         action: "PRODUCT_UPDATED",
         entity: "Product",
         entityId: productId,
@@ -280,37 +191,24 @@ export async function updateVendorProduct(
   });
 }
 
-/**
- * Secure Action: Safely archives products by changing status to ARCHIVED,
- * preventing cascading hard deletes from deleting past checkout order items.
- */
-export async function archiveVendorProduct(
-  productId: string,
-  vendorId: string,
-  requestedByUserId: string,
-) {
-  await verifyVendorPermission(vendorId, requestedByUserId);
-
-  const existingProduct = await prisma.product.findFirst({
-    where: { id: productId, vendorId },
-  });
+export async function archiveVendorProduct(productId: string) {
+  const context = await requireVendorContext("vendor:manage_products");
+  const { vendorId } = context;
+  const existingProduct = await prisma.product.findFirst({ where: { id: productId, vendorId } });
 
   if (!existingProduct) {
-    throw new Error(
-      "Target resource not found or isolated outside your store boundary.",
-    );
+    throw new Error("Target resource not found or isolated outside your store boundary.");
   }
 
-  return await prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx) => {
     await tx.product.update({
       where: { id: productId },
       data: { status: ProductStatus.ARCHIVED, deletedAt: new Date() },
     });
-
     await tx.auditLog.create({
       data: {
         vendorId,
-        userId: requestedByUserId,
+        userId: context.user.id,
         action: "PRODUCT_ARCHIVED",
         entity: "Product",
         entityId: productId,
@@ -318,7 +216,6 @@ export async function archiveVendorProduct(
         newValues: { status: ProductStatus.ARCHIVED },
       },
     });
-
     return { success: true };
   });
 }

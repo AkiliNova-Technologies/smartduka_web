@@ -4,6 +4,7 @@ import { adminAuth } from "@/lib/firebase/admin";
 import { prisma } from "@/lib/prisma/client"; 
 import { cookies } from "next/headers";
 import { PlatformRole, UserStatus } from "@prisma/client";
+import { createToken, SESSION_MAX_AGE_SECONDS } from "@/lib/auth/jwt";
 
 export async function handleServerSession(idToken: string, provider: string = "google") {
   try {
@@ -18,8 +19,7 @@ export async function handleServerSession(idToken: string, provider: string = "g
       update: {
         lastLoginAt: new Date(),
         avatarUrl: picture || null,
-        emailVerifiedAt: email_verified ? new Date() : null,
-        status: UserStatus.ACTIVE
+        emailVerifiedAt: email_verified ? new Date() : null
       },
       create: {
         id: uid,
@@ -51,13 +51,8 @@ export async function handleServerSession(idToken: string, provider: string = "g
     });
 
     const cookieStore = await cookies();
-    cookieStore.set("session", idToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 5,
-      path: "/",
-    });
+    const marketplaceToken = await createToken({ userId: user.id, name: user.name, email: user.email, platformRole: user.platformRole, vendorRole: user.vendorRole ?? null, vendorId: user.vendorId ?? null });
+    cookieStore.set("session", marketplaceToken, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", maxAge: SESSION_MAX_AGE_SECONDS, path: "/" });
 
     return { success: true, role: user.platformRole };
   } catch (error: unknown) {

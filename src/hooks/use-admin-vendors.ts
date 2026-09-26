@@ -3,25 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { VerificationStatus } from "@prisma/client";
 import { toast } from "sonner";
-
-export interface VendorApplicationRow {
-  id: string;
-  storeName: string;
-  storeSlug: string;
-  businessType: string;
-  businessEmail: string;
-  businessPhone: string;
-  streetAddress: string;
-  city: string;
-  district: string | null;
-  hasPhysicalStore: boolean;
-  status: VerificationStatus;
-  createdAt: string;
-  userName: string;
-  userEmail: string;
-  userPhone: string | null;
-  documentCount: number;
-}
+import type { VendorApplicationRow } from "@/types/marketplace";
 
 interface UseAdminVendorsReturn {
   applications: VendorApplicationRow[];

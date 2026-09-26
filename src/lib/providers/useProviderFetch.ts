@@ -104,9 +104,8 @@ export async function fetchApi<T>(url: string, init?: RequestInit): Promise<T> {
   return json as T;
 }
 
-export function authHeaders(uid: string | null): Record<string, string> {
+export function authHeaders(): Record<string, string> {
   return {
     "Content-Type": "application/json",
-    ...(uid ? { "x-marketplace-user-id": uid } : {}),
   };
 }

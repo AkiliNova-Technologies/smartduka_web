@@ -7,15 +7,8 @@ const ADMIN_PREFIX = "/admin";
 const VENDOR_PREFIX = "/vendor";
 const CHECKOUT_PREFIX = "/checkout";
 
-// API routes that authenticate via x-marketplace-user-id header
-const HEADER_AUTH_API_PREFIXES = [
-  "/api/settings",
-  "/api/orders",
-  "/api/user-profile",
-];
-
 // API routes that authenticate via userId in request body
-const BODY_AUTH_API_PREFIXES = ["/api/vendors", "/api/admin/vendors"];
+const BODY_AUTH_API_PREFIXES = ["/api/vendors"];
 
 // API routes that are fully public — no auth required
 const PUBLIC_API_PREFIXES = [
@@ -23,6 +16,16 @@ const PUBLIC_API_PREFIXES = [
   "/api/products",
   "/api/vendors/public",
 ];
+
+function getSanitizedRequestHeaders(request: NextRequest): Headers {
+  const headers = new Headers(request.headers);
+  headers.delete("x-marketplace-user-id");
+  headers.delete("x-marketplace-email");
+  headers.delete("x-marketplace-platform-role");
+  headers.delete("x-marketplace-vendor-role");
+  headers.delete("x-marketplace-vendor-id");
+  return headers;
+}
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -34,32 +37,17 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith("/api/auth") ||
     pathname.includes(".")
   ) {
-    return NextResponse.next();
+    return NextResponse.next({ request: { headers: getSanitizedRequestHeaders(request) } });
   }
 
-  // 1.5 Header-based auth routes
-  if (HEADER_AUTH_API_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
-    const clientUserId = request.headers.get("x-marketplace-user-id");
-    if (clientUserId) {
-      const modifiedHeaders = new Headers(request.headers);
-      return NextResponse.next({
-        request: { headers: modifiedHeaders },
-      });
-    }
-    return NextResponse.json(
-      { error: "Authentication required. Please sign in." },
-      { status: 401 },
-    );
-  }
-
-  // 1.6 Body-based auth routes — pass through, route handles its own validation
+  // 1.5 Body-based auth routes — pass through, route handles its own validation
   if (BODY_AUTH_API_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
-    return NextResponse.next();
+    return NextResponse.next({ request: { headers: getSanitizedRequestHeaders(request) } });
   }
 
-  // 1.7 Fully public API routes
+  // 1.6 Fully public API routes
   if (PUBLIC_API_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
-    return NextResponse.next();
+    return NextResponse.next({ request: { headers: getSanitizedRequestHeaders(request) } });
   }
 
   // 2. Fetch the marketplace access token cookie
@@ -96,7 +84,7 @@ export async function proxy(request: NextRequest) {
         return NextResponse.redirect(new URL(VENDOR_PREFIX, origin));
       return NextResponse.redirect(new URL("/", origin));
     }
-    return NextResponse.next();
+    return NextResponse.next({ request: { headers: getSanitizedRequestHeaders(request) } });
   }
 
   // 6. Define protected spaces
@@ -107,7 +95,6 @@ export async function proxy(request: NextRequest) {
     (pathname.startsWith("/api") &&
       !pathname.startsWith("/api/public") &&
       !PUBLIC_API_PREFIXES.some((prefix) => pathname.startsWith(prefix)) &&
-      !HEADER_AUTH_API_PREFIXES.some((prefix) => pathname.startsWith(prefix)) &&
       !BODY_AUTH_API_PREFIXES.some((prefix) => pathname.startsWith(prefix)));
 
   // 7. Enforce Authentication Guardrails
@@ -143,21 +130,9 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  // 9. Inject headers
-  const modifiedHeaders = new Headers(request.headers);
-  if (session) {
-    modifiedHeaders.set("x-marketplace-user-id", String(session.userId));
-    modifiedHeaders.set("x-marketplace-email", String(session.email));
-    if (session.platformRole) {
-      modifiedHeaders.set("x-marketplace-platform-role", session.platformRole);
-    }
-    if (session.vendorRole) {
-      modifiedHeaders.set("x-marketplace-vendor-role", session.vendorRole);
-    }
-    if (session.vendorId) {
-      modifiedHeaders.set("x-marketplace-vendor-id", session.vendorId);
-    }
-  }
+  // Never forward browser-supplied marketplace identity headers. Server code
+  // derives browser identity from the verified session cookie instead.
+  const modifiedHeaders = getSanitizedRequestHeaders(request);
 
   return NextResponse.next({
     request: { headers: modifiedHeaders },

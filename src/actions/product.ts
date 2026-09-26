@@ -8,6 +8,8 @@ import {
 } from "@/services/product";
 import { withErrorHandling, validateRequiredFields } from "@/lib/api-utils";
 import { Product } from "@/types/marketplace";
+import { requireVendorContext } from "@/lib/auth/vendor-context";
+import { prisma } from "@/lib/prisma/client";
 
 // ==========================================
 // TYPE-SAFE SERIALIZATION
@@ -194,7 +196,7 @@ function serializePublicProduct(product: Record<string, unknown>): SerializedPub
 
 export async function getProductAction(id: string) {
   return withErrorHandling(async () => {
-    const product = await ProductService.getProductById(id);
+    const product = await ProductService.getPublicProductById(id);
     if (!product) {
       throw new Error("Product not found.");
     }
@@ -214,7 +216,7 @@ export async function getProductAction(id: string) {
 
 export async function getProductBySlugAction(slug: string) {
   return withErrorHandling(async () => {
-    const product = await ProductService.getProductBySlug(slug);
+    const product = await ProductService.getPublicProductBySlug(slug);
     if (!product) {
       throw new Error("Product not found.");
     }
@@ -223,23 +225,28 @@ export async function getProductBySlugAction(slug: string) {
 }
 
 // ==========================================
-// CREATE ACTION
+// PRIVATE VENDOR READ
 // ==========================================
 
-export async function createProductAction(input: CreateProductInput) {
-  const validationError = validateRequiredFields(input, [
-    "name",
-    "slug",
-    "basePrice",
-    "vendorId",
-  ]);
+export async function getVendorProductAction(id: string) {
+  return withErrorHandling(async () => {
+    const context = await requireVendorContext("vendor:manage_products");
+    const product = await prisma.product.findFirst({ where: { id, vendorId: context.vendorId } });
+    if (!product) throw new Error("Product not found.");
+    return serializeProductBasic((await ProductService.getProductById(id)) as unknown as Record<string, unknown>);
+  }, "getVendorProductAction");
+}
 
-  if (validationError) {
-    return { success: false as const, error: validationError };
-  }
+export type CatalogCreateProductInput = Omit<CreateProductInput, "vendorId">;
+export type CatalogUpdateProductInput = UpdateProductInput;
+
+export async function createProductAction(input: CatalogCreateProductInput) {
+  const validationError = validateRequiredFields(input, ["name", "slug", "basePrice"]);
+  if (validationError) return { success: false as const, error: validationError };
 
   return withErrorHandling(async () => {
-    const product = await ProductService.createProduct(input);
+    const context = await requireVendorContext("vendor:manage_products");
+    const product = await ProductService.createProduct({ ...input, vendorId: context.vendorId });
     revalidatePath("/vendor/products");
     revalidatePath("/admin/products");
     revalidatePath("/products");
@@ -251,14 +258,14 @@ export async function createProductAction(input: CreateProductInput) {
 // UPDATE ACTION
 // ==========================================
 
-export async function updateProductAction(input: UpdateProductInput) {
+export async function updateProductAction(input: CatalogUpdateProductInput) {
   const validationError = validateRequiredFields(input, ["id"]);
-
-  if (validationError) {
-    return { success: false as const, error: validationError };
-  }
+  if (validationError) return { success: false as const, error: validationError };
 
   return withErrorHandling(async () => {
+    const context = await requireVendorContext("vendor:manage_products");
+    const existing = await prisma.product.findFirst({ where: { id: input.id, vendorId: context.vendorId } });
+    if (!existing) throw new Error("Product not found.");
     const product = await ProductService.updateProduct(input);
     revalidatePath("/vendor/products");
     revalidatePath("/admin/products");
@@ -336,6 +343,9 @@ export async function getDealsAction() {
 
 export async function deleteProductAction(id: string) {
   return withErrorHandling(async () => {
+    const context = await requireVendorContext("vendor:manage_products");
+    const existing = await prisma.product.findFirst({ where: { id, vendorId: context.vendorId } });
+    if (!existing) throw new Error("Product not found.");
     await ProductService.deleteProduct(id);
     revalidatePath("/vendor/products");
     revalidatePath("/admin/products");

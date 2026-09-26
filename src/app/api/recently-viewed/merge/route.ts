@@ -1,11 +1,11 @@
 import { NextRequest } from "next/server";
-import { getCurrentUserId } from "@/lib/auth/session";
+import { AuthenticationRequiredError, requireActiveUserId } from "@/lib/auth/session";
 import { RecentlyViewedService } from "@/services/recently-viewed";
 import { successResponse, errorResponse, getErrorMessage } from "@/lib/api-utils";
 
 export async function POST(req: NextRequest) {
   try {
-    const userId = await getCurrentUserId();
+    const userId = await requireActiveUserId();
     const { productIds } = await req.json();
 
     if (!productIds || !Array.isArray(productIds)) {
@@ -16,6 +16,9 @@ export async function POST(req: NextRequest) {
     return successResponse({ merged: true });
   } catch (error: unknown) {
     console.error("[Recently Viewed Merge API]", error);
-    return errorResponse(getErrorMessage(error));
+    return errorResponse(
+      getErrorMessage(error),
+      error instanceof AuthenticationRequiredError ? 401 : 500,
+    );
   }
 }

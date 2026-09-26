@@ -24,6 +24,16 @@ interface PesapalWebhookPayload {
  * Handles transaction verification, multi-vendor order updates, and ledger balancing.
  */
 export async function POST(request: Request) {
+  // Settlement remains deliberately disabled until Phase 3 implements Pesapal
+  // signature and server-to-server transaction verification. Never trust the
+  // callback payload itself to alter live order or ledger state.
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json(
+      { error: "Pesapal webhooks are not enabled for production." },
+      { status: 503 },
+    );
+  }
+
   let webhookLogId: string | null = null;
   
   try {

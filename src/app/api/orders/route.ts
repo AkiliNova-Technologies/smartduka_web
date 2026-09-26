@@ -1,23 +1,26 @@
 import { NextRequest } from "next/server";
-import { getCurrentUserId } from "@/lib/auth/session";
+import { AccountInactiveError, AuthenticationRequiredError, requireActiveUserId } from "@/lib/auth/session";
 import { OrderService } from "@/services/order";
 import { PaymentGateway } from "@prisma/client";
 import { successResponse, errorResponse, getErrorMessage } from "@/lib/api-utils";
 
 export async function GET() {
   try {
-    const userId = await getCurrentUserId();
+    const userId = await requireActiveUserId();
     const orders = await OrderService.getUserOrders(userId);
     return successResponse({ orders });
   } catch (error: unknown) {
     console.error("[Orders API GET]", error);
-    return errorResponse(getErrorMessage(error));
+    return errorResponse(
+      getErrorMessage(error),
+      error instanceof AuthenticationRequiredError ? 401 : error instanceof AccountInactiveError ? 403 : 500,
+    );
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const userId = await getCurrentUserId();
+    const userId = await requireActiveUserId();
     const body = await req.json();
 
     const order = await OrderService.createOrder({
@@ -34,6 +37,9 @@ export async function POST(req: NextRequest) {
     return successResponse({ order }, 201);
   } catch (error: unknown) {
     console.error("[Orders API POST]", error);
-    return errorResponse(getErrorMessage(error));
+    return errorResponse(
+      getErrorMessage(error),
+      error instanceof AuthenticationRequiredError ? 401 : error instanceof AccountInactiveError ? 403 : 500,
+    );
   }
 }

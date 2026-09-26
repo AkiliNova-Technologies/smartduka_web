@@ -185,7 +185,7 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
     if (!uid) return;
     setSettingsLoading(true);
     try {
-      const data = await fetchApi<UserSettings>("/api/settings", { headers: authHeaders(uid) });
+      const data = await fetchApi<UserSettings>("/api/settings", { headers: authHeaders() });
       setSettings(data);
     } catch {
       // Keep defaults on error
@@ -207,7 +207,7 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
       try {
         const data = await fetchApi<UserSettings>("/api/settings", {
           method: "PATCH",
-          headers: authHeaders(uid),
+          headers: authHeaders(),
           body: JSON.stringify(updates),
         });
         setSettings(data);
@@ -278,7 +278,7 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
     if (!uid) return;
     setWishlistLoading(true);
     try {
-      const data = await fetchApi<{ items: WishlistItem[] }>("/api/wishlist", { headers: authHeaders(uid) });
+      const data = await fetchApi<{ items: WishlistItem[] }>("/api/wishlist", { headers: authHeaders() });
       setWishlist(data.items || []);
     } catch {
       // Silent
@@ -309,7 +309,7 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
       try {
         const response = await fetch("/api/wishlist", {
           method: "POST",
-          headers: authHeaders(uid),
+          headers: authHeaders(),
           body: JSON.stringify({ productId: item.productId }),
         });
         if (!response.ok) {
@@ -330,7 +330,7 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
       try {
         const response = await fetch("/api/wishlist", {
           method: "DELETE",
-          headers: authHeaders(uid),
+          headers: authHeaders(),
           body: JSON.stringify({ productId }),
         });
         if (response.ok) {
@@ -350,7 +350,7 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
     if (!uid) return;
     setOrdersLoading(true);
     try {
-      const data = await fetchApi<{ orders: UserOrder[] }>("/api/orders", { headers: authHeaders(uid) });
+      const data = await fetchApi<{ orders: UserOrder[] }>("/api/orders", { headers: authHeaders() });
       setOrders(data.orders || []);
     } catch {
       // Silent
@@ -371,7 +371,7 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
       try {
         const response = await fetch("/api/orders", {
           method: "POST",
-          headers: authHeaders(uid),
+          headers: authHeaders(),
           body: JSON.stringify(input),
         });
         if (response.ok) {
@@ -414,7 +414,7 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
     try {
       const data = await fetchApi<{ notifications: UserNotification[] }>(
         "/api/notifications",
-        { headers: authHeaders(uid) },
+        { headers: authHeaders() },
       );
       setNotifications(data.notifications || []);
     } catch {

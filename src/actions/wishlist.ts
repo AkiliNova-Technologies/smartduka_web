@@ -1,13 +1,13 @@
 "use server";
 
 import { WishlistService } from "@/services/wishlist";
-import { getCurrentUserId } from "@/lib/auth/session";
+import { requireActiveUserId } from "@/lib/auth/session";
 import { revalidatePath } from "next/cache";
 import { withErrorHandling } from "@/lib/api-utils";
 
 export async function getUserWishlistAction() {
   return withErrorHandling(async () => {
-    const userId = await getCurrentUserId();
+    const userId = await requireActiveUserId();
     const items = await WishlistService.getUserWishlist(userId);
 
     return items.map((item) => ({
@@ -32,7 +32,7 @@ export async function getUserWishlistAction() {
 
 export async function toggleWishlistAction(productId: string) {
   return withErrorHandling(async () => {
-    const userId = await getCurrentUserId();
+    const userId = await requireActiveUserId();
     const isWishlisted = await WishlistService.isWishlisted(userId, productId);
 
     if (isWishlisted) {
@@ -49,7 +49,7 @@ export async function toggleWishlistAction(productId: string) {
 
 export async function removeFromWishlistAction(productId: string) {
   return withErrorHandling(async () => {
-    const userId = await getCurrentUserId();
+    const userId = await requireActiveUserId();
     await WishlistService.removeFromWishlist(userId, productId);
     revalidatePath("/wishlist");
     return { removed: true };
@@ -58,7 +58,7 @@ export async function removeFromWishlistAction(productId: string) {
 
 export async function clearWishlistAction() {
   return withErrorHandling(async () => {
-    const userId = await getCurrentUserId();
+    const userId = await requireActiveUserId();
     await WishlistService.clearWishlist(userId);
     revalidatePath("/wishlist");
     return { cleared: true };

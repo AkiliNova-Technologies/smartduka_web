@@ -1,13 +1,9 @@
 "use server";
 
 import { prisma } from "@/lib/prisma/client";
-import { getCurrentUserId } from "@/lib/auth/session";
+import { requireVendorContext } from "@/lib/auth/vendor-context";
 import { revalidatePath } from "next/cache";
 import { DocumentType } from "@prisma/client";
-
-// ==========================================
-// STORE PROFILE UPDATES
-// ==========================================
 
 export interface UpdateStoreProfileInput {
   storeName?: string;
@@ -21,18 +17,9 @@ export interface UpdateStoreProfileInput {
 }
 
 export async function updateStoreProfile(input: UpdateStoreProfileInput) {
-  const userId = await getCurrentUserId();
-
-  const profile = await prisma.vendorProfile.findUnique({
-    where: { ownerId: userId },
-  });
-
-  if (!profile) {
-    return { success: false, error: "Vendor profile not found." };
-  }
-
+  const context = await requireVendorContext("vendor:manage_shop");
   const updated = await prisma.vendorProfile.update({
-    where: { id: profile.id },
+    where: { id: context.vendorId },
     data: {
       ...(input.storeName !== undefined && { storeName: input.storeName }),
       ...(input.description !== undefined && { description: input.description }),
@@ -46,85 +33,47 @@ export async function updateStoreProfile(input: UpdateStoreProfileInput) {
   });
 
   revalidatePath("/vendor/settings");
-  revalidatePath(`/brands/${profile.slug}`);
+  revalidatePath(`/brands/${context.vendor.slug}`);
   revalidatePath("/brands");
-
-  return { success: true, data: updated };
+  return { success: true, data: updated, error: undefined };
 }
 
-// ==========================================
-// LOGO & BANNER UPLOAD
-// ==========================================
-
 export async function updateStoreLogo(logoUrl: string) {
-  const userId = await getCurrentUserId();
-
-  const profile = await prisma.vendorProfile.findUnique({
-    where: { ownerId: userId },
-  });
-
-  if (!profile) {
-    return { success: false, error: "Vendor profile not found." };
-  }
-
+  const context = await requireVendorContext("vendor:manage_shop");
   const updated = await prisma.vendorProfile.update({
-    where: { id: profile.id },
+    where: { id: context.vendorId },
     data: { logoUrl },
   });
 
   revalidatePath("/vendor/settings");
-  revalidatePath(`/brands/${profile.slug}`);
+  revalidatePath(`/brands/${context.vendor.slug}`);
   revalidatePath("/brands");
-
-  return { success: true, data: updated };
+  return { success: true, data: updated, error: undefined };
 }
 
 export async function updateStoreBanner(bannerUrl: string) {
-  const userId = await getCurrentUserId();
-
-  const profile = await prisma.vendorProfile.findUnique({
-    where: { ownerId: userId },
-  });
-
-  if (!profile) {
-    return { success: false, error: "Vendor profile not found." };
-  }
-
+  const context = await requireVendorContext("vendor:manage_shop");
   const updated = await prisma.vendorProfile.update({
-    where: { id: profile.id },
+    where: { id: context.vendorId },
     data: { bannerUrl },
   });
 
   revalidatePath("/vendor/settings");
-  revalidatePath(`/brands/${profile.slug}`);
-
-  return { success: true, data: updated };
+  revalidatePath(`/brands/${context.vendor.slug}`);
+  return { success: true, data: updated, error: undefined };
 }
-
-// ==========================================
-// VERIFICATION DOCUMENTS
-// ==========================================
 
 export async function uploadVerificationDocument(
   documentType: DocumentType,
   name: string,
   url: string,
   mimeType?: string,
-  size?: number
+  size?: number,
 ) {
-  const userId = await getCurrentUserId();
-
-  const profile = await prisma.vendorProfile.findUnique({
-    where: { ownerId: userId },
-  });
-
-  if (!profile) {
-    return { success: false, error: "Vendor profile not found." };
-  }
-
+  const context = await requireVendorContext("vendor:manage_shop");
   const document = await prisma.document.create({
     data: {
-      vendorId: profile.id,
+      vendorId: context.vendorId,
       type: documentType,
       name,
       url,
@@ -134,86 +83,40 @@ export async function uploadVerificationDocument(
   });
 
   revalidatePath("/vendor/settings");
-
-  return { success: true, data: document };
+  return { success: true, data: document, error: undefined };
 }
 
 export async function deleteVendorDocument(documentId: string) {
-  const userId = await getCurrentUserId();
-
-  const profile = await prisma.vendorProfile.findUnique({
-    where: { ownerId: userId },
-  });
-
-  if (!profile) {
-    return { success: false, error: "Vendor profile not found." };
-  }
-
-  // Verify the document belongs to this vendor
+  const context = await requireVendorContext("vendor:manage_shop");
   const document = await prisma.document.findFirst({
-    where: {
-      id: documentId,
-      vendorId: profile.id,
-    },
+    where: { id: documentId, vendorId: context.vendorId },
   });
+  if (!document) return { success: false, error: "Document not found." };
 
-  if (!document) {
-    return { success: false, error: "Document not found." };
-  }
-
-  await prisma.document.delete({
-    where: { id: documentId },
-  });
-
+  await prisma.document.delete({ where: { id: documentId } });
   revalidatePath("/vendor/settings");
-
   return { success: true };
 }
 
 export async function getMyVendorDocuments() {
-  const userId = await getCurrentUserId();
-
-  const profile = await prisma.vendorProfile.findUnique({
-    where: { ownerId: userId },
-  });
-
-  if (!profile) {
-    return { success: false, error: "Vendor profile not found.", data: [] };
-  }
-
+  const context = await requireVendorContext("vendor:manage_shop");
   const documents = await prisma.document.findMany({
-    where: { vendorId: profile.id },
+    where: { vendorId: context.vendorId },
     orderBy: { createdAt: "desc" },
   });
-
   return { success: true, data: documents };
 }
 
-// ==========================================
-// FULL PROFILE (for settings page)
-// ==========================================
-
 export async function getMyFullVendorProfile() {
-  const userId = await getCurrentUserId();
-
+  const context = await requireVendorContext();
   const profile = await prisma.vendorProfile.findUnique({
-    where: { ownerId: userId },
+    where: { id: context.vendorId },
     include: {
-      documents: {
-        orderBy: { createdAt: "desc" },
-      },
-      _count: {
-        select: {
-          products: true,
-          subOrders: true,
-        },
-      },
+      documents: { orderBy: { createdAt: "desc" } },
+      _count: { select: { products: true, subOrders: true } },
     },
   });
 
-  if (!profile) {
-    return { success: false, error: "Vendor profile not found.", data: null };
-  }
-
+  if (!profile) return { success: false, error: "Vendor profile not found.", data: null };
   return { success: true, data: profile };
 }

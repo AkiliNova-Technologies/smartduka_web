@@ -140,7 +140,18 @@ export class OrderService {
     }));
   }
 
-  static async updateSubOrderStatus(subOrderId: string, status: SubOrderStatus) {
+  static async updateSubOrderStatus(
+    subOrderId: string,
+    status: SubOrderStatus,
+    vendorId: string,
+  ) {
+    const existing = await prisma.subOrder.findFirst({
+      where: { id: subOrderId, vendorId },
+      select: { id: true },
+    });
+
+    if (!existing) return null;
+
     const updated = await prisma.subOrder.update({
       where: { id: subOrderId },
       data: { status },

@@ -8,7 +8,7 @@ import {
   SubOrderStatus,
 } from "@prisma/client";
 import { Decimal } from "@prisma/client/runtime/client";
-import { getCurrentUserId } from "@/lib/auth/session";
+import { requireActiveUserId } from "@/lib/auth/session";
 import { withErrorHandling } from "@/lib/api-utils";
 
 // ==========================================
@@ -269,7 +269,7 @@ export async function placeOrderAction(input: {
   notes?: string;
 }) {
   return withErrorHandling(async () => {
-    const userId = await getCurrentUserId();
+    const userId = await requireActiveUserId();
 
     const result = await processMultiVendorCheckout({
       customerId: userId,

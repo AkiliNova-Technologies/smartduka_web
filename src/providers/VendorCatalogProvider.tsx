@@ -11,7 +11,7 @@ import {
   createProductAction,
   updateProductAction,
   deleteProductAction,
-  getProductAction,
+  getVendorProductAction,
 } from "@/actions/product";
 import {
   createCategoryAction,
@@ -26,7 +26,6 @@ import type { Product, CategoryTree } from "@/types/marketplace";
 // ==========================================
 
 interface CreateProductHookInput {
-  vendorId: string;
   name: string;
   slug: string;
   brand?: string;
@@ -222,12 +221,7 @@ export function VendorCatalogProvider({
   // FETCH PRODUCTS
   // ==========================================
 
-  const buildProductsUrl = useCallback(() => {
-    const params = new URLSearchParams();
-    if (vendorId) params.set("vendorId", vendorId);
-    const queryString = params.toString();
-    return `/api/products${queryString ? `?${queryString}` : ""}`;
-  }, [vendorId]);
+  const buildProductsUrl = useCallback(() => vendorId ? "/api/vendor/products" : "/api/products", [vendorId]);
 
   const fetchProducts = useCallback(async () => {
     setProductsLoading(true);
@@ -252,7 +246,7 @@ export function VendorCatalogProvider({
   // ==========================================
 
   const fetchProductById = useCallback(async (id: string): Promise<Product> => {
-    const result = await getProductAction(id);
+    const result = await getVendorProductAction(id);
     if (!result.success) throw new Error(result.error || "Product not found");
     return result.data as Product;
   }, []);

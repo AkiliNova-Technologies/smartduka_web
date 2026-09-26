@@ -1,6 +1,10 @@
 import { headers, cookies } from "next/headers";
-import { PlatformRole, VendorUserRole } from "@prisma/client";
+import { PlatformRole, UserStatus, VendorUserRole } from "@prisma/client";
+import { prisma } from "@/lib/prisma/client";
 import { verifyToken } from "@/lib/auth/jwt";
+
+export class AuthenticationRequiredError extends Error {}
+export class AccountInactiveError extends Error {}
 
 export interface AuthenticatedUserSession {
   userId: string;
@@ -11,9 +15,9 @@ export interface AuthenticatedUserSession {
 }
 
 /**
- * Fast-access server context utility. Extracts the authenticated marketplace context
- * injected directly by the edge gateway shield, reads the session cookie for server actions,
- * OR authorizes background cron workers.
+ * Fast-access server context utility. Browser identity is derived only from a
+ * cryptographically verified marketplace session cookie. Background cron workers
+ * use their separate shared-secret authentication path.
  */
 export async function getAuthenticatedSession(): Promise<AuthenticatedUserSession | null> {
   const requestHeaders = await headers();
@@ -31,24 +35,10 @@ export async function getAuthenticatedSession(): Promise<AuthenticatedUserSessio
     };
   }
 
-  // Primary: proxy-injected headers
-  const userId = requestHeaders.get("x-marketplace-user-id");
-  const email = requestHeaders.get("x-marketplace-email");
-
-  if (userId && email) {
-    return {
-      userId,
-      email,
-      vendorId: requestHeaders.get("x-marketplace-vendor-id"),
-      vendorRole: requestHeaders.get("x-marketplace-vendor-role") as VendorUserRole | null,
-      platformRole: requestHeaders.get("x-marketplace-platform-role") as PlatformRole | null,
-    };
-  }
-
-  // Fallback for server actions: read session cookie directly
   try {
     const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get("session");
+    const sessionCookie =
+      cookieStore.get("marketplace_access_token") || cookieStore.get("session");
     if (sessionCookie) {
       const session = await verifyToken(sessionCookie.value);
       if (session) {
@@ -75,9 +65,20 @@ export async function getAuthenticatedSession(): Promise<AuthenticatedUserSessio
 export async function getCurrentUserId(): Promise<string> {
   const session = await getAuthenticatedSession();
   if (!session) {
-    throw new Error("Unauthorized: No authenticated session found.");
+    throw new AuthenticationRequiredError("Unauthorized: No authenticated session found.");
   }
   return session.userId;
+}
+
+/** Resolves a session identity whose current database account remains active. */
+export async function requireActiveUserId(): Promise<string> {
+  const userId = await getCurrentUserId();
+  if (userId === "MARKETPLACE_CRON_WORKER") return userId;
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { status: true } });
+  if (!user || user.status !== UserStatus.ACTIVE) {
+    throw new AccountInactiveError("This account is no longer active.");
+  }
+  return userId;
 }
 
 /**
@@ -93,21 +94,20 @@ export async function getCurrentUserIdOrNull(): Promise<string | null> {
  * Checks if the current user has a specific platform role.
  */
 export async function hasPlatformRole(role: PlatformRole): Promise<boolean> {
-  const session = await getAuthenticatedSession();
-  return session?.platformRole === role;
+  const userId = await requireActiveUserId();
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { platformRole: true } });
+  return user?.platformRole === role;
 }
 
 /**
  * Checks if the current user is a vendor and returns their vendor context.
  */
-export async function getVendorContext(): Promise<{
-  vendorId: string;
-  vendorRole: VendorUserRole;
-} | null> {
-  const session = await getAuthenticatedSession();
-  if (!session?.vendorId) return null;
-  return {
-    vendorId: session.vendorId,
-    vendorRole: session.vendorRole ?? ("STAFF" as VendorUserRole),
-  };
+export async function getVendorContext(): Promise<{ vendorId: string; vendorRole: VendorUserRole } | null> {
+  const userId = await requireActiveUserId();
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { vendorId: true, vendorRole: true, vendorProfile: { select: { id: true, status: true } } },
+  });
+  if (!user?.vendorId || !user.vendorRole || user.vendorProfile?.id !== user.vendorId || user.vendorProfile.status !== "ACTIVE") return null;
+  return { vendorId: user.vendorId, vendorRole: user.vendorRole };
 }

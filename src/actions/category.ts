@@ -7,6 +7,7 @@ import {
   UpdateCategoryInput,
 } from "@/services/category";
 import { withErrorHandling, validateRequiredFields } from "@/lib/api-utils";
+import { requireAdminContext } from "@/lib/auth/admin-context";
 
 export async function getCategoryDetailsAction(id: string) {
   return withErrorHandling(async () => {
@@ -38,6 +39,7 @@ export async function createCategoryAction(formData: CreateCategoryInput) {
   }
 
   return withErrorHandling(async () => {
+    await requireAdminContext("platform:manage");
     await CategoryService.createCategoryWithSubs(formData);
     revalidatePath("/admin/categories");
     return { created: true };
@@ -46,6 +48,7 @@ export async function createCategoryAction(formData: CreateCategoryInput) {
 
 export async function deleteCategoryAction(id: string) {
   return withErrorHandling(async () => {
+    await requireAdminContext("platform:manage");
     await CategoryService.deleteCategory(id);
     revalidatePath("/admin/categories");
     return { deleted: true };
@@ -59,6 +62,7 @@ export async function updateCategoryAction(formData: UpdateCategoryInput) {
   }
 
   return withErrorHandling(async () => {
+    await requireAdminContext("platform:manage");
     await CategoryService.updateCategory(formData);
     revalidatePath("/admin/categories");
     return { updated: true };

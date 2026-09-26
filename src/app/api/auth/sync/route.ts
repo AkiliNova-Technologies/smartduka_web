@@ -32,7 +32,6 @@ export async function POST(req: NextRequest) {
         avatarUrl: picture || null,
         emailVerifiedAt: email_verified ? new Date() : null,
         lastLoginAt: new Date(),
-        status: UserStatus.ACTIVE,
       },
       create: {
         id: uid,

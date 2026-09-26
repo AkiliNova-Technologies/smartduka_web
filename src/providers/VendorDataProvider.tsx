@@ -209,8 +209,8 @@ export function VendorDataProvider({
       setVendorOrdersLoading(true);
       try {
         const data = await fetchApi<{ orders: VendorSubOrder[] }>(
-          `/api/vendors/orders?vendorId=${profile.id}`,
-          { headers: authHeaders(uid) },
+          "/api/vendors/orders",
+          { headers: authHeaders() },
         );
         setVendorOrders(data.orders || []);
       } catch {
@@ -231,10 +231,7 @@ export function VendorDataProvider({
       try {
         await fetch(`/api/vendors/orders/${subOrderId}`, {
           method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            "x-marketplace-user-id": uid,
-          },
+          headers: authHeaders(),
           body: JSON.stringify({ status }),
         });
         await refreshVendorOrdersRef.current();

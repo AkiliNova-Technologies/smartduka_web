@@ -45,7 +45,16 @@ export function paginatedResponse<T>(
  * Extracts human-readable error message from any thrown value
  */
 export function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message;
+  if (error instanceof Error) {
+    const message = error.message;
+    if (
+      error.name.includes("Prisma") ||
+      /(?:prisma|postgres(?:ql)?|database|sql)/i.test(message)
+    ) {
+      return "An unexpected error occurred.";
+    }
+    return message;
+  }
   if (typeof error === "string") return error;
   return "An unexpected error occurred.";
 }

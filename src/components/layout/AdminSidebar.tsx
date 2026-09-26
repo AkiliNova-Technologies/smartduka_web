@@ -5,7 +5,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { 
   LayoutDashboard, ShoppingCart, Package, FileChartColumn,
-  Store, Moon, Sun, LayoutGrid, ShieldCheck
+  Store, Moon, Sun, LayoutGrid, ShieldCheck,
+  Users
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/hooks/use-theme";
@@ -22,13 +23,14 @@ import {
   SidebarMenuButton,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { IconTrolley } from "@tabler/icons-react";
+import { IconSmartHome } from "@tabler/icons-react";
 
 const managementItems = [
   { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
   { name: "Categories", href: "/admin/categories", icon: LayoutGrid },
   { name: "Vendors & Shops", href: "/admin/vendors", icon: Store },
   { name: "All Products", href: "/admin/products", icon: Package },
+  { name: "Users", href: "/admin/users", icon: Users },
 ];
 
 const analyticItems = [
@@ -153,7 +155,7 @@ export function AdminSidebar({ ...props }: React.ComponentProps<typeof Sidebar>)
               className="w-full px-4 py-2.5 rounded-full text-xs font-medium tracking-tight text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer"
             >
               <Link href="/">
-                <IconTrolley className="w-4 h-4 shrink-0" />
+                <IconSmartHome  className="w-4 h-4 shrink-0" />
                 <span>Marketplace</span>
               </Link>
             </SidebarMenuButton>
