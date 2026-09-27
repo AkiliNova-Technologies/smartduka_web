@@ -41,6 +41,8 @@ export interface CartItem {
   quantity: number;
   vendorId: string;
   vendorName: string;
+  /** Display-only snapshot; checkout derives ownership and price on the server. */
+  variantId?: string | null;
 }
 
 export interface WishlistItem {
@@ -116,10 +118,11 @@ interface UserDataContextType {
   ordersLoading: boolean;
   refreshOrders: () => Promise<void>;
   placeOrder: (input: {
-    items: { productId: string; quantity: number; price: number; vendorId: string }[];
+    items: { productId: string; variantId?: string | null; quantity: number }[];
     shippingAddress: string;
     shippingPhone: string;
     paymentGateway: "CASH_ON_DELIVERY" | "MTN_MOMO" | "AIRTEL_MONEY";
+    checkoutRequestId: string;
     notes?: string;
   }) => Promise<{ success: boolean; error?: string }>;
   notifications: UserNotification[];
@@ -361,10 +364,11 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
 
   const placeOrder = useCallback(
     async (input: {
-      items: { productId: string; quantity: number; price: number; vendorId: string }[];
+      items: { productId: string; variantId?: string | null; quantity: number }[];
       shippingAddress: string;
       shippingPhone: string;
       paymentGateway: "CASH_ON_DELIVERY" | "MTN_MOMO" | "AIRTEL_MONEY";
+      checkoutRequestId: string;
       notes?: string;
     }) => {
       if (!uid) return { success: false, error: "Not authenticated" };

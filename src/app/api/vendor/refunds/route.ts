@@ -1,0 +1,1 @@
+import { ReturnsRefundsService } from "@/services/returns-refunds"; import { successResponse,errorResponse,getErrorMessage } from "@/lib/api-utils"; export async function GET(){try{return successResponse(await ReturnsRefundsService.listRefundsForCurrentVendor());}catch(error){return errorResponse(getErrorMessage(error),403)}}

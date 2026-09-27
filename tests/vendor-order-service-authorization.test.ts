@@ -24,7 +24,7 @@ describe("vendor order status isolation", () => {
     ).resolves.toBeNull();
     expect(mocks.findFirst).toHaveBeenCalledWith({
       where: { id: "order-b", vendorId: "vendor-a" },
-      select: { id: true },
+      select: { id: true, status: true },
     });
     expect(mocks.update).not.toHaveBeenCalled();
   });

@@ -1,0 +1,1 @@
+import {ReconciliationService} from "@/services/reconciliation";import {successResponse,errorResponse,getErrorMessage} from "@/lib/api-utils";export async function GET(){try{return successResponse(await ReconciliationService.listOpen())}catch(e){return errorResponse(getErrorMessage(e),403)}}

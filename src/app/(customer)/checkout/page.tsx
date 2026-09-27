@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -47,6 +47,7 @@ export default function CheckoutPage() {
   // Payment
   const [paymentMethod, setPaymentMethod] = useState("cod");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const checkoutRequestId = useRef(crypto.randomUUID());
 
   const deliveryFee = 0;
   const totalAmount = cartTotal + deliveryFee;
@@ -69,9 +70,9 @@ export default function CheckoutPage() {
     items: cart.map((item) => ({
       productId: item.productId,
       quantity: item.quantity,
-      price: item.price,
-      vendorId: item.vendorId,
+      variantId: item.variantId,
     })),
+    checkoutRequestId: checkoutRequestId.current,
     shippingAddress: address,
     shippingPhone: phoneNumber,
     paymentGateway,

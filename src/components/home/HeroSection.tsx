@@ -56,6 +56,7 @@ export function HeroSection() {
                 alt={`Marketplace slide ${slide.tag}`}
                 src={slide.image}
                 sizes="(max-w-1200px) 100vw, 80vw"
+                loading="eager"
               />
             </div>
             

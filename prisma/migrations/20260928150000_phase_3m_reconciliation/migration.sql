@@ -1,0 +1,10 @@
+CREATE TYPE "ReconciliationDomain" AS ENUM ('PAYMENT','ORDER','VENDOR_EARNINGS','PAYOUT','REFUND','REVERSAL','RISK');
+CREATE TYPE "ReconciliationSeverity" AS ENUM ('INFO','WARNING','HIGH','CRITICAL');
+CREATE TYPE "ReconciliationFindingStatus" AS ENUM ('OPEN','RESOLVED','IGNORED');
+CREATE TABLE "ReconciliationFinding" ("id" TEXT NOT NULL,"type" TEXT NOT NULL,"domain" "ReconciliationDomain" NOT NULL,"severity" "ReconciliationSeverity" NOT NULL,"entityType" TEXT NOT NULL,"entityId" TEXT NOT NULL,"vendorId" TEXT,"orderId" TEXT,"subOrderId" TEXT,"paymentAttemptId" TEXT,"vendorPayoutId" TEXT,"refundId" TEXT,"status" "ReconciliationFindingStatus" NOT NULL DEFAULT 'OPEN',"detectedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,"resolvedAt" TIMESTAMP(3),"resolution" TEXT,"metadata" JSONB,"createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,"updatedAt" TIMESTAMP(3) NOT NULL,CONSTRAINT "ReconciliationFinding_pkey" PRIMARY KEY ("id"));
+CREATE UNIQUE INDEX "ReconciliationFinding_type_entityType_entityId_key" ON "ReconciliationFinding"("type","entityType","entityId");
+CREATE INDEX "ReconciliationFinding_status_severity_idx" ON "ReconciliationFinding"("status","severity");
+CREATE INDEX "ReconciliationFinding_domain_status_idx" ON "ReconciliationFinding"("domain","status");
+CREATE INDEX "ReconciliationFinding_vendorId_status_idx" ON "ReconciliationFinding"("vendorId","status");
+ALTER TABLE "ReconciliationFinding" ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE "ReconciliationFinding" FROM anon, authenticated;

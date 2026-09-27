@@ -1,0 +1,18 @@
+ALTER TYPE "LedgerTransactionType" ADD VALUE IF NOT EXISTS 'SALE_PENDING';
+ALTER TYPE "LedgerTransactionType" ADD VALUE IF NOT EXISTS 'SALE_RELEASE';
+ALTER TYPE "LedgerTransactionType" ADD VALUE IF NOT EXISTS 'PAYOUT_RESERVE';
+ALTER TYPE "LedgerTransactionType" ADD VALUE IF NOT EXISTS 'PAYOUT_COMPLETE';
+ALTER TYPE "LedgerTransactionType" ADD VALUE IF NOT EXISTS 'PAYOUT_RELEASE';
+ALTER TYPE "LedgerTransactionType" ADD VALUE IF NOT EXISTS 'REFUND_ADJUSTMENT';
+ALTER TYPE "LedgerTransactionType" ADD VALUE IF NOT EXISTS 'REVERSAL_ADJUSTMENT';
+ALTER TYPE "LedgerTransactionType" ADD VALUE IF NOT EXISTS 'MANUAL_ADJUSTMENT';
+CREATE TYPE "WalletBucket" AS ENUM ('PENDING','AVAILABLE','RESERVED','PAID_OUT');
+ALTER TABLE "SubOrder" ADD COLUMN "commissionRate" DECIMAL(5,2), ADD COLUMN "vendorNetEntitlement" DECIMAL(18,2), ADD COLUMN "paymentProcessingFee" DECIMAL(18,2) NOT NULL DEFAULT 0.00;
+ALTER TABLE "FinancialLedger" ADD COLUMN "orderId" TEXT, ADD COLUMN "subOrderId" TEXT, ADD COLUMN "paymentAttemptId" TEXT, ADD COLUMN "walletBucket" "WalletBucket", ADD COLUMN "currency" VARCHAR(3);
+CREATE UNIQUE INDEX "FinancialLedger_subOrderId_paymentAttemptId_type_key" ON "FinancialLedger"("subOrderId","paymentAttemptId","type");
+CREATE INDEX "FinancialLedger_vendorId_currency_walletBucket_idx" ON "FinancialLedger"("vendorId","currency","walletBucket");
+CREATE INDEX "FinancialLedger_orderId_idx" ON "FinancialLedger"("orderId");
+CREATE INDEX "FinancialLedger_paymentAttemptId_idx" ON "FinancialLedger"("paymentAttemptId");
+ALTER TABLE "FinancialLedger" ADD CONSTRAINT "FinancialLedger_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "Order"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "FinancialLedger" ADD CONSTRAINT "FinancialLedger_subOrderId_fkey" FOREIGN KEY ("subOrderId") REFERENCES "SubOrder"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "FinancialLedger" ADD CONSTRAINT "FinancialLedger_paymentAttemptId_fkey" FOREIGN KEY ("paymentAttemptId") REFERENCES "PaymentAttempt"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

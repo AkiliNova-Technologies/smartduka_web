@@ -15,6 +15,7 @@ const PUBLIC_API_PREFIXES = [
   "/api/categories",
   "/api/products",
   "/api/vendors/public",
+  "/api/webhooks/pesapal",
 ];
 
 function getSanitizedRequestHeaders(request: NextRequest): Headers {

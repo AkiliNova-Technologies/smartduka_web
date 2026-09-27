@@ -1,0 +1,1 @@
+import {ReconciliationService} from "@/services/reconciliation";import {successResponse,errorResponse,getErrorMessage} from "@/lib/api-utils";export async function POST(_:Request,{params}:{params:Promise<{id:string}>}){try{return successResponse(await ReconciliationService.repair((await params).id))}catch(e){return errorResponse(getErrorMessage(e),400)}}

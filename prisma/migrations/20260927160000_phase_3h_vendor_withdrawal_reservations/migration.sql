@@ -1,0 +1,14 @@
+ALTER TYPE "PayoutStatus" ADD VALUE IF NOT EXISTS 'REQUESTED';
+ALTER TYPE "PayoutStatus" ADD VALUE IF NOT EXISTS 'APPROVED';
+ALTER TYPE "PayoutStatus" ADD VALUE IF NOT EXISTS 'REJECTED';
+ALTER TYPE "PayoutStatus" ADD VALUE IF NOT EXISTS 'CANCELLED';
+CREATE TYPE "PayoutDestinationType" AS ENUM ('MOBILE_MONEY', 'BANK_ACCOUNT');
+ALTER TYPE "LedgerTransactionType" ADD VALUE IF NOT EXISTS 'PAYOUT_RESERVED';
+ALTER TYPE "LedgerTransactionType" ADD VALUE IF NOT EXISTS 'PAYOUT_AVAILABLE';
+ALTER TABLE "VendorPayout" ALTER COLUMN "gateway" DROP NOT NULL;
+ALTER TABLE "VendorPayout" ADD COLUMN "currency" VARCHAR(3), ADD COLUMN "withdrawalRequestId" TEXT, ADD COLUMN "requestHash" TEXT, ADD COLUMN "destinationType" "PayoutDestinationType", ADD COLUMN "maskedDestination" TEXT, ADD COLUMN "requestedByUserId" TEXT, ADD COLUMN "approvedByUserId" TEXT, ADD COLUMN "rejectedByUserId" TEXT, ADD COLUMN "cancelledByUserId" TEXT, ADD COLUMN "approvedAt" TIMESTAMP(3), ADD COLUMN "rejectedAt" TIMESTAMP(3), ADD COLUMN "cancelledAt" TIMESTAMP(3);
+ALTER TABLE "FinancialLedger" ADD COLUMN "vendorPayoutId" TEXT;
+CREATE UNIQUE INDEX "VendorPayout_vendorId_withdrawalRequestId_key" ON "VendorPayout"("vendorId", "withdrawalRequestId");
+CREATE UNIQUE INDEX "FinancialLedger_vendorPayoutId_type_key" ON "FinancialLedger"("vendorPayoutId", "type");
+CREATE INDEX "FinancialLedger_vendorPayoutId_idx" ON "FinancialLedger"("vendorPayoutId");
+ALTER TABLE "FinancialLedger" ADD CONSTRAINT "FinancialLedger_vendorPayoutId_fkey" FOREIGN KEY ("vendorPayoutId") REFERENCES "VendorPayout"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

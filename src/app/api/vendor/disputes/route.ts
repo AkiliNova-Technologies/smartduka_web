@@ -1,0 +1,1 @@
+import { DisputeRiskService } from "@/services/disputes-risk"; import { errorResponse, getErrorMessage, successResponse } from "@/lib/api-utils"; export async function GET(){try{return successResponse(await DisputeRiskService.listForCurrentVendor());}catch(error){return errorResponse(getErrorMessage(error),403);}}

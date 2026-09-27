@@ -1,0 +1,4 @@
+import { NextRequest } from "next/server";
+import { ReturnsRefundsService } from "@/services/returns-refunds";
+import { successResponse, errorResponse, getErrorMessage } from "@/lib/api-utils";
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) { try { const { id } = await params; const body = await req.json(); const refund = body.action === "approve" ? await ReturnsRefundsService.approveRefund(id) : body.action === "reject" ? await ReturnsRefundsService.rejectRefund(id, body.reason ?? "") : null; if (!refund) return errorResponse("Unsupported refund action", 400); return successResponse(refund); } catch (error) { return errorResponse(getErrorMessage(error), 400); } }

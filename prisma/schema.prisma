@@ -77,9 +77,124 @@ enum PaymentStatus {
 
 enum PayoutStatus {
   PENDING
+  REQUESTED
+  APPROVED
+  READY_FOR_DISBURSEMENT
+  REJECTED
+  CANCELLED
   PROCESSING
   COMPLETED
   FAILED
+}
+
+enum PayoutDestinationType {
+  MOBILE_MONEY
+  BANK_ACCOUNT
+}
+
+enum DeliveryConfirmationSource {
+  CUSTOMER
+  PLATFORM_ADMIN
+  LOGISTICS
+}
+
+enum PayoutAllocationStatus {
+  ACTIVE
+  RELEASED
+}
+
+enum RefundStatus {
+  REQUESTED
+  APPROVED
+  READY_FOR_PROVIDER_REFUND
+  COMPLETED
+  FAILED
+  REJECTED
+}
+
+enum ReturnStatus {
+  REQUESTED
+  APPROVED
+  REJECTED
+  RECEIVED
+  COMPLETED
+}
+
+enum DisputeStatus {
+  OPEN
+  UNDER_REVIEW
+  RESOLVED_CUSTOMER
+  RESOLVED_VENDOR
+  REJECTED
+  CANCELLED
+}
+
+enum RiskFlagScope {
+  CUSTOMER
+  VENDOR
+  ORDER
+  SUBORDER
+  PAYMENT
+  PAYOUT
+}
+
+enum RiskFlagCategory {
+  SUSPICIOUS_PAYMENT
+  ACCOUNT_TAKEOVER_SUSPECTED
+  UNUSUAL_ORDER_ACTIVITY
+  REFUND_ABUSE
+  VENDOR_FULFILLMENT_RISK
+  MANUAL_REVIEW
+}
+
+enum RiskFlagSource {
+  SYSTEM
+  ADMIN
+}
+
+enum RiskSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum RiskFlagStatus {
+  OPEN
+  RESOLVED
+  DISMISSED
+}
+
+enum ReconciliationDomain {
+  PAYMENT
+  ORDER
+  VENDOR_EARNINGS
+  PAYOUT
+  REFUND
+  REVERSAL
+  RISK
+}
+
+enum ReconciliationSeverity {
+  INFO
+  WARNING
+  HIGH
+  CRITICAL
+}
+
+enum ReconciliationFindingStatus {
+  OPEN
+  RESOLVED
+  IGNORED
+}
+
+enum PaymentAttemptStatus {
+  CREATED
+  SUBMISSION_UNKNOWN
+  INITIATED
+  COMPLETED
+  FAILED
+  REVERSED
 }
 
 enum LedgerTransactionType {
@@ -88,6 +203,27 @@ enum LedgerTransactionType {
   SUBSCRIPTION_PAYMENT
   VENDOR_PAYOUT
   REFUND_DEDUCTION
+  SALE_PENDING
+  SALE_RELEASE
+  SALE_AVAILABLE
+  PAYOUT_RESERVE
+  PAYOUT_RESERVED
+  PAYOUT_COMPLETE
+  PAYOUT_RELEASE
+  PAYOUT_AVAILABLE
+  REFUND_ADJUSTMENT
+  REVERSAL_ADJUSTMENT
+  MANUAL_ADJUSTMENT
+  SALE_REVERSAL_PENDING
+  SALE_REVERSAL_AVAILABLE
+  PLATFORM_COMMISSION_REVERSAL
+}
+
+enum WalletBucket {
+  PENDING
+  AVAILABLE
+  RESERVED
+  PAID_OUT
 }
 
 enum BillingCycle {
@@ -222,12 +358,20 @@ model User {
 
   vendorApplications VendorApplication[]
 
-  wishlistItems  WishlistItem[]
-  recentlyViewed  RecentlyViewed[]
-  customerOrders Order[]         @relation("CustomerOrders")
-  reviewsWritten ProductReview[]
-  auditLogs      AuditLog[]
-  notifications  Notification[]
+  wishlistItems     WishlistItem[]
+  recentlyViewed    RecentlyViewed[]
+  customerOrders    Order[]          @relation("CustomerOrders")
+  reviewsWritten    ProductReview[]
+  auditLogs         AuditLog[]
+  notifications     Notification[]
+  returnRequests    ReturnRequest[]  @relation("ReturnRequester")
+  refundsRequested  Refund[]         @relation("RefundRequester")
+  refundsApproved   Refund[]         @relation("RefundApprover")
+  disputesOpened    Dispute[]        @relation("DisputeCustomer")
+  disputesResolved  Dispute[]        @relation("DisputeResolver")
+  riskFlagsCreated  RiskFlag[]       @relation("RiskFlagCreator")
+  riskFlagsResolved RiskFlag[]       @relation("RiskFlagResolver")
+  customerRiskFlags RiskFlag[]       @relation("RiskFlagCustomer")
 
   @@index([status])
   @@index([vendorId])
@@ -398,6 +542,8 @@ model VendorProfile {
   auditLogs         AuditLog[]
   documents         Document[]
   vendorApplication VendorApplication?
+  disputes          Dispute[]
+  riskFlags         RiskFlag[]
 
   @@index([status])
   @@index([createdAt])
@@ -459,12 +605,12 @@ model Product {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  images        ProductImage[]
-  variants      ProductVariant[]
-  orderItems    OrderItem[]
-  reviews       ProductReview[]
-  wishlistItems WishlistItem[]
-  recentlyViewed  RecentlyViewed[]
+  images         ProductImage[]
+  variants       ProductVariant[]
+  orderItems     OrderItem[]
+  reviews        ProductReview[]
+  wishlistItems  WishlistItem[]
+  recentlyViewed RecentlyViewed[]
 
   @@unique([vendorId, slug])
   @@index([vendorId])
@@ -559,6 +705,7 @@ model Order {
 
   orderNumber   String  @unique
   totalAmount   Decimal @db.Decimal(18, 2)
+  currency      String  @db.VarChar(3)
   subTotal      Decimal @db.Decimal(18, 2)
   totalShipping Decimal @db.Decimal(18, 2)
   taxAmount     Decimal @default(0.00) @db.Decimal(18, 2)
@@ -567,18 +714,25 @@ model Order {
   paymentGateway PaymentGateway
   paymentStatus  PaymentStatus  @default(PENDING)
 
-  gatewayReference String? @unique
-  shippingAddress  String
-  shippingPhone    String
-  shippingEmail    String
-  notes            String?
+  gatewayReference    String?           @unique
+  checkoutRequestId   String?
+  checkoutRequestHash String?
+  paymentAttempts     PaymentAttempt[]
+  ledgerEntries       FinancialLedger[]
+  shippingAddress     String
+  shippingPhone       String
+  shippingEmail       String
+  notes               String?
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
   subOrders  SubOrder[]
   orderItems OrderItem[]
+  refunds    Refund[]
+  disputes   Dispute[]
+  riskFlags  RiskFlag[]
 
+  @@unique([customerId, checkoutRequestId])
   @@index([customerId])
   @@index([status])
   @@index([createdAt])
@@ -591,22 +745,64 @@ model SubOrder {
   vendorId String
   vendor   VendorProfile @relation(fields: [vendorId], references: [id], onDelete: Cascade)
 
-  subOrderNumber     String  @unique
-  vendorSubTotal     Decimal @db.Decimal(18, 2)
-  vendorShipping     Decimal @db.Decimal(18, 2)
-  vendorTotal        Decimal @db.Decimal(18, 2)
-  platformCommission Decimal @db.Decimal(18, 2)
+  subOrderNumber       String            @unique
+  vendorSubTotal       Decimal           @db.Decimal(18, 2)
+  vendorShipping       Decimal           @db.Decimal(18, 2)
+  vendorTotal          Decimal           @db.Decimal(18, 2)
+  platformCommission   Decimal           @db.Decimal(18, 2)
+  commissionRate       Decimal?          @db.Decimal(5, 2)
+  vendorNetEntitlement Decimal?          @db.Decimal(18, 2)
+  paymentProcessingFee Decimal           @default(0.00) @db.Decimal(18, 2)
+  ledgerEntries        FinancialLedger[]
 
-  status SubOrderStatus @default(PENDING)
-  notes  String?
+  status                     SubOrderStatus              @default(PENDING)
+  deliveryConfirmedAt        DateTime?
+  deliveryConfirmedByUserId  String?
+  deliveryConfirmationSource DeliveryConfirmationSource?
+  notes                      String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  items OrderItem[]
+  items          OrderItem[]
+  returnRequests ReturnRequest[]
+  refunds        Refund[]
+  disputes       Dispute[]
+  riskFlags      RiskFlag[]
 
   @@index([orderId])
   @@index([vendorId])
+  @@index([status])
+}
+
+model PaymentAttempt {
+  id                  String               @id @default(uuid())
+  orderId             String
+  order               Order                @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  gateway             PaymentGateway
+  merchantReference   String               @unique @db.VarChar(50)
+  initiationRequestId String?              @unique @db.VarChar(128)
+  redirectUrl         String?              @db.Text
+  providerTrackingId  String?              @unique @db.VarChar(191)
+  amount              Decimal              @db.Decimal(18, 2)
+  currency            String               @db.VarChar(3)
+  status              PaymentAttemptStatus @default(CREATED)
+  providerStatus      String?
+  confirmationCode    String?
+  paymentMethod       String?
+  providerPayload     Json?
+  initiatedAt         DateTime?
+  verifiedAt          DateTime?
+  completedAt         DateTime?
+  orderCompletedAt    DateTime?
+  reversedAt          DateTime?
+  lastVerifiedAt      DateTime?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  ledgerEntries       FinancialLedger[]
+  refunds             Refund[]
+
+  @@index([orderId])
   @@index([status])
 }
 
@@ -625,8 +821,10 @@ model OrderItem {
   priceAtPurchase Decimal @db.Decimal(18, 2)
   totalPrice      Decimal @db.Decimal(18, 2)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  returnItems ReturnItem[]
+  refundItems RefundItem[]
 
   @@index([orderId])
   @@index([subOrderId])
@@ -638,20 +836,175 @@ model OrderItem {
 // ==========================================
 
 model FinancialLedger {
-  id       String        @id @default(uuid())
-  vendorId String
-  vendor   VendorProfile @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  id                String                   @id @default(uuid())
+  vendorId          String
+  vendor            VendorProfile            @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  orderId           String?
+  order             Order?                   @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  subOrderId        String?
+  subOrder          SubOrder?                @relation(fields: [subOrderId], references: [id], onDelete: Restrict)
+  paymentAttemptId  String?
+  paymentAttempt    PaymentAttempt?          @relation(fields: [paymentAttemptId], references: [id], onDelete: Restrict)
+  vendorPayoutId    String?
+  vendorPayout      VendorPayout?            @relation(fields: [vendorPayoutId], references: [id], onDelete: Restrict)
+  type              LedgerTransactionType
+  walletBucket      WalletBucket?
+  amount            Decimal                  @db.Decimal(18, 2)
+  currency          String?                  @db.VarChar(3)
+  reference         String?
+  description       String?
+  createdAt         DateTime                 @default(now())
+  payoutAllocations VendorPayoutAllocation[]
+  refundId          String?
+  refund            Refund?                  @relation(fields: [refundId], references: [id], onDelete: Restrict)
 
-  type        LedgerTransactionType
-  amount      Decimal               @db.Decimal(18, 2)
-  reference   String?
-  description String?
+  @@unique([refundId, type])
+  @@unique([vendorPayoutId, type])
+  @@index([vendorId, currency, walletBucket])
+  @@index([orderId])
+  @@index([paymentAttemptId])
+  @@index([vendorPayoutId])
+}
 
-  createdAt DateTime @default(now())
+model ReturnRequest {
+  id                String       @id @default(uuid())
+  subOrderId        String
+  subOrder          SubOrder     @relation(fields: [subOrderId], references: [id], onDelete: Restrict)
+  requestedByUserId String
+  requestedBy       User         @relation("ReturnRequester", fields: [requestedByUserId], references: [id], onDelete: Restrict)
+  status            ReturnStatus @default(REQUESTED)
+  reason            String       @db.Text
+  receivedAt        DateTime?
+  completedAt       DateTime?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  items             ReturnItem[]
+  refund            Refund?
 
-  @@index([vendorId])
-  @@index([type])
-  @@index([createdAt])
+  @@index([subOrderId, status])
+  @@index([requestedByUserId])
+}
+
+model ReturnItem {
+  id              String        @id @default(uuid())
+  returnRequestId String
+  returnRequest   ReturnRequest @relation(fields: [returnRequestId], references: [id], onDelete: Cascade)
+  orderItemId     String
+  orderItem       OrderItem     @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
+  quantity        Int
+  restockedAt     DateTime?
+
+  @@unique([returnRequestId, orderItemId])
+  @@index([orderItemId])
+}
+
+model Refund {
+  id                           String            @id @default(uuid())
+  orderId                      String
+  order                        Order             @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  subOrderId                   String
+  subOrder                     SubOrder          @relation(fields: [subOrderId], references: [id], onDelete: Restrict)
+  paymentAttemptId             String?
+  paymentAttempt               PaymentAttempt?   @relation(fields: [paymentAttemptId], references: [id], onDelete: Restrict)
+  returnRequestId              String?           @unique
+  returnRequest                ReturnRequest?    @relation(fields: [returnRequestId], references: [id], onDelete: Restrict)
+  requestedByUserId            String
+  requestedBy                  User              @relation("RefundRequester", fields: [requestedByUserId], references: [id], onDelete: Restrict)
+  approvedByUserId             String?
+  approvedBy                   User?             @relation("RefundApprover", fields: [approvedByUserId], references: [id], onDelete: Restrict)
+  amount                       Decimal           @db.Decimal(18, 2)
+  platformCommissionAdjustment Decimal           @default(0) @db.Decimal(18, 2)
+  vendorLiabilityAdjustment    Decimal           @default(0) @db.Decimal(18, 2)
+  shippingAmount               Decimal           @default(0) @db.Decimal(18, 2)
+  gatewayFeeAdjustment         Decimal           @default(0) @db.Decimal(18, 2)
+  currency                     String            @db.VarChar(3)
+  reason                       String            @db.Text
+  status                       RefundStatus      @default(REQUESTED)
+  approvedAt                   DateTime?
+  completedAt                  DateTime?
+  createdAt                    DateTime          @default(now())
+  updatedAt                    DateTime          @updatedAt
+  ledgerEntries                FinancialLedger[]
+  items                        RefundItem[]
+
+  @@index([subOrderId, status])
+  @@index([orderId])
+  @@index([paymentAttemptId])
+}
+
+model Dispute {
+  id               String        @id @default(uuid())
+  customerId       String
+  customer         User          @relation("DisputeCustomer", fields: [customerId], references: [id], onDelete: Restrict)
+  orderId          String
+  order            Order         @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  subOrderId       String
+  subOrder         SubOrder      @relation(fields: [subOrderId], references: [id], onDelete: Restrict)
+  vendorId         String
+  vendor           VendorProfile @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  reason           String
+  description      String        @db.Text
+  status           DisputeStatus @default(OPEN)
+  openedAt         DateTime      @default(now())
+  resolvedAt       DateTime?
+  resolvedByUserId String?
+  resolvedBy       User?         @relation("DisputeResolver", fields: [resolvedByUserId], references: [id], onDelete: SetNull)
+  resolution       String?       @db.Text
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  @@index([customerId, createdAt])
+  @@index([vendorId, status])
+  @@index([subOrderId, status])
+  @@index([orderId])
+}
+
+model RiskFlag {
+  id               String           @id @default(uuid())
+  scope            RiskFlagScope
+  category         RiskFlagCategory
+  source           RiskFlagSource   @default(ADMIN)
+  severity         RiskSeverity
+  status           RiskFlagStatus   @default(OPEN)
+  reason           String           @db.Text
+  customerId       String?
+  customer         User?            @relation("RiskFlagCustomer", fields: [customerId], references: [id], onDelete: SetNull)
+  vendorId         String?
+  vendor           VendorProfile?   @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+  orderId          String?
+  order            Order?           @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  subOrderId       String?
+  subOrder         SubOrder?        @relation(fields: [subOrderId], references: [id], onDelete: SetNull)
+  payoutId         String?
+  payout           VendorPayout?    @relation(fields: [payoutId], references: [id], onDelete: SetNull)
+  createdByUserId  String
+  createdBy        User             @relation("RiskFlagCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  resolvedByUserId String?
+  resolvedBy       User?            @relation("RiskFlagResolver", fields: [resolvedByUserId], references: [id], onDelete: SetNull)
+  resolvedAt       DateTime?
+  resolution       String?          @db.Text
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  @@index([status, severity])
+  @@index([vendorId, status])
+  @@index([subOrderId, status])
+  @@index([orderId, status])
+  @@index([payoutId, status])
+}
+
+model RefundItem {
+  id          String    @id @default(uuid())
+  refundId    String
+  refund      Refund    @relation(fields: [refundId], references: [id], onDelete: Restrict)
+  orderItemId String
+  orderItem   OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
+  quantity    Int
+  grossAmount Decimal   @db.Decimal(18, 2)
+  createdAt   DateTime  @default(now())
+
+  @@unique([refundId, orderItemId])
+  @@index([orderItemId])
 }
 
 model VendorPayout {
@@ -659,18 +1012,54 @@ model VendorPayout {
   vendorId String
   vendor   VendorProfile @relation(fields: [vendorId], references: [id], onDelete: Cascade)
 
-  amount       Decimal        @db.Decimal(18, 2)
-  gateway      PaymentGateway
-  reference    String?
-  status       PayoutStatus   @default(PENDING)
-  errorMessage String?
+  amount              Decimal                @db.Decimal(18, 2)
+  currency            String?                @db.VarChar(3)
+  withdrawalRequestId String?
+  requestHash         String?
+  destinationType     PayoutDestinationType?
+  maskedDestination   String?
+  requestedByUserId   String?
+  approvedByUserId    String?
+  rejectedByUserId    String?
+  cancelledByUserId   String?
+  approvedAt          DateTime?
+  rejectedAt          DateTime?
+  cancelledAt         DateTime?
+  readyAt             DateTime?
+  merchantReference   String?                @unique
+  gateway             PaymentGateway?
+  reference           String?
+  status              PayoutStatus           @default(PENDING)
+  errorMessage        String?
 
-  processedAt DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  processedAt   DateTime?
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+  ledgerEntries FinancialLedger[]
+  allocations   VendorPayoutAllocation[]
+  riskFlags     RiskFlag[]
 
+  @@unique([vendorId, withdrawalRequestId])
   @@index([vendorId])
   @@index([status])
+}
+
+model VendorPayoutAllocation {
+  id              String                 @id @default(uuid())
+  vendorPayoutId  String
+  vendorPayout    VendorPayout           @relation(fields: [vendorPayoutId], references: [id], onDelete: Restrict)
+  earningLedgerId String
+  earningLedger   FinancialLedger        @relation(fields: [earningLedgerId], references: [id], onDelete: Restrict)
+  vendorId        String
+  currency        String                 @db.VarChar(3)
+  allocatedAmount Decimal                @db.Decimal(18, 2)
+  status          PayoutAllocationStatus @default(ACTIVE)
+  releasedAt      DateTime?
+  createdAt       DateTime               @default(now())
+
+  @@unique([vendorPayoutId, earningLedgerId])
+  @@index([earningLedgerId, status])
+  @@index([vendorId, currency, status])
 }
 
 // ==========================================
@@ -804,4 +1193,31 @@ model PaymentGatewayWebhookLog {
   @@index([trackingId])
   @@index([reference])
   @@index([status])
+}
+
+model ReconciliationFinding {
+  id               String                      @id @default(uuid())
+  type             String
+  domain           ReconciliationDomain
+  severity         ReconciliationSeverity
+  entityType       String
+  entityId         String
+  vendorId         String?
+  orderId          String?
+  subOrderId       String?
+  paymentAttemptId String?
+  vendorPayoutId   String?
+  refundId         String?
+  status           ReconciliationFindingStatus @default(OPEN)
+  detectedAt       DateTime                    @default(now())
+  resolvedAt       DateTime?
+  resolution       String?
+  metadata         Json?
+  createdAt        DateTime                    @default(now())
+  updatedAt        DateTime                    @updatedAt
+
+  @@unique([type, entityType, entityId])
+  @@index([status, severity])
+  @@index([domain, status])
+  @@index([vendorId, status])
 }
