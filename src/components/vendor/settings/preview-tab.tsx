@@ -1,7 +1,8 @@
 "use client";
 
-import Image from "next/image";
-import { Star, MapPin, Store } from "lucide-react";
+import { MediaImage } from "@/components/marketplace/media-image";
+import { SHOP_BANNER_FALLBACK, SHOP_LOGO_FALLBACK } from "@/lib/media";
+import { Star, MapPin } from "lucide-react";
 import { IconRosetteDiscountCheckFilled } from "@tabler/icons-react";
 import type { VendorProfile, Document } from "@prisma/client";
 
@@ -15,7 +16,7 @@ interface PreviewTabProps {
 }
 
 export function PreviewTab({ profile }: PreviewTabProps) {
-  const storeUrl = `/brands/${profile.slug}`;
+  const storeUrl = `/shops/${profile.slug}`;
 
   return (
     <div className="bg-card text-card-foreground border border-border/60 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.03)] dark:shadow-none overflow-hidden animate-in fade-in-50 duration-200">
@@ -37,38 +38,14 @@ export function PreviewTab({ profile }: PreviewTabProps) {
           <div className="bg-card rounded-2xl border border-border/60 overflow-hidden shadow-sm">
             {/* Banner */}
             <div className="aspect-[16/10] bg-zinc-100 dark:bg-zinc-800 relative">
-              {profile.bannerUrl ? (
-                <Image
-                  src={profile.bannerUrl}
-                  alt={profile.storeName}
-                  fill
-                  className="object-cover"
-                  sizes="400px"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-zinc-300 dark:text-zinc-600">
-                  <Store className="w-8 h-8 opacity-40" />
-                </div>
-              )}
+              <MediaImage src={profile.bannerUrl} fallback={SHOP_BANNER_FALLBACK} alt="" fill className="object-cover" sizes="400px" />
             </div>
 
             {/* Info */}
             <div className="p-4 space-y-2">
               <div className="flex items-center gap-2">
                 <div className="w-10 h-10 rounded-xl bg-zinc-100 dark:bg-zinc-800 overflow-hidden shrink-0">
-                  {profile.logoUrl ? (
-                    <Image
-                      src={profile.logoUrl}
-                      alt={profile.storeName}
-                      width={40}
-                      height={40}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <Store className="w-4 h-4 text-zinc-400" />
-                    </div>
-                  )}
+                  <MediaImage src={profile.logoUrl} fallback={SHOP_LOGO_FALLBACK} alt={`${profile.storeName} logo`} width={40} height={40} className="h-full w-full object-cover" fallbackClassName="object-cover" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1">

@@ -55,6 +55,7 @@ export function RegisterForm({
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [formError, setFormError] = useState("");
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -67,10 +68,9 @@ export function RegisterForm({
   const handleRegister = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    if (password !== confirmPassword) {
-      toast.error("Passwords do not match. Please verify your entries.");
-      return;
-    }
+    setFormError("");
+    if (password.length < 6) { setFormError("Use at least 6 characters for your password."); return; }
+    if (password !== confirmPassword) { setFormError("Passwords do not match. Please verify your entries."); return; }
 
     const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
 
@@ -80,56 +80,58 @@ export function RegisterForm({
       router.push("/");
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "";
-      toast.error(getFriendlyErrorMessage(message));
+      setFormError(getFriendlyErrorMessage(message));
     }
   };
 
   const handleGoogleSignIn = async () => {
+    setFormError("");
     try {
       await loginWithGoogle();
       toast.success("Logged in successfully!");
       router.push("/");
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "";
-      toast.error(getFriendlyErrorMessage(message));
+      setFormError(getFriendlyErrorMessage(message));
     }
   };
 
   return (
-    <div className={cn("flex flex-col gap-6 w-full", className)}>
+    <div className={cn("flex flex-1 flex-col gap-6 w-full", className)}>
       <div className="flex flex-col items-start gap-1.5 text-start select-none">
         <h1 className="text-xl font-semibold tracking-tight text-foreground">
-          {step === 1 ? "Create your account" : "Set your password"}
+          {step === 1 ? "Create your SmartDuka account" : "Set your password"}
         </h1>
         <p className="text-xs text-muted-foreground leading-relaxed">
           {step === 1
-            ? "Enter your name and email to get started."
+            ? "Shop from local businesses and apply to sell when you’re ready."
             : "Choose a strong password to secure your account."}
         </p>
       </div>
 
       <form onSubmit={handleRegister} className="flex flex-col gap-2" {...props}>
         <FieldGroup>
+          {formError && <p role="alert" className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive">{formError}</p>}
           {step === 1 && (
             <div className="space-y-3 animate-in fade-in slide-in-from-right-2 duration-200">
               <div className="grid grid-cols-2 gap-3">
                 <Field>
                   <FieldLabel htmlFor="firstName" className="text-xs font-medium text-muted-foreground">First Name</FieldLabel>
                   <div className="relative group mt-1.5">
-                    <Input id="firstName" type="text" required placeholder="John" value={firstName} onChange={(e) => setFirstName(e.target.value)} className="px-6 h-11 border-border/60 rounded-full bg-card focus-visible:ring-primary/20 focus-visible:border-primary text-sm" />
+                    <Input id="firstName" type="text" required placeholder="Amina" autoComplete="given-name" value={firstName} onChange={(e) => setFirstName(e.target.value)} className="px-6 h-11 border-border/60 rounded-full bg-card focus-visible:ring-primary/20 focus-visible:border-primary text-sm" />
                   </div>
                 </Field>
                 <Field>
                   <FieldLabel htmlFor="lastName" className="text-xs font-medium text-muted-foreground">Last Name</FieldLabel>
                   <div className="relative group mt-1.5">
-                    <Input id="lastName" type="text" required placeholder="Doe" value={lastName} onChange={(e) => setLastName(e.target.value)} className="px-6 h-11 border-border/60 rounded-full bg-card focus-visible:ring-primary/20 focus-visible:border-primary text-sm" />
+                    <Input id="lastName" type="text" required placeholder="Nakato" autoComplete="family-name" value={lastName} onChange={(e) => setLastName(e.target.value)} className="px-6 h-11 border-border/60 rounded-full bg-card focus-visible:ring-primary/20 focus-visible:border-primary text-sm" />
                   </div>
                 </Field>
               </div>
               <Field>
                 <FieldLabel htmlFor="email" className="text-xs font-medium text-muted-foreground">Email Address</FieldLabel>
                 <div className="relative group mt-1.5">
-                  <Input id="email" type="email" required placeholder="m@example.com" value={email} onChange={(e) => setEmail(e.target.value)} className="pl-6 pr-6 h-11 border-border/60 rounded-full bg-card focus-visible:ring-primary/20 focus-visible:border-primary text-sm" />
+                  <Input id="email" type="email" required placeholder="you@example.com" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} className="pl-6 pr-6 h-11 border-border/60 rounded-full bg-card focus-visible:ring-primary/20 focus-visible:border-primary text-sm" />
                 </div>
               </Field>
               <Field className="pt-1">
@@ -144,8 +146,9 @@ export function RegisterForm({
               <Field>
                 <FieldLabel htmlFor="password" className="text-xs font-medium text-muted-foreground">Password</FieldLabel>
                 <div className="relative group mt-1.5 flex items-center">
-                  <Input id="password" type={showPassword ? "text" : "password"} required disabled={actionLoading} placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} className="pl-6 pr-12 h-11 border-border/60 rounded-full bg-card focus-visible:ring-primary/20 focus-visible:border-primary text-sm w-full" />
-                  <button type="button" onClick={() => setShowPassword(!showPassword)} disabled={actionLoading} className="absolute right-4 p-1 text-muted-foreground/70 hover:text-foreground outline-none cursor-pointer">
+                  <Input id="password" type={showPassword ? "text" : "password"} required disabled={actionLoading} placeholder="••••••••" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} className="pl-6 pr-12 h-11 border-border/60 rounded-full bg-card focus-visible:ring-primary/20 focus-visible:border-primary text-sm w-full" />
+                  <button type="button" onClick={() => setShowPassword(!showPassword)} disabled={actionLoading} aria-label={showPassword ? "Hide password" : "Show password"}
+                    className="absolute right-4 p-1 text-muted-foreground/70 hover:text-foreground outline-none cursor-pointer">
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
@@ -153,7 +156,7 @@ export function RegisterForm({
               <Field>
                 <FieldLabel htmlFor="confirmPassword" className="text-xs font-medium text-muted-foreground">Confirm Password</FieldLabel>
                 <div className="relative group mt-1.5 flex items-center">
-                  <Input id="confirmPassword" type={showPassword ? "text" : "password"} required disabled={actionLoading} placeholder="••••••••" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="pl-6 pr-12 h-11 border-border/60 rounded-full bg-card focus-visible:ring-primary/20 focus-visible:border-primary text-sm w-full" />
+                  <Input id="confirmPassword" type={showPassword ? "text" : "password"} required disabled={actionLoading} placeholder="••••••••" autoComplete="new-password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="pl-6 pr-12 h-11 border-border/60 rounded-full bg-card focus-visible:ring-primary/20 focus-visible:border-primary text-sm w-full" />
                 </div>
               </Field>
               <div className="flex gap-3 pt-1">

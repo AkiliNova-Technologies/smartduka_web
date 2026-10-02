@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma/client";
 import { ProductStatus, Prisma } from "@prisma/client";
 import { Decimal } from "@prisma/client/runtime/client";
 import { requireVendorContext } from "@/lib/auth/vendor-context";
+import { optionKey, validateVariants } from "@/lib/variant-validation";
+import { createVariantWithSku } from "@/lib/variant-sku";
 
 function generateSlug(text: string): string {
   return text
@@ -13,7 +15,7 @@ function generateSlug(text: string): string {
 }
 
 interface VariantInput {
-  sku: string;
+  sku?: string;
   name: string;
   price: number;
   inventoryCount: number;
@@ -63,6 +65,8 @@ export async function createVendorProduct(input: CreateProductInput) {
     variants = [],
   } = input;
   const { vendorId } = context;
+  const validVariants = validateVariants(variants as Parameters<typeof validateVariants>[0]);
+  const needsAutomaticVariantSkus = validVariants.some((variant) => !variant.sku);
 
   const baseSlug = generateSlug(name);
   let finalSlug = baseSlug;
@@ -94,20 +98,35 @@ export async function createVendorProduct(input: CreateProductInput) {
             })),
           },
         },
-        variants: {
+        variants: needsAutomaticVariantSkus ? undefined : {
           createMany: {
-            data: variants.map((variant) => ({
-              sku: variant.sku,
+            data: validVariants.map((variant) => ({
+              sku: variant.sku!,
               name: variant.name,
               price: new Decimal(variant.price),
               inventoryCount: variant.inventoryCount,
               options: variant.options ?? Prisma.DbNull,
+              optionKey: optionKey(variant.options),
+              isActive: variant.isActive,
             })),
           },
         },
       },
-      include: { images: true, variants: true },
     });
+    if (needsAutomaticVariantSkus) {
+      for (const variant of validVariants) {
+        await createVariantWithSku(tx, {
+          productId: product.id,
+          sku: variant.sku,
+          name: variant.name,
+          price: new Decimal(variant.price),
+          inventoryCount: variant.inventoryCount,
+          options: variant.options ?? Prisma.DbNull,
+          optionKey: optionKey(variant.options),
+          isActive: variant.isActive,
+        });
+      }
+    }
 
     await tx.auditLog.create({
       data: {

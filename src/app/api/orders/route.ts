@@ -14,6 +14,7 @@ import {
   errorResponse,
   getErrorMessage,
 } from "@/lib/api-utils";
+import { type FulfillmentMethod } from "@/lib/fulfillment";
 
 export async function GET() {
   try {
@@ -52,6 +53,12 @@ export async function POST(req: NextRequest) {
       shippingAddress: body.shippingAddress,
       shippingPhone: body.shippingPhone,
       shippingEmail: body.shippingEmail,
+      fulfillmentSelections: Array.isArray(body.fulfillmentSelections)
+        ? body.fulfillmentSelections.map((selection: { vendorId?: string; method?: string }) => ({
+            vendorId: selection?.vendorId || "",
+            method: selection?.method as FulfillmentMethod,
+          }))
+        : undefined,
       paymentGateway: body.paymentGateway,
       checkoutRequestId: req.headers.get("idempotency-key") || body.checkoutRequestId,
       notes: body.notes,

@@ -4,8 +4,6 @@ import { prisma } from "@/lib/prisma/client";
 import { parsePesapalNotification, readPesapalPost, sanitizePesapalNotification } from "@/lib/payments/pesapal/notification";
 import { isTransientPesapalError, PesapalVerificationService } from "@/services/payments/pesapal-verification-service";
 
-export const dynamic = "force-dynamic";
-
 function acknowledgement(notification: { orderTrackingId?: string; merchantReference?: string; notificationType?: string }, status: 200 | 500) {
   return NextResponse.json({
     orderNotificationType: notification.notificationType ?? "IPNCHANGE",

@@ -1,18 +1,23 @@
 "use client";
 
 import React, { useState } from "react";
-import {
-  Store, Shield, Globe, ImageIcon,
-} from "lucide-react";
+import { Store, Shield, Globe, ImageIcon } from "lucide-react";
+import { PackageCheck } from "lucide-react";
 import { useVendor } from "@/hooks/use-vendor";
 import { StoreBrandingTab } from "@/components/vendor/settings/store-branding-tab";
 import { StoreInfoTab } from "@/components/vendor/settings/store-info-tab";
 import { DocumentsTab } from "@/components/vendor/settings/documents-tab";
 import { PreviewTab } from "@/components/vendor/settings/preview-tab";
+import { FulfillmentPolicyTab } from "@/components/vendor/settings/fulfillment-policy-tab";
 import type { VendorProfile, Document } from "@prisma/client";
 import { Skeleton } from "@/components/ui/skeleton";
 
-type TabID = "branding" | "information" | "documents" | "preview";
+type TabID =
+  | "branding"
+  | "information"
+  | "fulfillment"
+  | "documents"
+  | "preview";
 
 type FullVendorProfile = VendorProfile & {
   documents: Document[];
@@ -22,6 +27,11 @@ type FullVendorProfile = VendorProfile & {
 const TABS = [
   { id: "branding" as const, label: "Store Branding", icon: ImageIcon },
   { id: "information" as const, label: "Store Information", icon: Store },
+  {
+    id: "fulfillment" as const,
+    label: "Fulfilment & Returns",
+    icon: PackageCheck,
+  },
   { id: "documents" as const, label: "Verification Docs", icon: Shield },
   { id: "preview" as const, label: "Live Preview", icon: Globe },
 ];
@@ -72,7 +82,8 @@ export default function VendorSettingsPage() {
               Store Settings
             </h1>
             <p className="text-xs font-semibold text-zinc-400 dark:text-zinc-500 mt-0.5">
-              Manage your store branding, profile information, and verification documents.
+              Manage your store branding, profile information, and verification
+              documents.
             </p>
           </div>
         </div>
@@ -93,8 +104,7 @@ export default function VendorSettingsPage() {
                 activeTab === tab.id
                   ? "bg-zinc-900 text-white dark:bg-zinc-50 dark:text-zinc-950 shadow-xs"
                   : "text-zinc-500 hover:bg-muted hover:text-zinc-900 dark:hover:text-zinc-200"
-              }`}
-            >
+              }`}>
               <tab.icon className="w-4 h-4" /> {tab.label}
             </button>
           ))}
@@ -102,18 +112,18 @@ export default function VendorSettingsPage() {
 
         {/* Right Content */}
         <div className="md:col-span-2">
-          {activeTab === "branding" && (
-            <StoreBrandingTab profile={profile} />
-          )}
-          {activeTab === "information" && (
-            <StoreInfoTab profile={profile} />
+          {activeTab === "branding" && <StoreBrandingTab profile={profile} />}
+          {activeTab === "information" && <StoreInfoTab profile={profile} />}
+          {activeTab === "fulfillment" && (
+            <FulfillmentPolicyTab profile={profile} />
           )}
           {activeTab === "documents" && (
-            <DocumentsTab vendorId={profile.id} initialDocuments={profile.documents} />
+            <DocumentsTab
+              vendorId={profile.id}
+              initialDocuments={profile.documents}
+            />
           )}
-          {activeTab === "preview" && (
-            <PreviewTab profile={profile} />
-          )}
+          {activeTab === "preview" && <PreviewTab profile={profile} />}
         </div>
       </div>
     </div>

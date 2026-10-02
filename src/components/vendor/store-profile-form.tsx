@@ -265,7 +265,7 @@ export function StoreProfileForm({ profile }: StoreProfileFormProps) {
                 Changes appear instantly on your public store page
               </p>
               <a
-                href={`/brands/${profile.slug}`}
+                href={`/shops/${profile.slug}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline"

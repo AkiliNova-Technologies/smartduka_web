@@ -8,23 +8,7 @@ export async function GET() {
     const userId = await requireActiveUserId();
     const items = await WishlistService.getUserWishlist(userId);
 
-    const serialized = items.map((item) => ({
-      id: item.id,
-      productId: item.productId,
-      name: item.product.name,
-      slug: item.product.slug,
-      brand: item.product.brand,
-      basePrice: Number(item.product.basePrice),
-      compareAtPrice: item.product.compareAtPrice
-        ? Number(item.product.compareAtPrice)
-        : null,
-      image: item.product.images[0]?.url || "",
-      vendorId: item.product.vendorId,
-      vendorName: item.product.vendor?.storeName || "Unknown Store",
-      addedAt: item.createdAt.toISOString(),
-    }));
-
-    return successResponse({ items: serialized });
+    return successResponse({ items });
   } catch (error: unknown) {
     console.error("[Wishlist API GET]", error);
     return errorResponse(

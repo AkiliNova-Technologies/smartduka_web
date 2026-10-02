@@ -18,6 +18,7 @@ export class PesapalClientError extends Error {
     readonly code: PesapalErrorCode,
     message: string,
     readonly status?: number,
+    readonly providerError?: PesapalProviderError,
   ) {
     super(message);
     this.name = "PesapalClientError";
@@ -90,9 +91,18 @@ function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function providerMessage(value: unknown): string | undefined {
-  if (!isObject(value) || !isObject(value.error)) return undefined;
-  return typeof value.error.message === "string" ? value.error.message : undefined;
+function providerError(value: unknown): PesapalProviderError | undefined {
+  if (!isObject(value)) return undefined;
+  const nestedError = isObject(value.error) ? value.error : undefined;
+  const candidate = nestedError ?? value;
+  const message = typeof candidate.message === "string" ? candidate.message : undefined;
+  const code = typeof candidate.code === "string" || typeof candidate.code === "number" ? candidate.code : undefined;
+  const type = typeof candidate.type === "string" ? candidate.type : undefined;
+  const errorType = typeof candidate.error_type === "string" ? candidate.error_type : undefined;
+  if (!nestedError && code === undefined && !type && !errorType) return undefined;
+  return message || code !== undefined || type || errorType
+    ? { ...(message ? { message } : {}), ...(code !== undefined ? { code } : {}), ...(type ? { type } : {}), ...(errorType ? { error_type: errorType } : {}) }
+    : undefined;
 }
 
 function activePostIpn(ipn: PesapalIpnRecord): boolean {
@@ -127,8 +137,8 @@ export class PesapalClient {
       "PESAPAL_AUTH_ERROR",
     );
 
-    if (providerMessage(response)) {
-      throw new PesapalClientError("PESAPAL_PROVIDER_ERROR", "Pesapal rejected the authentication request.");
+    if (providerError(response)) {
+      throw new PesapalClientError("PESAPAL_PROVIDER_ERROR", "Pesapal rejected the authentication request.", undefined, providerError(response));
     }
     if (!isObject(response) || typeof response.token !== "string" || !response.token.trim()) {
       throw new PesapalClientError("PESAPAL_INVALID_RESPONSE", "Pesapal token response did not include a token.");
@@ -234,10 +244,11 @@ export class PesapalClient {
       throw new PesapalClientError("PESAPAL_INVALID_RESPONSE", "Pesapal returned invalid JSON.", response.status);
     }
     if (!response.ok) {
-      throw new PesapalClientError(errorCode, "Pesapal returned an unsuccessful response.", response.status);
+      throw new PesapalClientError(errorCode, "Pesapal returned an unsuccessful response.", response.status, providerError(body));
     }
-    if (providerMessage(body)) {
-      throw new PesapalClientError("PESAPAL_PROVIDER_ERROR", "Pesapal reported a provider error.", response.status);
+    const diagnostic = providerError(body);
+    if (diagnostic) {
+      throw new PesapalClientError("PESAPAL_PROVIDER_ERROR", "Pesapal reported a provider error.", response.status, diagnostic);
     }
     return body;
   }

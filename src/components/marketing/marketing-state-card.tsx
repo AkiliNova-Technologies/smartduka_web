@@ -1,0 +1,3 @@
+"use client";
+import { AlertCircle } from "lucide-react";
+export function MarketingStateCard({ onRetry }: { onRetry: () => void }) { return <div role="alert" className="flex flex-wrap items-center gap-3 rounded-xl border border-rose-200/70 bg-card px-4 py-3 shadow-sm dark:border-rose-950"><AlertCircle className="size-4 text-rose-600" aria-hidden="true" /><div className="min-w-0 flex-1"><p className="text-sm font-medium text-foreground">We couldn&apos;t load this section</p><p className="text-xs text-muted-foreground">Try again to refresh these recommendations.</p></div><button onClick={onRetry} className="rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted">Retry</button></div>; }

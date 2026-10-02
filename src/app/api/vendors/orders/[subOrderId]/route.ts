@@ -3,6 +3,8 @@ import { AuthenticationRequiredError } from "@/lib/auth/session";
 import { requireVendorContext, VendorAuthorizationError } from "@/lib/auth/vendor-context";
 import { OrderService } from "@/services/order";
 import { successResponse, errorResponse, getErrorMessage } from "@/lib/api-utils";
+import { revalidateTag } from "next/cache";
+import { cacheTags } from "@/lib/cache-policy";
 
 export async function PATCH(
   req: NextRequest,
@@ -21,6 +23,7 @@ export async function PATCH(
       context.vendorId,
     );
     if (!updated) return errorResponse("Order not found", 404);
+    revalidateTag(cacheTags.vendorOrders(context.vendorId), "max");
 
     return successResponse({ updated: true, status: updated.status });
   } catch (error: unknown) {

@@ -14,7 +14,7 @@ export default function AdminDashboardLayout({
 }) {
   return (
     <AdminDataProvider>
-      <VendorCatalogProvider>
+      <VendorCatalogProvider includeInactiveCategories>
         <SidebarProvider>
           <AdminSidebar variant="inset" />
           <SidebarInset>

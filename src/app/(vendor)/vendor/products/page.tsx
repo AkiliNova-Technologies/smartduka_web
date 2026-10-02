@@ -1,10 +1,12 @@
 "use client";
 
 import * as React from "react";
-import Image from "next/image";
+import { MediaImage } from "@/components/marketplace/media-image";
+import { PRODUCT_IMAGE_FALLBACK } from "@/lib/media";
 import Link from "next/link";
 import { type ColumnDef } from "@tanstack/react-table";
 import { Plus, Edit2, Eye, AlertCircle } from "lucide-react";
+import { IllustratedEmptyState } from "@/components/marketplace/illustrated-empty-state";
 import { DataTable } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
 import { useProducts } from "@/hooks/use-products";
@@ -43,8 +45,7 @@ export default function VendorProductsPage() {
           ? typeof p.images[0] === "string"
             ? p.images[0]
             : (p.images[0] as { url: string }).url
-          : "") ||
-        "https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&w=600&q=80",
+          : "") || PRODUCT_IMAGE_FALLBACK,
     }));
   }, [vendorProducts]);
 
@@ -63,13 +64,7 @@ export default function VendorProductsPage() {
           const product = row.original;
           return (
             <div className="w-9 h-9 rounded-lg overflow-hidden bg-muted border border-border/40 relative shrink-0">
-              <Image
-                src={product.image}
-                alt={product.name}
-                fill
-                sizes="36px"
-                className="object-cover"
-              />
+              <MediaImage src={product.image} fallback={PRODUCT_IMAGE_FALLBACK} alt={product.name} fill sizes="36px" className="object-cover" fallbackClassName="object-contain p-1.5" />
             </div>
           );
         },
@@ -250,6 +245,15 @@ export default function VendorProductsPage() {
         </div>
       )}
 
+      {!isLoading && !error && productsList.length === 0 ? (
+        <IllustratedEmptyState
+          illustration="/illustrations/vendor-empty-products.svg"
+          title="No products yet"
+          description="Add your first product to start selling on SmartDuka."
+          action={{ label: "Add product", href: "/vendor/products/new" }}
+          size="standard"
+        />
+      ) : (
       <DataTable
         key={tableKey}
         columns={columns}
@@ -275,6 +279,7 @@ export default function VendorProductsPage() {
           </div>
         }
       />
+      )}
     </div>
   );
 }

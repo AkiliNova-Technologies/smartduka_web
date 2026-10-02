@@ -107,6 +107,8 @@ export interface Category {
   description: string;
   image: string;
   parentId: string | null;
+  isActive?: boolean;
+  sortOrder?: number;
   _count?: {
     products: number;
     subCategories: number;
@@ -115,6 +117,7 @@ export interface Category {
 
 export interface CategoryTree extends Category {
   productCount?: number;
+  children?: CategoryTree[];
   subCategories?: CategoryTree[];
 }
 
@@ -159,6 +162,7 @@ export interface Product {
     slug: string;
     logoUrl: string | null;
   } | null;
+  variants?: ProductVariant[];
 }
 
 export interface ProductImage {
@@ -177,6 +181,8 @@ export interface ProductVariant {
   price: number;
   inventoryCount: number;
   options: Record<string, string>;
+  isActive?: boolean;
+  optionKey?: string;
 }
 
 export interface ProductSpec {
@@ -274,16 +280,24 @@ export interface Order {
 
 export interface OrderRow {
   id: string;
+  orderId: string;
   orderNumber: string;
   customerName: string;
   customerEmail: string;
+  customerPhone: string;
   storeName: string;
   totalAmount: number;
+  subTotal: number;
+  totalShipping: number;
   paymentGateway: string;
-  status: string;
+  paymentStatus: string;
   subOrderStatus: string;
   deliveryLocation: string;
+  notes: string | null;
   date: string;
+  items: { id: string; name: string; quantity: number; unitPrice: number; lineTotal: number; variant: string | null }[];
+  paymentAttempt: { id: string; status: string; providerStatus: string | null; paymentMethod: string | null; confirmationCode: string | null; verifiedAt: string | null } | null;
+  issues: { returns: string[]; refunds: string[]; disputes: string[]; riskFlags: string[]; financialExceptions: string[] };
 }
 
 

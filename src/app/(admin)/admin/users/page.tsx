@@ -45,6 +45,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAdmin } from "@/hooks/use-admin";
 import { useAuth } from "@/hooks/use-auth";
+import { AdminMetricCard } from "@/components/admin/admin-metric-card";
 import { updateUserRoleAction, updateUserStatusAction } from "@/actions/admin";
 import { PlatformRole, UserStatus } from "@prisma/client";
 import { toast } from "sonner";
@@ -65,19 +66,19 @@ interface AdminUser {
 }
 
 const ROLE_CONFIG: Record<string, { label: string; color: string; icon: React.ElementType }> = {
-  SUPER_ADMIN: { label: "Super Admin", color: "text-amber-600 bg-amber-500/5 border-amber-500/10", icon: Shield },
-  ADMIN: { label: "Admin", color: "text-purple-600 bg-purple-500/5 border-purple-500/10", icon: Shield },
-  VENDOR: { label: "Vendor", color: "text-blue-600 bg-blue-500/5 border-blue-500/10", icon: Store },
-  CUSTOMER: { label: "Customer", color: "text-emerald-600 bg-emerald-500/5 border-emerald-500/10", icon: User },
-  SUPPORT: { label: "Support", color: "text-cyan-600 bg-cyan-500/5 border-cyan-500/10", icon: User },
-  BILLING: { label: "Billing", color: "text-orange-600 bg-orange-500/5 border-orange-500/10", icon: User },
+  SUPER_ADMIN: { label: "Super administrator", color: "text-white bg-amber-500 border-transparent", icon: Shield },
+  ADMIN: { label: "Administrator", color: "text-white bg-purple-500 border-transparent", icon: Shield },
+  VENDOR: { label: "Vendor", color: "text-white bg-blue-500 border-transparent", icon: Store },
+  CUSTOMER: { label: "Customer", color: "text-white bg-emerald-500 border-transparent", icon: User },
+  SUPPORT: { label: "Support", color: "text-white bg-cyan-500 border-transparent", icon: User },
+  BILLING: { label: "Billing", color: "text-white bg-orange-500 border-transparent", icon: User },
 };
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.ElementType }> = {
-  ACTIVE: { label: "Active", color: "text-emerald-600 bg-emerald-500/5 border-emerald-500/10", icon: CheckCircle2 },
-  PENDING: { label: "Pending", color: "text-amber-600 bg-amber-500/5 border-amber-500/10", icon: Clock },
-  SUSPENDED: { label: "Suspended", color: "text-rose-600 bg-rose-500/5 border-rose-500/10", icon: XCircle },
-  DEACTIVATED: { label: "Deactivated", color: "text-zinc-500 bg-zinc-500/5 border-zinc-500/10", icon: XCircle },
+  ACTIVE: { label: "Active", color: "text-white bg-emerald-600 border-transparent", icon: CheckCircle2 },
+  PENDING: { label: "Pending", color: "text-white bg-amber-500 border-transparent", icon: Clock },
+  SUSPENDED: { label: "Suspended", color: "text-white bg-rose-600 border-transparent", icon: XCircle },
+  DEACTIVATED: { label: "Deactivated", color: "text-zinc-700 bg-zinc-100 border-zinc-200 dark:text-zinc-300 dark:bg-zinc-800 dark:border-zinc-700", icon: XCircle },
 };
 
 function formatDate(date: Date | string | null): string {
@@ -135,7 +136,7 @@ export default function AdminUsersPage() {
     return result;
   }, [users, searchQuery, roleFilter]);
 
-  const handleRoleChange = async (userId: string, newRole: PlatformRole) => {
+  const handleRoleChange = React.useCallback(async (userId: string, newRole: PlatformRole) => {
     setActionLoading(userId);
     try {
       const result = await updateUserRoleAction(userId, newRole);
@@ -150,9 +151,9 @@ export default function AdminUsersPage() {
     } finally {
       setActionLoading(null);
     }
-  };
+  }, [refreshUsers]);
 
-  const handleStatusChange = async (userId: string, newStatus: UserStatus) => {
+  const handleStatusChange = React.useCallback(async (userId: string, newStatus: UserStatus) => {
     setActionLoading(userId);
     try {
       const result = await updateUserStatusAction(userId, newStatus);
@@ -167,7 +168,7 @@ export default function AdminUsersPage() {
     } finally {
       setActionLoading(null);
     }
-  };
+  }, [refreshUsers]);
 
   const columns = React.useMemo<ColumnDef<AdminUser, unknown>[]>(
     () => [
@@ -186,8 +187,8 @@ export default function AdminUsersPage() {
               )}
             </div>
             <div className="space-y-0.5 min-w-0">
-              <p className="text-sm font-semibold text-foreground truncate">{row.original.name || "Unnamed"}</p>
-              <p className="text-[11px] text-muted-foreground truncate">{row.original.email}</p>
+              <p className="line-clamp-2 text-sm font-semibold text-foreground" title={row.original.name || "Unnamed"}>{row.original.name || "Unnamed"}</p>
+              <p className="truncate text-[11px] text-muted-foreground" title={row.original.email}>{row.original.email}</p>
             </div>
           </div>
         ),
@@ -199,7 +200,7 @@ export default function AdminUsersPage() {
           const config = ROLE_CONFIG[row.original.platformRole || ""] || ROLE_CONFIG.CUSTOMER;
           const Icon = config.icon;
           return (
-            <span className={cn("inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-0.5 rounded-full border", config.color)}>
+            <span className={cn("inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium leading-none", config.color)}>
               <Icon className="w-3 h-3" />{config.label}
             </span>
           );
@@ -212,7 +213,7 @@ export default function AdminUsersPage() {
           const config = STATUS_CONFIG[row.original.status] || STATUS_CONFIG.ACTIVE;
           const Icon = config.icon;
           return (
-            <span className={cn("inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-0.5 rounded-full border", config.color)}>
+            <span className={cn("inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium leading-none", config.color)}>
               <Icon className="w-3 h-3" />{config.label}
             </span>
           );
@@ -265,7 +266,7 @@ export default function AdminUsersPage() {
         },
       },
     ],
-    [isSuperAdmin, actionLoading, refreshUsers]
+    [isSuperAdmin, actionLoading, handleRoleChange, handleStatusChange]
   );
 
   if (usersLoading && users.length === 0) return <UsersSkeleton />;
@@ -282,21 +283,11 @@ export default function AdminUsersPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 select-none">
-        {[
-          { label: "Total Users", value: metrics?.totalUsers ?? 0, icon: Users, color: "text-blue-600" },
-          { label: "Customers", value: metrics?.totalCustomers ?? 0, icon: User, color: "text-emerald-600" },
-          { label: "Vendors", value: metrics?.totalVendors ?? 0, icon: Store, color: "text-purple-600" },
-          { label: "Admins", value: metrics?.totalAdmins ?? 0, icon: Shield, color: "text-amber-600" },
-        ].map((kpi, idx) => (
-          <div key={idx} className="bg-card border border-border/60 rounded-2xl p-4 space-y-2 shadow-2xs">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">{kpi.label}</span>
-              <kpi.icon className={cn("w-4 h-4", kpi.color)} />
-            </div>
-            <p className="text-2xl font-semibold text-foreground tracking-tight">{metricsLoading ? "—" : kpi.value}</p>
-          </div>
-        ))}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <AdminMetricCard label="Total Users" value={metricsLoading ? "—" : (metrics?.totalUsers ?? 0)} icon={Users} />
+        <AdminMetricCard label="Customers" value={metricsLoading ? "—" : (metrics?.totalCustomers ?? 0)} icon={User} />
+        <AdminMetricCard label="Vendors" value={metricsLoading ? "—" : (metrics?.totalVendors ?? 0)} icon={Store} />
+        <AdminMetricCard label="Admins" value={metricsLoading ? "—" : (metrics?.totalAdmins ?? 0)} icon={Shield} />
       </div>
 
       <DataTable

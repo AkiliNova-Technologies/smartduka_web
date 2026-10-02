@@ -1,0 +1,7 @@
+import { NextRequest } from "next/server";
+import { errorResponse, getErrorMessage, successResponse } from "@/lib/api-utils";
+import { ReviewError, ReviewService } from "@/services/reviews";
+type Kind = "product" | "shop";
+const kindOf = (value: string): Kind | null => value === "product" || value === "shop" ? value : null;
+export async function PATCH(request: NextRequest, context: RouteContext<"/api/reviews/[kind]/[id]">) { try { const { kind, id } = await context.params, type = kindOf(kind); if (!type) return errorResponse("Invalid review type.", 400); const body = await request.json(); const review = type === "product" ? await ReviewService.updateProductReviewForCurrentUser(id, body) : await ReviewService.updateShopReviewForCurrentUser(id, body); return successResponse({ review }); } catch (error) { return errorResponse(getErrorMessage(error), error instanceof ReviewError && error.code === "NOT_FOUND" ? 404 : 400); } }
+export async function DELETE(_request: NextRequest, context: RouteContext<"/api/reviews/[kind]/[id]">) { try { const { kind, id } = await context.params, type = kindOf(kind); if (!type) return errorResponse("Invalid review type.", 400); await ReviewService.deleteOwnReview(type, id); return successResponse({ deleted: true }); } catch (error) { return errorResponse(getErrorMessage(error), error instanceof ReviewError && error.code === "NOT_FOUND" ? 404 : 400); } }

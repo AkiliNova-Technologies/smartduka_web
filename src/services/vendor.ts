@@ -1,5 +1,9 @@
 import { prisma } from "@/lib/prisma/client";
 import { VerificationStatus, Prisma } from "@prisma/client";
+import { cacheLife, cacheTag } from "next/cache";
+import { cacheProfiles, cacheTags } from "@/lib/cache-policy";
+import { serializeMarketplaceProduct } from "@/services/product";
+import { ReviewService } from "@/services/reviews";
 
 // ==========================================
 // TYPES
@@ -227,9 +231,12 @@ export class VendorService {
   }
 
   /**
-   * Get all active vendor profiles for the public brands/stores listing page
+   * Get all active vendor profiles for the public shops/stores listing page
    */
   static async getPublicStoreListings() {
+    "use cache";
+    cacheLife(cacheProfiles.marketplace);
+    cacheTag(cacheTags.marketplace.shops);
     return prisma.vendorProfile.findMany({
       where: {
         status: "ACTIVE",
@@ -252,5 +259,43 @@ export class VendorService {
       },
       orderBy: { createdAt: "desc" },
     });
+  }
+
+  /** Public storefront data only. The slug argument is part of this cache entry's identity. */
+  static async getPublicShopBySlug(vendorSlug: string) {
+    "use cache";
+    cacheLife(cacheProfiles.marketplace);
+    cacheTag(cacheTags.marketplace.shops, cacheTags.shopSlug(vendorSlug));
+    const vendorProfile = await prisma.vendorProfile.findUnique({
+      where: { slug: vendorSlug, status: "ACTIVE", deletedAt: null },
+      include: {
+        products: {
+          where: { status: { in: ["ACTIVE", "PUBLISHED"] }, deletedAt: null },
+          include: {
+            images: { orderBy: [{ isFeatured: "desc" }, { sortOrder: "asc" }] },
+            category: { include: { parent: { include: { parent: true } } } },
+            subCategory: { include: { parent: { include: { parent: true } } } },
+            variants: { select: { isActive: true, inventoryCount: true, price: true } },
+            reviews: { where: { status: "PUBLISHED" }, select: { rating: true } },
+          },
+          orderBy: { createdAt: "desc" },
+        },
+        _count: { select: { products: true } },
+      },
+    });
+    if (!vendorProfile) return null;
+    cacheTag(cacheTags.shop(vendorProfile.id));
+    const [reviewSummary, shopReviews] = await Promise.all([ReviewService.shopSummary(vendorProfile.id), ReviewService.publicShopReviews(vendorProfile.id)]);
+    const categories = Array.from(new Map(vendorProfile.products.filter((product) => product.category).map((product) => [product.category!.id, { id: product.category!.id, name: product.category!.name }])).values());
+    const products = vendorProfile.products.map((product) => ({ ...serializeMarketplaceProduct({ ...product, vendor: { storeName: vendorProfile.storeName } }), categoryId: product.categoryId, subCategoryName: product.subCategory?.name ?? null }));
+    return {
+      store: {
+        id: vendorProfile.id, name: vendorProfile.storeName, slug: vendorProfile.slug, logo: vendorProfile.logoUrl, banner: vendorProfile.bannerUrl || null, verified: vendorProfile.isVerified,
+        description: vendorProfile.description || null, email: vendorProfile.email || null, phone: vendorProfile.phone || null, website: vendorProfile.website || null, address: vendorProfile.address || null,
+        city: vendorProfile.city || "Kampala", country: vendorProfile.country || "Uganda", returnWindowDays: vendorProfile.returnWindowDays, returnPolicy: vendorProfile.returnPolicy,
+        acceptsExchanges: vendorProfile.acceptsExchanges, exchangePolicy: vendorProfile.exchangePolicy, totalProducts: vendorProfile._count.products, rating: reviewSummary.average, reviewCount: reviewSummary.count,
+        reviews: shopReviews.map((review) => ({ id: review.id, rating: review.rating, comment: review.comment, customer: review.user.name, reply: review.vendorReplies[0]?.body ?? null, createdAt: review.createdAt.toISOString() })), joinedAt: vendorProfile.createdAt.toISOString(),
+      }, products, categories,
+    };
   }
 }

@@ -24,8 +24,9 @@ export default function RegisterPage() {
         </div>
 
         <div className="flex flex-1 items-center justify-center py-8">
-          <div className="w-full max-w-xs">
+          <div className="w-full max-w-sm">
             <RegisterForm />
+            <p className="mt-5 text-center text-xs text-muted-foreground"><Link href="/privacy-policy" className="hover:text-primary hover:underline">Privacy Policy</Link><span aria-hidden="true"> · </span><Link href="/cookie-policy" className="hover:text-primary hover:underline">Cookie Policy</Link></p>
           </div>
         </div>
       </div>
@@ -49,7 +50,7 @@ export default function RegisterPage() {
             Shopping, Redefined
           </span>
           <h2 className="text-2xl font-bold tracking-tight text-zinc-100 leading-tight">
-            Thousands of brands, one secure checkout.
+            Thousands of shops, one secure checkout.
           </h2>
           <p className="text-xs text-zinc-400 font-medium leading-relaxed">
             Join the SmartDuka community to track your orders in real-time,

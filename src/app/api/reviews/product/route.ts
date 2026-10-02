@@ -1,0 +1,6 @@
+import { NextRequest } from "next/server";
+import { errorResponse, getErrorMessage, successResponse } from "@/lib/api-utils";
+import { ReviewError, ReviewService } from "@/services/reviews";
+import { AuthenticationRequiredError, AccountInactiveError } from "@/lib/auth/session";
+export async function GET(request: NextRequest) { try { const productId = request.nextUrl.searchParams.get("productId"); if (!productId) return errorResponse("productId is required.", 400); const min = Number(request.nextUrl.searchParams.get("rating")); return successResponse({ summary: await ReviewService.productSummary(productId), reviews: await ReviewService.publicProductReviews(productId, Number.isInteger(min) && min >= 1 && min <= 5 ? min : undefined) }); } catch (error) { return errorResponse(getErrorMessage(error), 500); } }
+export async function POST(request: NextRequest) { try { return successResponse({ review: await ReviewService.createProductReviewForCurrentUser(await request.json()) }, 201); } catch (error) { const status = error instanceof AuthenticationRequiredError ? 401 : error instanceof AccountInactiveError ? 403 : error instanceof ReviewError ? error.code === "DUPLICATE" ? 409 : error.code === "INELIGIBLE" ? 403 : 400 : 500; return errorResponse(getErrorMessage(error), status); } }

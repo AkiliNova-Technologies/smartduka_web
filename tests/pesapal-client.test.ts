@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { getPesapalConfig, PesapalConfigError, type PesapalConfig } from "@/lib/payments/pesapal/config";
-import { PesapalClient } from "@/services/payments/pesapal-client";
+import { paymentInitiationError } from "@/services/payments/pesapal-payment-service";
+import { PesapalClient, PesapalClientError } from "@/services/payments/pesapal-client";
 
 const config: PesapalConfig = {
   environment: "sandbox",
@@ -23,10 +24,24 @@ describe("Pesapal configuration", () => {
     expect(getPesapalConfig({ ...shared, PESAPAL_ENV: "sandbox" }).baseUrl).toBe(config.baseUrl);
     expect(getPesapalConfig({ ...shared, PESAPAL_ENV: "production" }).baseUrl).toBe("https://pay.pesapal.com/v3");
     expect(() => getPesapalConfig(shared)).toThrow(PesapalConfigError);
+    expect(() => getPesapalConfig({ ...shared, PESAPAL_ENV: "sandbox", PESAPAL_IPN_URL: "http://localhost:3000/api/webhooks/pesapal" })).toThrow("PESAPAL_IPN_URL must use HTTPS.");
   });
 });
 
 describe("PesapalClient", () => {
+  it("maps the merchant amount limit without exposing provider details to customers", () => {
+    const error = paymentInitiationError(new PesapalClientError(
+      "PESAPAL_PROVIDER_ERROR",
+      "Pesapal reported a provider error.",
+      200,
+      { code: "amount_exceeds_default_limit", error_type: "contractual_error", message: "Transaction amount exceeds limit.Contact support for assistance" },
+    ));
+    expect(error).toMatchObject({
+      code: "PESAPAL_AMOUNT_LIMIT",
+      message: "This order exceeds the merchant's payment limit. Please contact support.",
+    });
+  });
+
   it("sends credentials only in authentication JSON and accepts a token", async () => {
     const fetch = vi.fn().mockResolvedValue(jsonResponse({ token: "token-a", expiryDate: "2030-01-01T00:00:00Z" }));
     const client = new PesapalClient({ getConfig: () => config, fetch });
@@ -40,8 +55,8 @@ describe("PesapalClient", () => {
   it("turns non-success, provider errors, and malformed responses into typed errors", async () => {
     const nonSuccess = new PesapalClient({ getConfig: () => config, fetch: vi.fn().mockResolvedValue(jsonResponse({}, 401)) });
     await expect(nonSuccess.getAccessToken()).rejects.toMatchObject({ code: "PESAPAL_AUTH_ERROR", status: 401 });
-    const providerError = new PesapalClient({ getConfig: () => config, fetch: vi.fn().mockResolvedValue(jsonResponse({ error: { message: "no" } })) });
-    await expect(providerError.getAccessToken()).rejects.toMatchObject({ code: "PESAPAL_PROVIDER_ERROR" });
+    const providerError = new PesapalClient({ getConfig: () => config, fetch: vi.fn().mockResolvedValue(jsonResponse({ error: { error_type: "validation", code: "INVALID_NOTIFICATION", message: "no" } })) });
+    await expect(providerError.getAccessToken()).rejects.toMatchObject({ code: "PESAPAL_PROVIDER_ERROR", status: 200, providerError: { error_type: "validation", code: "INVALID_NOTIFICATION", message: "no" } });
     const malformed = new PesapalClient({ getConfig: () => config, fetch: vi.fn().mockResolvedValue(jsonResponse({ expiryDate: "2030-01-01T00:00:00Z" })) });
     await expect(malformed.getAccessToken()).rejects.toMatchObject({ code: "PESAPAL_INVALID_RESPONSE" });
   });

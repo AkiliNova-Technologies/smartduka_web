@@ -74,11 +74,30 @@ describe("checkout idempotency", () => {
     expect(mocks.notification).not.toHaveBeenCalled();
   });
 
+  it("reuses a matching unpaid order after a fresh checkout request ID", async () => {
+    const existing = { id: "order-a", paymentStatus: "PENDING", checkoutRequestHash: checkoutRequestHash(input) };
+    mocks.findExistingOrder.mockResolvedValueOnce(null).mockResolvedValueOnce(existing);
+
+    await expect(OrderService.createOrder({ ...input, checkoutRequestId: "checkout-request-0002" })).resolves.toBe(existing);
+    expect(mocks.transaction).not.toHaveBeenCalled();
+    expect(mocks.updateProductStock).not.toHaveBeenCalled();
+  });
+
   it("rejects a reused key with changed checkout intent", async () => {
     mocks.findExistingOrder.mockResolvedValue({ id: "order-a", checkoutRequestHash: "different" });
 
     await expect(OrderService.createOrder(input)).rejects.toMatchObject({ code: "IDEMPOTENCY_CONFLICT" });
     expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
+  it("requires a variant when every persisted variant is disabled", async () => {
+    mocks.findMany.mockResolvedValue([{
+      ...product,
+      variants: [{ id: "retired-variant", isActive: false, inventoryCount: 4, price: 12000 }],
+    }]);
+
+    await expect(OrderService.createOrder(input)).rejects.toMatchObject({ code: "VARIANT_UNAVAILABLE" });
+    expect(mocks.updateProductStock).not.toHaveBeenCalled();
   });
 
   it("hashes equivalent item ordering deterministically", () => {
@@ -115,7 +134,7 @@ describe("checkout idempotency", () => {
 
   it("rejects a P2002 winner whose request hash conflicts", async () => {
     mocks.transaction.mockRejectedValue(p2002(["customerId", "checkoutRequestId"]));
-    mocks.findExistingOrder.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: "winner", checkoutRequestHash: "different" });
+    mocks.findExistingOrder.mockResolvedValueOnce(null).mockResolvedValueOnce(null).mockResolvedValueOnce({ id: "winner", checkoutRequestHash: "different" });
 
     await expect(OrderService.createOrder(input)).rejects.toMatchObject({ code: "IDEMPOTENCY_CONFLICT" });
   });
@@ -125,6 +144,6 @@ describe("checkout idempotency", () => {
     mocks.transaction.mockRejectedValue(error);
 
     await expect(OrderService.createOrder(input)).rejects.toBe(error);
-    expect(mocks.findExistingOrder).toHaveBeenCalledTimes(1);
+    expect(mocks.findExistingOrder).toHaveBeenCalledTimes(2);
   });
 });

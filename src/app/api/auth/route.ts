@@ -1,10 +1,15 @@
 import { NextRequest } from "next/server";
 import { adminAuth } from "@/lib/firebase/admin";
-import { prisma } from "@/lib/prisma/client";
-import { PlatformRole, UserStatus } from "@prisma/client";
+import { PlatformRole } from "@prisma/client";
 import { cookies } from "next/headers";
 import { createToken, SESSION_MAX_AGE_SECONDS } from "@/lib/auth/jwt";
 import { successResponse, errorResponse, getErrorMessage } from "@/lib/api-utils";
+import { getAuthSyncErrorResponse, synchronizeFirebaseIdentity } from "@/services/auth-sync";
+import { getCurrentWorkspaceAccess } from "@/lib/auth/workspaces";
+
+export async function GET() {
+  return successResponse(await getCurrentWorkspaceAccess());
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -29,26 +34,14 @@ export async function POST(req: NextRequest) {
     }
 
     // Upsert user in database
-    const user = await prisma.user.upsert({
-      where: { email },
-      update: {
-        lastLoginAt: new Date(),
-        avatarUrl: picture || null,
-        emailVerifiedAt: email_verified ? new Date() : null,
-      },
-      create: {
-        id: uid,
-        email,
-        name: name || email.split("@")[0],
-        avatarUrl: picture || null,
-        status: UserStatus.ACTIVE,
-        platformRole: PlatformRole.CUSTOMER,
-        emailVerifiedAt: email_verified ? new Date() : null,
-        lastLoginAt: new Date(),
-      },
+    const user = await synchronizeFirebaseIdentity({
+      uid,
+      email,
+      name,
+      picture,
+      emailVerified: email_verified,
     });
 
-    // Create marketplace JWT with full vendor/role context
     const marketplaceToken = await createToken({
       userId: user.id,
       name: user.name,
@@ -58,11 +51,8 @@ export async function POST(req: NextRequest) {
       vendorId: user.vendorId ?? null,
     });
 
-    // Set session cookie for browser requests
     const isBrowserRequest =
-      req.headers.get("sec-ch-ua") ||
-      req.headers.get("user-agent")?.includes("Mozilla");
-
+      req.headers.get("sec-ch-ua") || req.headers.get("user-agent")?.includes("Mozilla");
     if (isBrowserRequest) {
       const cookieStore = await cookies();
       cookieStore.set("session", marketplaceToken, {
@@ -80,8 +70,9 @@ export async function POST(req: NextRequest) {
       name: user.name,
     });
   } catch (error: unknown) {
-    console.error("[Auth API]", error);
-    return errorResponse(getErrorMessage(error), 401);
+    console.error("[Auth API]", error instanceof Error ? error.name : "Unknown auth error");
+    const response = getAuthSyncErrorResponse(error);
+    return errorResponse(response.message, response.status, response.code);
   }
 }
 

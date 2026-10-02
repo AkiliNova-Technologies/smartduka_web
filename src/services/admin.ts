@@ -146,32 +146,45 @@ export class AdminService {
       include: {
         order: {
           select: {
-            id: true,
-            orderNumber: true,
-            customerId: true,
+            id: true, orderNumber: true, shippingAddress: true, shippingPhone: true, notes: true,
+            paymentGateway: true, paymentStatus: true, subTotal: true, totalShipping: true, createdAt: true,
             customer: { select: { name: true, email: true } },
-            shippingAddress: true,
-            paymentGateway: true,
-            createdAt: true,
+            paymentAttempts: { orderBy: { createdAt: "desc" }, take: 1, select: { id: true, status: true, providerStatus: true, paymentMethod: true, confirmationCode: true, verifiedAt: true, lastVerifiedAt: true } },
+            riskFlags: { where: { status: "OPEN" }, select: { status: true } },
           },
         },
         vendor: { select: { storeName: true } },
+        items: { include: { product: { select: { name: true } }, variant: { select: { name: true } } } },
+        returnRequests: { select: { status: true } },
+        refunds: { select: { status: true } },
+        disputes: { select: { status: true } },
+        riskFlags: { where: { status: "OPEN" }, select: { status: true } },
       },
       orderBy: { createdAt: "desc" },
       take: 100,
     });
-
-    return subOrders.map((so) => ({
-      id: so.id,
-      orderNumber: so.subOrderNumber,
-      customerName: so.order.customer?.name || "Customer",
-      customerEmail: so.order.customer?.email || "",
-      storeName: so.vendor?.storeName || "Unknown Store",
-      totalAmount: Number(so.vendorTotal),
-      paymentGateway: so.order.paymentGateway,
-      subOrderStatus: so.status,
-      deliveryLocation: so.order.shippingAddress || "",
-      date: so.createdAt.toISOString(),
-    }));
+    const findingRows = await prisma.reconciliationFinding.findMany({
+      where: { status: "OPEN", OR: [{ subOrderId: { in: subOrders.map((order) => order.id) } }, { orderId: { in: subOrders.map((order) => order.orderId) } }] },
+      select: { subOrderId: true, orderId: true, type: true },
+    });
+    const findings = new Map<string, string[]>();
+    for (const finding of findingRows) {
+      for (const entityId of [finding.subOrderId, finding.orderId]) {
+        if (entityId) findings.set(entityId, [...(findings.get(entityId) || []), finding.type]);
+      }
+    }
+    return subOrders.map((so) => {
+      const attempt = so.order.paymentAttempts[0] || null;
+      return {
+        id: so.id, orderId: so.order.id, orderNumber: so.subOrderNumber,
+        customerName: so.order.customer?.name || "Customer", customerEmail: so.order.customer?.email || "", customerPhone: so.order.shippingPhone,
+        storeName: so.vendor?.storeName || "Unknown Store", totalAmount: Number(so.vendorTotal), subTotal: Number(so.order.subTotal), totalShipping: Number(so.order.totalShipping),
+        paymentGateway: so.order.paymentGateway, paymentStatus: so.order.paymentStatus, subOrderStatus: so.status,
+        deliveryLocation: so.order.shippingAddress || "", notes: so.order.notes, date: so.order.createdAt.toISOString(),
+        items: so.items.map((item) => ({ id: item.id, name: item.productNameSnapshot ?? item.product.name, quantity: item.quantity, unitPrice: Number(item.priceAtPurchase), lineTotal: Number(item.totalPrice), variant: item.variantNameSnapshot ?? item.variant?.name ?? null })),
+        paymentAttempt: attempt ? { id: attempt.id, status: attempt.status, providerStatus: attempt.providerStatus, paymentMethod: attempt.paymentMethod, confirmationCode: attempt.confirmationCode, verifiedAt: (attempt.verifiedAt || attempt.lastVerifiedAt)?.toISOString() || null } : null,
+        issues: { returns: so.returnRequests.map((item) => item.status), refunds: so.refunds.map((item) => item.status), disputes: so.disputes.map((item) => item.status), riskFlags: [...so.riskFlags, ...so.order.riskFlags].map((item) => item.status), financialExceptions: [...(findings.get(so.id) || []), ...(findings.get(so.order.id) || [])] },
+      };
+    });
   }
 }

@@ -15,10 +15,11 @@ export function successResponse<T>(data: T, status = 200) {
 export function errorResponse(
   error: string,
   status = 500,
-  code?: string
+  code?: string,
+  errors?: Record<string, string>,
 ) {
   return Response.json(
-    { success: false, error, ...(code && { code }) },
+    { success: false, error, ...(code && { code }), ...(errors && { errors }) },
     { status }
   );
 }
@@ -45,6 +46,14 @@ export function paginatedResponse<T>(
  * Extracts human-readable error message from any thrown value
  */
 export function getErrorMessage(error: unknown): string {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: unknown }).code === "P2028"
+  ) {
+    return "Product creation took too long. Please try again.";
+  }
   if (error instanceof Error) {
     const message = error.message;
     if (

@@ -20,7 +20,10 @@ import { cn } from "@/lib/utils";
 import { useProducts } from "@/hooks/use-products";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Product } from "@/types/marketplace";
-import Image from "next/image";
+import { MediaImage } from "@/components/marketplace/media-image";
+import { PRODUCT_IMAGE_FALLBACK } from "@/lib/media";
+import { DataTable } from "@/components/data-table";
+import type { ColumnDef } from "@tanstack/react-table";
 
 function ProductDetailSkeleton() {
   return (
@@ -80,7 +83,9 @@ function ErrorState({ error }: { error: string }) {
         <AlertTriangle className="w-8 h-8 text-amber-500" />
       </div>
       <div className="space-y-1">
-        <h3 className="text-sm font-bold text-foreground">Error Loading Product</h3>
+        <h3 className="text-sm font-bold text-foreground">
+          Error Loading Product
+        </h3>
         <p className="text-xs text-muted-foreground max-w-sm">{error}</p>
       </div>
       <Link
@@ -124,7 +129,59 @@ export default function VendorProductPreviewPage() {
   const [product, setProduct] = React.useState<Product | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  const [selectedImage, setSelectedImage] = React.useState<string | null>(null);
   const fetchedRef = React.useRef(false);
+  const variantColumns = React.useMemo<
+    ColumnDef<NonNullable<Product["variants"]>[number]>[]
+  >(
+    () => [
+      {
+        id: "combination",
+        header: "Combination",
+        cell: ({ row }) =>
+          row.original.name ||
+          Object.values(row.original.options || {}).join(" · ") ||
+          "Default",
+      },
+      {
+        accessorKey: "sku",
+        header: "SKU",
+        cell: ({ row }) => (
+          <span className="font-mono text-[11px]">{row.original.sku}</span>
+        ),
+      },
+      {
+        accessorKey: "price",
+        header: "Selling price",
+        cell: ({ row }) => `UGX ${Number(row.original.price).toLocaleString()}`,
+      },
+      { accessorKey: "inventoryCount", header: "Available stock" },
+      {
+        id: "availability",
+        header: "Availability",
+        cell: ({ row }) => {
+          const available =
+            row.original.isActive !== false && row.original.inventoryCount > 0;
+          return (
+            <span
+              className={cn(
+                "rounded-full border px-2 py-0.5 text-[10px] font-medium",
+                available
+                  ? "border-emerald-500/10 bg-emerald-500/5 text-emerald-600"
+                  : "border-rose-500/10 bg-rose-500/5 text-rose-600",
+              )}>
+              {available
+                ? "Available"
+                : row.original.isActive === false
+                  ? "Disabled"
+                  : "Out of stock"}
+            </span>
+          );
+        },
+      },
+    ],
+    [],
+  );
 
   React.useEffect(() => {
     if (!productId || fetchedRef.current || !fetchProductById) return;
@@ -137,7 +194,9 @@ export default function VendorProductPreviewPage() {
         const data = await fetchProductById(productId);
         setProduct(data);
       } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : "Failed to load product.");
+        setError(
+          err instanceof Error ? err.message : "Failed to load product.",
+        );
       } finally {
         setLoading(false);
       }
@@ -173,7 +232,9 @@ export default function VendorProductPreviewPage() {
   }
 
   const basePrice = Number(product.basePrice) ?? 0;
-  const compareAtPrice = product.compareAtPrice ? Number(product.compareAtPrice) : undefined;
+  const compareAtPrice = product.compareAtPrice
+    ? Number(product.compareAtPrice)
+    : undefined;
   const productName = product.name ?? "";
   const inventoryCount = product.inventoryCount ?? 0;
   const rating = product.rating ?? 0;
@@ -184,7 +245,13 @@ export default function VendorProductPreviewPage() {
   const productSizes = product.sizes || [];
   const productColors = product.colors || [];
   const productTags = product.tags || [];
-  const productSpecs = (product.specs || []) as { name: string; value: string }[];
+  const productSpecs = (product.specs || []) as {
+    name: string;
+    value: string;
+  }[];
+  const productImages = product.images || [];
+  const displayedImage = selectedImage || product.image;
+  const productVariants = product.variants || [];
   const categoryName = product.category?.name || "Uncategorized";
   const subCategoryName = product.subCategory?.name || null;
   const storeName = product.vendor?.storeName || "Main Store";
@@ -207,7 +274,9 @@ export default function VendorProductPreviewPage() {
           </Link>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-xl font-medium tracking-tight text-foreground">{productName}</h1>
+              <h1 className="text-xl font-medium tracking-tight text-foreground">
+                {productName}
+              </h1>
               <span
                 className={cn(
                   "text-[10px] font-medium px-2 py-0.5 rounded-full border",
@@ -217,24 +286,29 @@ export default function VendorProductPreviewPage() {
                       ? "bg-amber-500/5 border-amber-500/10 text-amber-600"
                       : "bg-emerald-500/5 border-emerald-500/10 text-emerald-600",
                 )}>
-                {isOutOfStock ? "Out of Stock" : isLowStock ? "Low Stock" : "In Stock"}
+                {isOutOfStock
+                  ? "Out of Stock"
+                  : isLowStock
+                    ? "Low Stock"
+                    : "In Stock"}
               </span>
             </div>
             <p className="text-xs text-muted-foreground font-medium mt-0.5">
-              Product ID: <code className="font-mono text-[11px]">{product.id}</code>
+              Product ID:{" "}
+              <code className="font-mono text-[11px]">{product.id}</code>
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <Link
             href={`/products/${product.id}`}
-            className="h-9 px-4 border border-border/60 hover:bg-muted text-xs font-medium rounded-full transition-all flex items-center gap-1.5">
+            className="h-10 px-4 border border-border/60 hover:bg-muted text-xs font-medium rounded-full transition-all flex items-center gap-1.5">
             <ShoppingBag className="w-3.5 h-3.5" />
             <span>View Storefront</span>
           </Link>
           <Link
             href={`/vendor/products/${product.id}/edit`}
-            className="h-9 px-4 bg-primary text-primary-foreground text-xs font-medium rounded-full hover:bg-emerald-600 active:scale-95 transition-all flex items-center gap-1.5">
+            className="h-9 px-4 bg-primary text-primary-foreground text-xs font-medium rounded-full hover:bg-emerald-600 active:scale-95 transition-all flex items-center gap-1.5 dark:text-white">
             <Edit2 className="w-3.5 h-3.5" />
             <span>Edit Product</span>
           </Link>
@@ -245,7 +319,16 @@ export default function VendorProductPreviewPage() {
         <div className="lg:col-span-4 space-y-4">
           <div className="bg-card border border-border/60 rounded-2xl p-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.02)]">
             <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-muted border border-border/40">
-              <Image src={product.image} alt={productName} fill className="w-full h-full object-cover" />
+              <MediaImage
+                src={displayedImage}
+                fallback={PRODUCT_IMAGE_FALLBACK}
+                alt={productName}
+                fill
+                sizes="(max-width: 1024px) 100vw, 33vw"
+                loading="eager"
+                className="object-cover"
+                fallbackClassName="object-cover"
+              />
               {markdownPercentage > 0 && (
                 <span className="absolute top-3 left-3 bg-orange-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider">
                   -{markdownPercentage}% OFF
@@ -253,26 +336,77 @@ export default function VendorProductPreviewPage() {
               )}
             </div>
           </div>
+          {productImages.length > 1 && (
+            <div
+              className="grid grid-cols-4 gap-2"
+              aria-label="Product gallery">
+              {productImages.map((image) => (
+                <button
+                  key={image.id}
+                  type="button"
+                  onClick={() => setSelectedImage(image.url)}
+                  className={cn(
+                    "relative aspect-square overflow-hidden rounded-lg border bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+                    displayedImage === image.url
+                      ? "border-primary"
+                      : "border-border/60",
+                  )}
+                  aria-label={`View ${image.isFeatured ? "primary" : "gallery"} image`}>
+                  <MediaImage
+                    src={image.url}
+                    fallback={PRODUCT_IMAGE_FALLBACK}
+                    alt=""
+                    fill
+                    sizes="120px"
+                    className="object-cover"
+                    fallbackClassName="object-cover"
+                  />
+                  {image.isFeatured && (
+                    <span className="absolute bottom-1 left-1 rounded bg-background/90 px-1 py-0.5 text-[8px] font-medium text-foreground">
+                      Primary
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-card border border-border/60 rounded-2xl p-4 space-y-1">
               <div className="flex items-center gap-1.5 text-muted-foreground">
                 <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                <span className="text-[10px] font-medium uppercase tracking-wider">Rating</span>
+                <span className="text-[10px] font-medium uppercase tracking-wider">
+                  Rating
+                </span>
               </div>
               <p className="text-lg font-medium text-foreground">
-                {rating} <span className="text-xs text-muted-foreground">/ 5.0</span>
+                {rating}{" "}
+                <span className="text-xs text-muted-foreground">/ 5.0</span>
               </p>
-              <p className="text-[10px] text-muted-foreground">{reviews} reviews</p>
+              <p className="text-[10px] text-muted-foreground">
+                {reviews} reviews
+              </p>
             </div>
             <div className="bg-card border border-border/60 rounded-2xl p-4 space-y-1">
               <div className="flex items-center gap-1.5 text-muted-foreground">
                 <Box className="w-3.5 h-3.5" />
-                <span className="text-[10px] font-medium uppercase tracking-wider">Stock</span>
+                <span className="text-[10px] font-medium uppercase tracking-wider">
+                  Stock
+                </span>
               </div>
-              <p className={cn("text-lg font-medium", isOutOfStock ? "text-rose-500" : isLowStock ? "text-amber-500" : "text-foreground")}>
+              <p
+                className={cn(
+                  "text-lg font-medium",
+                  isOutOfStock
+                    ? "text-rose-500"
+                    : isLowStock
+                      ? "text-amber-500"
+                      : "text-foreground",
+                )}>
                 {inventoryCount}
               </p>
-              <p className="text-[10px] text-muted-foreground">units available</p>
+              <p className="text-[10px] text-muted-foreground">
+                units available
+              </p>
             </div>
           </div>
         </div>
@@ -280,91 +414,188 @@ export default function VendorProductPreviewPage() {
         <div className="lg:col-span-8 space-y-4">
           <div className="bg-card border border-border/60 rounded-2xl p-5 space-y-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.02)]">
             <div className="space-y-1">
-              <span className="text-[10px] font-bold text-primary bg-primary/5 px-2 py-0.5 rounded-md uppercase tracking-wider inline-block">{brand}</span>
-              <h2 className="text-lg font-medium text-foreground tracking-tight pt-1">{productName}</h2>
+              <span className="text-[10px] font-bold text-primary bg-primary/5 px-2 py-0.5 rounded-md uppercase tracking-wider inline-block">
+                {brand}
+              </span>
+              <h2 className="text-lg font-medium text-foreground tracking-tight pt-1">
+                {productName}
+              </h2>
             </div>
             <div className="border-t border-border/40 pt-3 flex items-baseline gap-3 flex-wrap">
-              <span className="text-2xl font-extrabold text-foreground tracking-tight">UGX {basePrice.toLocaleString()}</span>
+              <span className="text-2xl font-extrabold text-foreground tracking-tight">
+                UGX {basePrice.toLocaleString()}
+              </span>
               {compareAtPrice && (
                 <>
-                  <span className="text-sm text-muted-foreground font-medium line-through">UGX {compareAtPrice.toLocaleString()}</span>
+                  <span className="text-sm text-muted-foreground font-medium line-through">
+                    UGX {compareAtPrice.toLocaleString()}
+                  </span>
                   <span className="inline-flex items-center gap-1 text-[10px] bg-emerald-500/5 text-emerald-600 font-extrabold border border-emerald-500/10 px-2 py-0.5 rounded-full">
-                    <TrendingDown className="w-2.5 h-2.5" /> Save {markdownPercentage}%
+                    <TrendingDown className="w-2.5 h-2.5" /> Save{" "}
+                    {markdownPercentage}%
                   </span>
                 </>
               )}
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 border-t border-border/40">
               <div className="space-y-0.5">
-                <span className="text-[9px] font-medium text-muted-foreground uppercase tracking-wider">SKU</span>
-                <p className="text-xs font-mono font-medium text-foreground">{sku}</p>
+                <span className="text-[9px] font-medium text-muted-foreground uppercase tracking-wider">
+                  SKU
+                </span>
+                <p className="text-xs font-mono font-medium text-foreground">
+                  {sku}
+                </p>
               </div>
               <div className="space-y-0.5">
-                <span className="text-[9px] font-medium text-muted-foreground uppercase tracking-wider">Category</span>
-                <p className="text-xs font-medium text-foreground truncate" title={subCategoryName ? `${categoryName} › ${subCategoryName}` : categoryName}>
+                <span className="text-[9px] font-medium text-muted-foreground uppercase tracking-wider">
+                  Category
+                </span>
+                <p
+                  className="text-xs font-medium text-foreground truncate"
+                  title={
+                    subCategoryName
+                      ? `${categoryName} › ${subCategoryName}`
+                      : categoryName
+                  }>
                   {subCategoryName || categoryName}
                 </p>
               </div>
               <div className="space-y-0.5">
-                <span className="text-[9px] font-medium text-muted-foreground uppercase tracking-wider">Store</span>
-                <p className="text-xs font-medium text-foreground truncate">{storeName}</p>
+                <span className="text-[9px] font-medium text-muted-foreground uppercase tracking-wider">
+                  Store
+                </span>
+                <p className="text-xs font-medium text-foreground truncate">
+                  {storeName}
+                </p>
               </div>
               <div className="space-y-0.5">
-                <span className="text-[9px] font-medium text-muted-foreground uppercase tracking-wider">Status</span>
-                <span className={cn("text-[10px] font-medium px-2 py-0.5 rounded-full border", isOutOfStock ? "bg-rose-500/5 border-rose-500/10 text-rose-600" : isLowStock ? "bg-amber-500/5 border-amber-500/10 text-amber-600" : "bg-emerald-500/5 border-emerald-500/10 text-emerald-600")}>
-                  {isOutOfStock ? "Out of Stock" : isLowStock ? "Low Stock" : "Active"}
+                <span className="text-[9px] font-medium text-muted-foreground uppercase tracking-wider">
+                  Status
+                </span>
+                <span
+                  className={cn(
+                    "text-[10px] font-medium px-2 py-0.5 rounded-full border",
+                    isOutOfStock
+                      ? "bg-rose-500/5 border-rose-500/10 text-rose-600"
+                      : isLowStock
+                        ? "bg-amber-500/5 border-amber-500/10 text-amber-600"
+                        : "bg-emerald-500/5 border-emerald-500/10 text-emerald-600",
+                  )}>
+                  {isOutOfStock
+                    ? "Out of Stock"
+                    : isLowStock
+                      ? "Low Stock"
+                      : "Active"}
                 </span>
               </div>
             </div>
           </div>
 
+          {productVariants.length > 0 && (
+            <section className="bg-card border border-border/60 rounded-2xl p-5 space-y-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.02)]">
+              <div>
+                <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  Variant inventory
+                </h3>
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Prices and stock are managed per combination. Total available
+                  stock: {inventoryCount}.
+                </p>
+              </div>
+              <DataTable
+                columns={variantColumns}
+                data={productVariants}
+                getRowId={(variant) => variant.id}
+                defaultPageSize={10}
+                features={{
+                  search: false,
+                  filtering: false,
+                  pagination: productVariants.length > 10,
+                  columnVisibility: false,
+                  rowSelection: false,
+                  toolbar: false,
+                  footer: false,
+                }}
+              />
+            </section>
+          )}
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="bg-card border border-border/60 rounded-2xl p-5 space-y-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.02)]">
               <div className="flex items-center gap-2">
                 <Ruler className="w-4 h-4 text-muted-foreground" />
-                <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Variants</h3>
+                <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  Variants
+                </h3>
               </div>
               {productSizes.length > 0 && (
                 <div className="space-y-2">
-                  <span className="text-[10px] font-medium text-muted-foreground">Available Sizes</span>
+                  <span className="text-[10px] font-medium text-muted-foreground">
+                    Available Sizes
+                  </span>
                   <div className="flex flex-wrap gap-1.5">
                     {productSizes.map((size) => (
-                      <span key={size} className="px-2.5 py-1 bg-muted/50 border border-border/40 rounded-md text-[11px] font-medium text-foreground">{size}</span>
+                      <span
+                        key={size}
+                        className="px-2.5 py-1 bg-muted/50 border border-border/40 rounded-md text-[11px] font-medium text-foreground">
+                        {size}
+                      </span>
                     ))}
                   </div>
                 </div>
               )}
               {productColors.length > 0 && (
                 <div className="space-y-2">
-                  <span className="text-[10px] font-medium text-muted-foreground">Available Colors</span>
+                  <span className="text-[10px] font-medium text-muted-foreground">
+                    Available Colors
+                  </span>
                   <div className="flex flex-wrap gap-1.5">
                     {productColors.map((color) => (
-                      <span key={color} className="px-2.5 py-1 bg-muted/50 border border-border/40 rounded-md text-[11px] font-medium text-foreground">{color}</span>
+                      <span
+                        key={color}
+                        className="px-2.5 py-1 bg-muted/50 border border-border/40 rounded-md text-[11px] font-medium text-foreground">
+                        {color}
+                      </span>
                     ))}
                   </div>
                 </div>
               )}
               {productSizes.length === 0 && productColors.length === 0 && (
-                <p className="text-[11px] text-muted-foreground italic">No variants configured</p>
+                <p className="text-[11px] text-muted-foreground italic">
+                  No variants configured
+                </p>
               )}
             </div>
 
             <div className="bg-card border border-border/60 rounded-2xl p-5 space-y-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.02)]">
               <div className="flex items-center gap-2">
                 <FileText className="w-4 h-4 text-muted-foreground" />
-                <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Specifications</h3>
+                <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  Specifications
+                </h3>
               </div>
               {productSpecs.length > 0 ? (
                 <div className="space-y-2">
                   {productSpecs.map((spec, index) => (
-                    <div key={index} className={cn("flex justify-between items-center py-1.5 px-2 rounded-lg text-xs", index % 2 === 0 ? "bg-muted/20" : "")}>
-                      <span className="text-muted-foreground font-medium">{spec.name}</span>
-                      <span className="font-medium text-foreground text-right max-w-[140px] truncate">{spec.value}</span>
+                    <div
+                      key={index}
+                      className={cn(
+                        "flex justify-between items-center py-1.5 px-2 rounded-lg text-xs",
+                        index % 2 === 0 ? "bg-muted/20" : "",
+                      )}>
+                      <span className="text-muted-foreground font-medium">
+                        {spec.name}
+                      </span>
+                      <span className="font-medium text-foreground text-right max-w-[140px] truncate">
+                        {spec.value}
+                      </span>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-[11px] text-muted-foreground italic">No specifications provided</p>
+                <p className="text-[11px] text-muted-foreground italic">
+                  No specifications provided
+                </p>
               )}
             </div>
           </div>
@@ -373,19 +604,29 @@ export default function VendorProductPreviewPage() {
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <FileText className="w-4 h-4 text-muted-foreground" />
-                <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Description</h3>
+                <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  Description
+                </h3>
               </div>
-              <p className="text-xs text-muted-foreground leading-relaxed">{productDescription}</p>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                {productDescription}
+              </p>
             </div>
             {productTags.length > 0 && (
               <div className="space-y-2 pt-2 border-t border-border/40">
                 <div className="flex items-center gap-2">
                   <Tag className="w-4 h-4 text-muted-foreground" />
-                  <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Tags</h3>
+                  <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    Tags
+                  </h3>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {productTags.map((tag) => (
-                    <span key={tag} className="px-2.5 py-1 bg-primary/5 border border-primary/10 rounded-full text-[10px] font-medium text-primary">#{tag}</span>
+                    <span
+                      key={tag}
+                      className="px-2.5 py-1 bg-primary/5 border border-primary/10 rounded-full text-[10px] font-medium text-primary">
+                      #{tag}
+                    </span>
                   ))}
                 </div>
               </div>
@@ -396,8 +637,13 @@ export default function VendorProductPreviewPage() {
             <div className="bg-amber-500/5 border border-amber-500/20 rounded-2xl p-4 flex items-start gap-3">
               <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
               <div className="space-y-1">
-                <p className="text-xs font-medium text-amber-600">Low Stock Warning</p>
-                <p className="text-[11px] text-amber-500/80">Only {inventoryCount} units remaining. Consider restocking soon.</p>
+                <p className="text-xs font-medium text-amber-600">
+                  Low Stock Warning
+                </p>
+                <p className="text-[11px] text-amber-500/80">
+                  Only {inventoryCount} units remaining. Consider restocking
+                  soon.
+                </p>
               </div>
             </div>
           )}
@@ -406,8 +652,13 @@ export default function VendorProductPreviewPage() {
             <div className="bg-rose-500/5 border border-rose-500/20 rounded-2xl p-4 flex items-start gap-3">
               <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
               <div className="space-y-1">
-                <p className="text-xs font-medium text-rose-600">Out of Stock</p>
-                <p className="text-[11px] text-rose-500/80">This product is currently unavailable. Update inventory to make it visible again.</p>
+                <p className="text-xs font-medium text-rose-600">
+                  Out of Stock
+                </p>
+                <p className="text-[11px] text-rose-500/80">
+                  This product is currently unavailable. Update inventory to
+                  make it visible again.
+                </p>
               </div>
             </div>
           )}

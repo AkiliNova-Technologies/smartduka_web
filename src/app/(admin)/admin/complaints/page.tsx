@@ -23,6 +23,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
+import { AdminMetricCard } from "@/components/admin/admin-metric-card";
 
 // Basic interface for marketplace customer complaints
 interface CustomerReport {
@@ -119,12 +120,12 @@ export default function AdminReportsPage() {
       {
         accessorKey: "reportedItem",
         header: "Item Involved",
-        cell: ({ row }) => <span className="text-muted-foreground">{row.original.reportedItem}</span>,
+        cell: ({ row }) => <span className="block max-w-[18rem] truncate text-muted-foreground" title={row.original.reportedItem}>{row.original.reportedItem}</span>,
       },
       {
         accessorKey: "reason",
         header: "Reason / Issue",
-        cell: ({ row }) => <span className="font-medium text-rose-600 dark:text-rose-400">{row.original.reason}</span>,
+        cell: ({ row }) => <span className="block max-w-[18rem] line-clamp-2 font-medium text-foreground" title={row.original.reason}>{row.original.reason}</span>,
       },
       {
         accessorKey: "status",
@@ -132,10 +133,10 @@ export default function AdminReportsPage() {
         cell: ({ row }) => (
           <span
             className={cn(
-              "text-[10px] font-medium px-2 py-0.5 rounded-full border inline-flex items-center gap-1",
-              row.original.status === "Pending" && "bg-amber-500/5 border-amber-500/10 text-amber-600",
-              row.original.status === "Resolved" && "bg-emerald-500/5 border-emerald-500/10 text-emerald-600",
-              row.original.status === "Dismissed" && "bg-zinc-500/5 border-zinc-500/10 text-zinc-500"
+              "text-xs font-medium leading-none px-2.5 py-1 rounded-full border inline-flex items-center gap-1",
+              row.original.status === "Pending" && "bg-amber-500 border-transparent text-white",
+              row.original.status === "Resolved" && "bg-emerald-600 border-transparent text-white",
+              row.original.status === "Dismissed" && "bg-zinc-100 border-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-300"
             )}
           >
             {row.original.status}
@@ -179,41 +180,9 @@ export default function AdminReportsPage() {
       </div>
 
       {/* 2. SUMMARY COUNTERS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 select-none">
-        {[
-          {
-            label: "Needs Attention (Pending)",
-            value: totalPending,
-            icon: AlertTriangle,
-            style: "bg-card border-border/60 text-amber-600 dark:text-amber-400",
-          },
-          {
-            label: "Settled Issues",
-            value: totalResolved,
-            icon: CheckCircle2,
-            style: "bg-card border-border/60 text-emerald-600 dark:text-emerald-400",
-          },
-        ].map((kpi, idx) => (
-          <div
-            key={idx}
-            className={cn(
-              "border rounded-2xl p-4 flex items-center justify-between shadow-2xs",
-              kpi.style
-            )}
-          >
-            <div className="space-y-1">
-              <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-                {kpi.label}
-              </span>
-              <h3 className="text-2xl font-medium text-foreground tracking-tight">
-                {kpi.value}
-              </h3>
-            </div>
-            <div className="p-2.5 rounded-full bg-muted/60 border border-border/40 text-muted-foreground">
-              <kpi.icon className="w-4 h-4" />
-            </div>
-          </div>
-        ))}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <AdminMetricCard label="Needs Attention (Pending)" value={totalPending} icon={AlertTriangle} tone="warning" />
+        <AdminMetricCard label="Settled Issues" value={totalResolved} icon={CheckCircle2} />
       </div>
 
       {/* 3. CORE TABLE */}

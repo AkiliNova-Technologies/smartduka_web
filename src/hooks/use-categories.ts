@@ -25,5 +25,6 @@ export function useCategories() {
     createCategory: vendorCatalog?.createCategory,
     updateCategory: vendorCatalog?.updateCategory,
     deleteCategory: vendorCatalog?.deleteCategory,
+    setCategoryStatus: vendorCatalog?.setCategoryStatus,
   };
 }

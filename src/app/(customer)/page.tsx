@@ -1,61 +1,23 @@
-import { HeroSection } from "@/components/home/HeroSection";
-import { CategoryBento } from "@/components/home/CategoryBento";
-import { PromoGrid } from "@/components/home/PromoGrid";
+import { HomeDiscovery } from "@/components/home/HomeDiscovery";
 import { ProductGrid } from "@/components/home/ProductGrid";
-import { ScrollToTop } from "@/components/scroll-to-top";
-import { CustomerSidebar } from "@/components/layout/CustomerSidebar";
-import { Header } from "@/components/layout/Header";
-import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
-import { Suspense } from "react";
+import { PageContainer } from "@/components/marketplace/page-container";
 import { getDealsAction, getNewArrivalsAction } from "@/actions/product";
-
-interface HomeProduct {
-  id: string;
-  name: string;
-  slug: string;
-  brand: string | null;
-  basePrice: number;
-  compareAtPrice: number | null;
-  image: string;
-  vendorId: string;
-  vendorName: string;
-  rating: number;
-  reviews: number;
-}
+import { PromotionSection } from "@/components/marketing/promotion-section";
+import { FeaturedProductsSection, FeaturedShopsSection } from "@/components/marketing/featured-sections";
+import { CategoryService } from "@/services/category";
+import { MarketingService } from "@/services/marketing";
 
 export default async function HomePage() {
-  const [dealsResult, newArrivalsResult] = await Promise.all([
-    getDealsAction(),
-    getNewArrivalsAction(10),
-  ]);
-
-  const deals: HomeProduct[] = dealsResult.success ? (dealsResult.data ?? []) as HomeProduct[] : [];
-  const newArrivals: HomeProduct[] = newArrivalsResult.success ? (newArrivalsResult.data ?? []) as HomeProduct[] : [];
-
+  const [dealsResult, arrivalsResult, categories, featuredProducts, featuredShops] = await Promise.all([getDealsAction(), getNewArrivalsAction(10), CategoryService.getHomepageCategories(), MarketingService.publicFeaturedProducts(), MarketingService.publicFeaturedShops()]);
+  const deals = dealsResult.success ? (dealsResult.data ?? []) : [];
+  const newArrivals = arrivalsResult.success ? (arrivalsResult.data ?? []) : [];
   return (
-    <SidebarProvider defaultOpen={false}>
-      <div className="min-h-screen flex w-full bg-background selection:bg-emerald-500/10 selection:text-emerald-700 antialiased overflow-x-hidden">
-        <CustomerSidebar variant="floating" />
-
-        <SidebarInset className="min-h-screen flex flex-col bg-transparent transition-all duration-300 w-full min-w-0">
-          <Suspense
-            fallback={
-              <div className="h-20 w-full bg-muted/20 rounded-full animate-pulse mt-2" />
-            }>
-            <Header />
-          </Suspense>
-
-          <main className="flex-1 flex flex-col lg:flex-row px-4 sm:px-6 lg:px-8 py-6 lg:py-10 gap-6 lg:gap-12 max-w-8xl w-full mx-auto min-w-0">
-            <div className="flex-1 min-w-0 w-full space-y-6 relative">
-              <HeroSection />
-              <CategoryBento />
-              <PromoGrid />
-              <ProductGrid deals={deals} newArrivals={newArrivals} />
-              <ScrollToTop />
-            </div>
-          </main>
-        </SidebarInset>
-      </div>
-    </SidebarProvider>
+    <PageContainer className="space-y-10 py-6 sm:py-8 lg:py-10">
+      <PromotionSection placement="HOMEPAGE" />
+      <HomeDiscovery categories={categories} />
+      <FeaturedProductsSection products={featuredProducts} />
+      <FeaturedShopsSection shops={featuredShops} />
+      <ProductGrid deals={deals} newArrivals={newArrivals} />
+    </PageContainer>
   );
 }

@@ -62,7 +62,7 @@ export async function proxy(request: NextRequest) {
 
   const isPublicMarketplaceRoute =
     pathname === "/" ||
-    ["/about", "/contact", "/products", "/cart", "/shop", "/brands"].some(
+    ["/about", "/contact", "/products", "/cart", "/shop", "/shops"].some(
       (route) => pathname.startsWith(route),
     );
 

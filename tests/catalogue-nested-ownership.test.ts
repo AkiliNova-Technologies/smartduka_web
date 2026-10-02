@@ -47,7 +47,7 @@ describe("vendor catalogue nested ownership", () => {
           name: "Small",
           price: 10,
           inventoryCount: 2,
-          options: {},
+          options: { Size: "S" },
         },
       ],
     } as never);

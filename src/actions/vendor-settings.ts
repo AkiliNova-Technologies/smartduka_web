@@ -2,8 +2,15 @@
 
 import { prisma } from "@/lib/prisma/client";
 import { requireVendorContext } from "@/lib/auth/vendor-context";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
+import { cacheTags } from "@/lib/cache-policy";
 import { DocumentType } from "@prisma/client";
+import { z } from "zod";
+import {
+  FulfillmentMethodSchema,
+  type FulfillmentMethod,
+} from "@/lib/fulfillment";
+import { toVendorProfileDto } from "@/lib/vendor-profile-dto";
 
 export interface UpdateStoreProfileInput {
   storeName?: string;
@@ -32,10 +39,99 @@ export async function updateStoreProfile(input: UpdateStoreProfileInput) {
     },
   });
 
+  updateTag(cacheTags.marketplace.shops);
+  updateTag(cacheTags.shop(context.vendorId));
+
   revalidatePath("/vendor/settings");
-  revalidatePath(`/brands/${context.vendor.slug}`);
-  revalidatePath("/brands");
+  revalidatePath(`/shops/${context.vendor.slug}`);
+  revalidatePath("/shops");
   return { success: true, data: updated, error: undefined };
+}
+
+const fulfillmentSettingsSchema = z.object({
+  methods: z.array(FulfillmentMethodSchema).min(1, "Choose at least one fulfilment method."),
+  deliveryFee: z.coerce.number().finite("Enter a valid delivery fee.").nonnegative("Enter a valid delivery fee.").optional(),
+  deliveryEstimate: z.string().optional(),
+  pickupLocation: z.string().optional(),
+  pickupDirections: z.string().optional(),
+  pickupInstructions: z.string().optional(),
+});
+
+const returnPolicySchema = z.object({
+  returnWindowDays: z.coerce.number().int().min(7).max(90),
+  returnPolicy: z.string().optional(),
+  returnInstructions: z.string().optional(),
+  returnAddress: z.string().optional(),
+  acceptsExchanges: z.boolean().optional(),
+  exchangePolicy: z.string().optional(),
+}).superRefine((value, context) => {
+  if (value.acceptsExchanges && !value.exchangePolicy?.trim()) {
+    context.addIssue({ code: "custom", path: ["exchangePolicy"], message: "Add an exchange policy or disable exchanges." });
+  }
+});
+
+type SettingsFieldErrors = Partial<Record<"methods" | "deliveryFee" | "pickupLocation" | "returnWindowDays" | "exchangePolicy", string>>;
+
+function fieldErrors(error: z.ZodError): SettingsFieldErrors {
+  const errors: SettingsFieldErrors = {};
+  for (const issue of error.issues) {
+    const field = issue.path[0];
+    if (field === "methods" || field === "deliveryFee" || field === "pickupLocation" || field === "returnWindowDays" || field === "exchangePolicy") errors[field] ??= issue.message;
+  }
+  return errors;
+}
+
+export async function updateFulfillmentSettings(input: unknown) {
+  const context = await requireVendorContext("vendor:manage_shop");
+  const parsed = fulfillmentSettingsSchema.safeParse(input);
+  if (!parsed.success) return { success: false, fieldErrors: fieldErrors(parsed.error) };
+  const methods = [...new Set(parsed.data.methods)] as FulfillmentMethod[];
+  const errors: SettingsFieldErrors = {};
+  const deliveryFee = parsed.data.deliveryFee ?? 0;
+  if (methods.includes("DELIVERY") && (!Number.isFinite(deliveryFee) || deliveryFee < 0)) errors.deliveryFee = "Enter a valid delivery fee.";
+  if (methods.includes("PICKUP") && !parsed.data.pickupLocation?.trim()) errors.pickupLocation = "Enter a pickup location.";
+  if (Object.keys(errors).length) return { success: false, fieldErrors: errors };
+  await prisma.vendorProfile.update({
+    where: { id: context.vendorId },
+    data: {
+      fulfillmentMethods: methods,
+      deliveryFee: methods.includes("DELIVERY") ? deliveryFee : 0,
+      deliveryEstimate: parsed.data.deliveryEstimate?.trim() || null,
+      pickupLocation: parsed.data.pickupLocation?.trim() || null,
+      pickupDirections: parsed.data.pickupDirections?.trim() || null,
+      pickupInstructions: parsed.data.pickupInstructions?.trim() || null,
+    },
+  });
+  updateTag(cacheTags.marketplace.shops);
+  updateTag(cacheTags.shop(context.vendorId));
+  await prisma.auditLog.create({ data: { vendorId: context.vendorId, userId: context.user.id, action: "FULFILLMENT_SETTINGS_UPDATED", entity: "VendorProfile", entityId: context.vendorId, newValues: { methods } } });
+  revalidatePath("/vendor/settings");
+  revalidatePath(`/shops/${context.vendor.slug}`);
+  return { success: true, error: undefined };
+}
+
+export async function updateReturnPolicy(input: unknown) {
+  const context = await requireVendorContext("vendor:manage_shop");
+  const parsed = returnPolicySchema.safeParse(input);
+  if (!parsed.success) return { success: false, fieldErrors: fieldErrors(parsed.error) };
+  const { data } = parsed;
+  await prisma.vendorProfile.update({
+    where: { id: context.vendorId },
+    data: {
+      returnWindowDays: data.returnWindowDays,
+      returnPolicy: data.returnPolicy?.trim() || null,
+      returnInstructions: data.returnInstructions?.trim() || null,
+      returnAddress: data.returnAddress?.trim() || null,
+      acceptsExchanges: Boolean(data.acceptsExchanges),
+      exchangePolicy: data.exchangePolicy?.trim() || null,
+    },
+  });
+  updateTag(cacheTags.marketplace.shops);
+  updateTag(cacheTags.shop(context.vendorId));
+  await prisma.auditLog.create({ data: { vendorId: context.vendorId, userId: context.user.id, action: "RETURN_POLICY_UPDATED", entity: "VendorProfile", entityId: context.vendorId, newValues: { returnWindowDays: data.returnWindowDays, acceptsExchanges: Boolean(data.acceptsExchanges) } } });
+  revalidatePath("/vendor/settings");
+  revalidatePath(`/shops/${context.vendor.slug}`);
+  return { success: true, error: undefined };
 }
 
 export async function updateStoreLogo(logoUrl: string) {
@@ -45,9 +141,12 @@ export async function updateStoreLogo(logoUrl: string) {
     data: { logoUrl },
   });
 
+  updateTag(cacheTags.marketplace.shops);
+  updateTag(cacheTags.shop(context.vendorId));
+
   revalidatePath("/vendor/settings");
-  revalidatePath(`/brands/${context.vendor.slug}`);
-  revalidatePath("/brands");
+  revalidatePath(`/shops/${context.vendor.slug}`);
+  revalidatePath("/shops");
   return { success: true, data: updated, error: undefined };
 }
 
@@ -58,8 +157,11 @@ export async function updateStoreBanner(bannerUrl: string) {
     data: { bannerUrl },
   });
 
+  updateTag(cacheTags.marketplace.shops);
+  updateTag(cacheTags.shop(context.vendorId));
+
   revalidatePath("/vendor/settings");
-  revalidatePath(`/brands/${context.vendor.slug}`);
+  revalidatePath(`/shops/${context.vendor.slug}`);
   return { success: true, data: updated, error: undefined };
 }
 
@@ -118,5 +220,5 @@ export async function getMyFullVendorProfile() {
   });
 
   if (!profile) return { success: false, error: "Vendor profile not found.", data: null };
-  return { success: true, data: profile };
+  return { success: true, data: toVendorProfileDto(profile) };
 }

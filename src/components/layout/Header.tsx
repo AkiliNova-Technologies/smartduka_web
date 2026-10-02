@@ -1,223 +1,266 @@
 "use client";
 
-import { useState, FormEvent, Suspense, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import {
-  Search,
-  Bell,
-  AlignStartVertical,
-  AlignEndVertical,
-  ShoppingCart,
-} from "lucide-react";
+import { Suspense, useState, useSyncExternalStore } from "react";
+import Link from "next/link";
 import Image from "next/image";
-import { useSidebar } from "@/components/ui/sidebar";
+import { useRouter } from "next/navigation";
+import {
+  Bell,
+  LogOut,
+  Menu,
+  Package,
+  Settings,
+  ShoppingBag,
+  ShoppingCart,
+  ShieldCheck,
+  Store,
+  UserRound,
+} from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { useWorkspaceAccess } from "@/hooks/use-workspace-access";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useUserData } from "@/providers/UserDataProvider";
 import { NotificationsSheet } from "@/components/notifications/NotificationsSheet";
+import { MarketplaceSearch } from "@/components/marketplace/marketplace-search";
+import { CustomerNavigationSheet } from "@/components/layout/CustomerNavigationSheet";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
-function SearchInputFields() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const currentSearchParam = searchParams.get("search") || "";
+const emptySubscribe = () => () => {};
 
-  const [searchQuery, setSearchQuery] = useState(currentSearchParam);
-  const [prevSearchParam, setPrevSearchParam] = useState(currentSearchParam);
-
-  if (currentSearchParam !== prevSearchParam) {
-    setSearchQuery(currentSearchParam);
-    setPrevSearchParam(currentSearchParam);
-  }
-
-  const handleSearchSubmit = (e: FormEvent) => {
-    e.preventDefault();
-    if (!searchQuery.trim()) {
-      router.push("/products");
-    } else {
-      router.push(`/products?search=${encodeURIComponent(searchQuery.trim())}`);
-    }
-  };
-
+function AccountAvatar({
+  name,
+  photoUrl,
+}: {
+  name: string;
+  photoUrl: string | null;
+}) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const initial = name.trim().charAt(0).toUpperCase() || "U";
   return (
-    <form
-      onSubmit={handleSearchSubmit}
-      className="relative w-full max-w-md hidden md:block group">
-      <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" />
-      <input
-        type="text"
-        placeholder="Search products, brands, stores..."
-        value={searchQuery}
-        onChange={(e) => setSearchQuery(e.target.value)}
-        className="w-full h-11 pl-11 pr-5 bg-zinc-200/60 dark:bg-background/60 hover:bg-background/80 border border-transparent rounded-full text-sm text-foreground placeholder-muted-foreground/70 font-medium focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary focus:bg-background transition-all duration-200"
-      />
-    </form>
+    <span className="relative flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/10 text-xs font-bold text-primary">
+      {photoUrl && !imageFailed ? (
+        <Image
+          alt=""
+          src={photoUrl}
+          fill
+          sizes="36px"
+          className="object-cover"
+          onError={() => setImageFailed(true)}
+        />
+      ) : (
+        initial
+      )}
+    </span>
   );
 }
 
 function ProfileSection() {
   const router = useRouter();
-  const { user, loading, isAuthenticated, userRole } = useAuth();
-
-  if (loading && !isAuthenticated) {
+  const { user, loading, isAuthenticated, logout } = useAuth();
+  const { canAccessVendor, canAccessAdmin, loading: workspaceLoading } =
+    useWorkspaceAccess();
+  if (loading && !isAuthenticated)
+    return <Skeleton className="size-9 rounded-full" />;
+  if (!isAuthenticated)
     return (
-      <div className="flex items-center gap-3">
-        <Skeleton className="w-9 h-9 rounded-full" />
+      <div className="flex items-center gap-1">
+        <Link
+          href="/login"
+          className="inline-flex min-h-10 items-center rounded-full px-3 text-sm font-medium text-foreground hover:bg-muted"
+        >
+          Sign in
+        </Link>
+        <Link
+          href="/register"
+          className="hidden min-h-10 items-center rounded-full bg-primary px-3 text-sm font-semibold text-primary-foreground hover:bg-primary/90 sm:inline-flex dark:text-white"
+        >
+          Create account
+        </Link>
       </div>
     );
-  }
-
-  if (!isAuthenticated) {
-    return (
-      <button
-        onClick={() => router.push("/login")}
-        className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-full text-xs font-semibold hover:bg-emerald-600 transition-colors cursor-pointer">
-        <span className="hidden sm:inline">Sign In</span>
-      </button>
-    );
-  }
-
-  const canAccessDashboard =
-    userRole === "SUPER_ADMIN" || userRole === "ADMIN" || userRole === "VENDOR";
-
-  const getDashboardPath = () => {
-    switch (userRole) {
-      case "SUPER_ADMIN":
-      case "ADMIN":
-        return "/admin";
-      case "VENDOR":
-        return "/vendor";
-      default:
-        return "/";
-    }
+  const name = user?.displayName || user?.email?.split("@")[0] || "Account";
+  const signOut = async () => {
+    await logout();
+    router.replace("/");
   };
-
-  const displayName = user?.displayName || user?.email?.split("@")[0] || "User";
-  const avatarUrl = user?.photoURL || null;
-
   return (
-    <div className="flex items-center gap-2">
-      {isAuthenticated && canAccessDashboard && (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
         <button
-          onClick={() => router.push(getDashboardPath())}
-          className="hidden sm:flex items-center gap-2 px-3 py-2 bg-primary/10 hover:bg-primary/20 text-primary rounded-full text-xs font-semibold transition-all duration-200 hover:shadow-sm cursor-pointer border border-primary/20"
-          title={`${userRole === "VENDOR" ? "Vendor" : "Admin"} Dashboard`}>
-          <span>Dashboard</span>
+          className="inline-flex min-h-11 items-center gap-2 rounded-full p-1 text-left outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
+          aria-label="Open account menu"
+        >
+          <AccountAvatar name={name} photoUrl={user?.photoURL || null} />
+          <span className="hidden max-w-28 truncate text-sm font-medium sm:inline">
+            {name}
+          </span>
         </button>
-      )}
-
-      <div
-        onClick={() => router.push("/settings")}
-        className="flex items-center gap-3 border-transparent hover:border-border hover:bg-card hover:shadow-2xs cursor-pointer group transition-all duration-200 rounded-full px-1 py-1">
-        <div className="relative w-9 h-9 rounded-full overflow-hidden ring-2 ring-transparent group-hover:ring-primary/20 transition-all shadow-none shrink-0">
-          {avatarUrl ? (
-            <Image
-              alt={`${displayName} Avatar Profile`}
-              src={avatarUrl}
-              fill
-              sizes="36px"
-              className="object-cover"
-              priority
-            />
-          ) : (
-            <div className="w-full h-full bg-primary/10 flex items-center justify-center rounded-full">
-              <span className="text-xs font-bold text-primary uppercase">
-                {displayName.charAt(0)}
-              </span>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56 mt-2">
+        <DropdownMenuLabel className="truncate">{name}</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Link href="/settings">
+            <UserRound />
+            My account
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href="/orders">
+            <Package />
+            My orders
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href="/wishlist">
+            <ShoppingBag />
+            Wishlist
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href="/settings">
+            <Settings />
+            Settings
+          </Link>
+        </DropdownMenuItem>
+        {!workspaceLoading && (canAccessVendor || canAccessAdmin) && (
+          <>
+            <DropdownMenuSeparator />
+            {canAccessVendor && (
+              <DropdownMenuItem asChild>
+                <Link href="/vendor">
+                  <Store />
+                  Vendor dashboard
+                </Link>
+              </DropdownMenuItem>
+            )}
+            {canAccessAdmin && (
+              <DropdownMenuItem asChild>
+                <Link href="/admin">
+                  <ShieldCheck />
+                  Admin dashboard
+                </Link>
+              </DropdownMenuItem>
+            )}
+          </>
+        )}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={signOut} variant="destructive">
+          <LogOut />
+          Sign out
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
 function CartButton() {
-  const router = useRouter();
   const { cartCount } = useUserData();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setMounted(true);
-  }, []);
-
+  const mounted = useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false,
+  );
   return (
-    <button
-      aria-label="Open Cart View"
-      className="p-2.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full relative transition-all active:scale-95 group cursor-pointer"
-      onClick={() => router.push("/cart")}>
-      <ShoppingCart className="w-5 h-5 transition-transform group-hover:scale-105" />
+    <Link
+      href="/cart"
+      aria-label="Open cart"
+      className="relative inline-flex size-11 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+    >
+      <ShoppingCart className="size-5" />
       {mounted && cartCount > 0 && (
-        <span className="absolute top-1 right-1 w-4 h-4 bg-primary text-primary-foreground rounded-full text-[9px] font-bold flex items-center justify-center ring-2 ring-background scale-90 select-none">
+        <span className="absolute right-0.5 top-0.5 flex size-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground ring-2 ring-background">
           {cartCount > 99 ? "99+" : cartCount}
         </span>
       )}
-    </button>
+    </Link>
   );
 }
 
 function NotificationsButton() {
   const { unreadCount } = useUserData();
   const [sheetOpen, setSheetOpen] = useState(false);
-
   return (
     <>
       <button
         onClick={() => setSheetOpen(true)}
-        className="p-2.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full relative transition-all active:scale-95 group cursor-pointer"
-        aria-label="Open Notifications">
-        <Bell className="w-5 h-5 transition-transform group-hover:rotate-12" />
+        className="relative inline-flex size-11 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+        aria-label="Open notifications"
+      >
+        <Bell className="size-5" />
         {unreadCount > 0 && (
-          <>
-            <span className="absolute top-1 right-1 min-w-[16px] h-4 bg-primary text-primary-foreground rounded-full text-[9px] font-bold flex items-center justify-center ring-2 ring-background px-1">
-              {unreadCount > 99 ? "99+" : unreadCount}
-            </span>
-            <span className="absolute top-1 right-1 min-w-[16px] h-4 bg-primary rounded-full animate-ping opacity-40" />
-          </>
+          <span className="absolute right-0.5 top-0.5 flex min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-bold leading-4 text-primary-foreground ring-2 ring-background">
+            {unreadCount > 99 ? "99+" : unreadCount}
+          </span>
         )}
       </button>
-
       <NotificationsSheet open={sheetOpen} onOpenChange={setSheetOpen} />
     </>
   );
 }
 
 export function Header() {
-  const { toggleSidebar, open } = useSidebar();
-
+  const [menuOpen, setMenuOpen] = useState(false);
   return (
-    <header className="sticky top-0 left-0 right-0 z-40 w-full bg-customer-sidebar backdrop-blur-md border-b border-border/40 dark:border-zinc-800/60 transition-all duration-300">
-      <div className="max-w-8xl mx-auto w-full h-20 px-4 sm:px-6 md:px-10 flex justify-between items-center">
-        <div className="flex items-center gap-4 flex-1">
-          <button
-            onClick={() => toggleSidebar()}
-            aria-label={open ? "Collapse Navigation Sidebar" : "Expand Navigation Sidebar"}
-            className="p-2.5 -ml-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-xl transition-all active:scale-95 cursor-pointer">
-            {open ? (
-              <AlignStartVertical className="w-5 h-5 animate-in fade-in zoom-in-75 duration-200" />
-            ) : (
-              <AlignEndVertical className="w-5 h-5 animate-in fade-in zoom-in-75 duration-200" />
-            )}
-          </button>
-
-          <Suspense
-            fallback={
-              <div className="w-full max-w-md h-11 bg-muted/40 rounded-full hidden md:block animate-pulse" />
-            }>
-            <SearchInputFields />
-          </Suspense>
-        </div>
-
-        <div className="flex items-center gap-2.5 sm:gap-3 ml-4 shrink-0">
+    <header className="sticky top-0 z-40 border-b border-border/60 bg-background/95 backdrop-blur">
+      <div className="mx-auto flex min-h-16 w-full max-w-7xl items-center gap-3 px-4 sm:px-6 lg:px-8">
+        <button
+          onClick={() => setMenuOpen(true)}
+          aria-label="Open menu"
+          className="inline-flex size-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
+        >
+          <Menu className="size-5" />
+        </button>
+        <Link
+          href="/"
+          className="flex shrink-0 items-center gap-2 text-base font-bold tracking-tight text-foreground"
+        >
+          <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+            <ShoppingBag className="size-4" />
+          </span>
+          <span className="hidden sm:inline">
+            Smart<span className="text-primary">Duka</span>
+          </span>
+        </Link>
+        <Suspense
+          fallback={
+            <div className="hidden h-10 max-w-2xl flex-1 animate-pulse rounded-lg bg-muted md:block" />
+          }
+        >
+          <MarketplaceSearch className="hidden max-w-2xl flex-1 md:block" />
+        </Suspense>
+        <MarketplaceSearch mobileTrigger className="md:hidden" />
+        <nav
+          aria-label="Marketplace shortcuts"
+          className="hidden items-center gap-1 lg:flex"
+        >
+          <Link
+            href="/categories"
+            className="inline-flex min-h-11 items-center rounded-lg px-3 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            Categories
+          </Link>
+          <Link
+            href="/shops"
+            className="inline-flex min-h-11 items-center rounded-lg px-3 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            Shops
+          </Link>
+        </nav>
+        <div className="ml-auto flex shrink-0 items-center gap-1">
           <CartButton />
-
           <NotificationsButton />
-
-          <div className="h-5 w-[1px] bg-border mx-1.5 hidden sm:block" />
-
           <ProfileSection />
         </div>
       </div>
+      <CustomerNavigationSheet open={menuOpen} onOpenChange={setMenuOpen} />
     </header>
   );
 }

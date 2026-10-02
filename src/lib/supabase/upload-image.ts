@@ -1,77 +1,21 @@
-import { supabase } from './client';
+"use client";
 
-interface UploadImageOptions {
-  file: File;
-  bucket: string;
-  folder?: string;
-  maxSizeInMB?: number;
-}
+import { legacyUploadPurpose, STORAGE_UPLOAD_RULES, type StorageUploadPurpose } from "./storage-contract";
 
-interface UploadImageResult {
-  success: boolean;
-  url?: string;
-  error?: string;
-}
+interface UploadImageOptions { file: File; bucket?: string; folder?: string; maxSizeInMB?: number; purpose?: StorageUploadPurpose; }
+interface UploadImageResult { success: boolean; url?: string; path?: string; error?: string; }
 
-export async function uploadImageToSupabase({
-  file,
-  bucket,
-  folder = 'categories',
-  maxSizeInMB = 5,
-}: UploadImageOptions): Promise<UploadImageResult> {
+/** Client-side convenience only: authorization and Storage writes occur on the server. */
+export async function uploadImageToSupabase(options: UploadImageOptions): Promise<UploadImageResult> {
+  const purpose = options.purpose ?? legacyUploadPurpose(options.bucket, options.folder);
+  if (!purpose) return { success: false, error: "Unknown upload destination." };
+  const rule = STORAGE_UPLOAD_RULES[purpose];
+  if (!rule.mimeTypes.includes(options.file.type)) return { success: false, error: "Unsupported file type." };
+  if (options.file.size > rule.maxBytes) return { success: false, error: "File is too large." };
+  const form = new FormData(); form.set("purpose", purpose); form.set("file", options.file);
   try {
-    const fileSizeInMB = file.size / (1024 * 1024);
-    if (fileSizeInMB > maxSizeInMB) {
-      return {
-        success: false,
-        error: `File size must be less than ${maxSizeInMB}MB`,
-      };
-    }
-
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-    if (!allowedTypes.includes(file.type)) {
-      return {
-        success: false,
-        error: 'File must be an image (JPEG, PNG, WebP, or GIF)',
-      };
-    }
-
-    // Generate unique filename
-    const timestamp = Date.now();
-    const randomString = Math.random().toString(36).substring(2, 8);
-    const extension = file.name.split('.').pop();
-    const fileName = `${folder}/${timestamp}-${randomString}.${extension}`;
-
-    // Upload to Supabase
-    const { data, error } = await supabase.storage
-      .from(bucket)
-      .upload(fileName, file, {
-        cacheControl: '3600',
-        upsert: false,
-      });
-
-    if (error) {
-      console.error('Supabase upload error:', error);
-      return {
-        success: false,
-        error: error.message || 'Failed to upload image',
-      };
-    }
-
-    // Get public URL
-    const { data: { publicUrl } } = supabase.storage
-      .from(bucket)
-      .getPublicUrl(data.path);
-
-    return {
-      success: true,
-      url: publicUrl,
-    };
-  } catch (error) {
-    console.error('Upload error:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Failed to upload image',
-    };
-  }
+    const response = await fetch("/api/storage/upload", { method: "POST", body: form });
+    const result = await response.json() as { url?: string; path?: string; error?: string };
+    return response.ok && result.url ? { success: true, url: result.url, path: result.path } : { success: false, error: result.error ?? "Upload failed." };
+  } catch { return { success: false, error: "Upload failed." }; }
 }

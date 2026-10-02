@@ -14,11 +14,11 @@ import {
   Phone,
   MapPin,
   Loader2,
-  Store,
   FileText,
   Download,
 } from "lucide-react";
-import Image from "next/image";
+import { MediaImage } from "@/components/marketplace/media-image";
+import { SHOP_LOGO_FALLBACK } from "@/lib/media";
 import { type ColumnDef } from "@tanstack/react-table";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -43,6 +43,7 @@ import { useAdmin } from "@/hooks/use-admin";
 import { verifyVendorAction } from "@/actions/admin";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AdminMetricCard } from "@/components/admin/admin-metric-card";
 import type { VendorApplicationRow } from "@/types/marketplace";
 
 
@@ -52,27 +53,27 @@ const STATUS_CONFIG: Record<
 > = {
   PENDING: {
     label: "Pending",
-    color: "text-amber-600 bg-amber-500/5 border-amber-500/10",
+    color: "text-white bg-amber-500 border-transparent",
     icon: Clock,
   },
   SUBMITTED: {
     label: "Submitted",
-    color: "text-blue-600 bg-blue-500/5 border-blue-500/10",
+    color: "text-white bg-amber-500 border-transparent",
     icon: FileSearch,
   },
   UNDER_REVIEW: {
     label: "Under Review",
-    color: "text-purple-600 bg-purple-500/5 border-purple-500/10",
+    color: "text-white bg-amber-500 border-transparent",
     icon: FileSearch,
   },
   APPROVED: {
     label: "Approved",
-    color: "text-emerald-600 bg-emerald-500/5 border-emerald-500/10",
+    color: "text-white bg-emerald-600 border-transparent",
     icon: CheckCircle2,
   },
   REJECTED: {
     label: "Rejected",
-    color: "text-rose-600 bg-rose-500/5 border-rose-500/10",
+    color: "text-white bg-rose-600 border-transparent",
     icon: XCircle,
   },
 };
@@ -147,7 +148,7 @@ export default function AdminVendorsPage() {
     (a) => a.status === "REJECTED",
   ).length;
 
-  const handleVerify = async (id: string, status: VerificationStatus) => {
+  const handleVerify = React.useCallback(async (id: string, status: VerificationStatus) => {
     setActionLoading(id);
     try {
       const result = await verifyVendorAction(
@@ -170,7 +171,7 @@ export default function AdminVendorsPage() {
     } finally {
       setActionLoading(null);
     }
-  };
+  }, [refreshVendors]);
 
   const columns = React.useMemo<ColumnDef<VendorApplicationRow, unknown>[]>(
     () => [
@@ -179,26 +180,14 @@ export default function AdminVendorsPage() {
         header: "Store",
         cell: ({ row }) => (
           <div className="flex items-center gap-3">
-            <div className="relative size-10 rounded-xl bg-muted border border-border/40 overflow-hidden shrink-0">
-              {row.original.logoUrl ? (
-                <Image
-                  src={row.original.logoUrl}
-                  alt={row.original.storeName}
-                  fill
-                  sizes="40px"
-                  className="object-cover"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-primary/5">
-                  <Store className="w-4 h-4 text-muted-foreground/50" />
-                </div>
-              )}
+            <div className="relative size-10 rounded-lg bg-muted border border-border/40 overflow-hidden shrink-0">
+              <MediaImage src={row.original.logoUrl} fallback={SHOP_LOGO_FALLBACK} alt={row.original.storeName} fill sizes="40px" className="object-cover" fallbackClassName="object-cover" />
             </div>
             <div className="space-y-0.5 min-w-0">
-              <p className="text-sm font-semibold text-foreground truncate">
+              <p className="line-clamp-2 text-sm font-semibold text-foreground" title={row.original.storeName}>
                 {row.original.storeName}
               </p>
-              <p className="text-[10px] text-muted-foreground truncate">
+              <p className="truncate text-[10px] text-muted-foreground" title={row.original.storeSlug}>
                 {row.original.storeSlug}
               </p>
             </div>
@@ -213,7 +202,7 @@ export default function AdminVendorsPage() {
             <p className="text-xs font-medium text-foreground">
               {row.original.userName}
             </p>
-            <p className="text-[10px] text-muted-foreground">
+            <p className="truncate text-[10px] text-muted-foreground" title={row.original.userEmail}>
               {row.original.userEmail}
             </p>
           </div>
@@ -238,7 +227,7 @@ export default function AdminVendorsPage() {
           return (
             <span
               className={cn(
-                "inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-0.5 rounded-full border",
+                "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium leading-none",
                 config.color,
               )}>
               <Icon className="w-3 h-3" />
@@ -339,7 +328,7 @@ export default function AdminVendorsPage() {
         },
       },
     ],
-    [actionLoading],
+    [actionLoading, handleVerify],
   );
 
   if (loading && applications.length === 0) return <VendorsSkeleton />;
@@ -355,46 +344,10 @@ export default function AdminVendorsPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 select-none">
-        {[
-          {
-            label: "Pending Review",
-            value: totalPending,
-            icon: Clock,
-            style: "bg-card border-border/60 text-amber-600",
-          },
-          {
-            label: "Approved Stores",
-            value: totalApproved,
-            icon: CheckCircle2,
-            style: "bg-card border-border/60 text-emerald-600",
-          },
-          {
-            label: "Rejected",
-            value: totalRejected,
-            icon: XCircle,
-            style: "bg-card border-border/60 text-rose-600",
-          },
-        ].map((kpi, idx) => (
-          <div
-            key={idx}
-            className={cn(
-              "border rounded-2xl p-4 flex items-center justify-between shadow-2xs",
-              kpi.style,
-            )}>
-            <div className="space-y-1">
-              <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-                {kpi.label}
-              </span>
-              <h3 className="text-2xl font-medium text-foreground tracking-tight">
-                {loading ? "—" : kpi.value}
-              </h3>
-            </div>
-            <div className="p-2.5 rounded-xl bg-muted/60 border border-border/40">
-              <kpi.icon className="w-4 h-4" />
-            </div>
-          </div>
-        ))}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <AdminMetricCard label="Pending Review" value={loading ? "—" : totalPending} icon={Clock} tone="warning" />
+        <AdminMetricCard label="Approved Stores" value={loading ? "—" : totalApproved} icon={CheckCircle2} />
+        <AdminMetricCard label="Rejected" value={loading ? "—" : totalRejected} icon={XCircle} tone="danger" />
       </div>
 
       <div className="flex gap-2 flex-wrap">

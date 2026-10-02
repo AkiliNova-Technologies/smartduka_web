@@ -1,0 +1,6 @@
+import type { PromotionStatus } from "@prisma/client";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import type { Change, PromotionFormValue } from "./types";
+export function PromotionPublishingFields({ form, change }: { form: PromotionFormValue; change: Change }) { return <div className="grid gap-4"><div><Label>Status</Label><Select value={form.status} onValueChange={(value) => change("status", value as PromotionStatus)}><SelectTrigger className="w-full"><SelectValue placeholder="Choose status" /></SelectTrigger><SelectContent><SelectItem value="DRAFT">Draft</SelectItem><SelectItem value="ACTIVE">Active</SelectItem><SelectItem value="DISABLED">Disabled</SelectItem></SelectContent></Select></div><div><Label>Display priority</Label><Input type="number" value={form.priority} onChange={(e) => change("priority", Number(e.target.value))} /></div><div><Label>Starts</Label><Input type="datetime-local" value={form.startsAt} onChange={(e) => change("startsAt", e.target.value)} /></div><div><Label>Ends</Label><Input type="datetime-local" value={form.endsAt} onChange={(e) => change("endsAt", e.target.value)} /></div></div>; }

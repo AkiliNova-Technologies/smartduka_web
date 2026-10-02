@@ -5,6 +5,7 @@ import {
   Plus,
   Edit2,
   Trash2,
+  Power,
   FolderTree,
   Layers,
   ShoppingBag,
@@ -56,6 +57,7 @@ export default function AdminCategoriesPage() {
     createCategory,
     updateCategory,
     deleteCategory,
+    setCategoryStatus,
     isLoading,
   } = useCategories();
 
@@ -78,10 +80,19 @@ export default function AdminCategoriesPage() {
   const [slug, setSlug] = React.useState("");
   const [description, setDescription] = React.useState("");
   const [image, setImage] = React.useState("");
+  const [parentId, setParentId] = React.useState("");
   const [step, setStep] = React.useState<1 | 2>(1);
   const [subCategories, setSubCategories] = React.useState<SubCategoryFormState[]>([]);
   const [newSubName, setNewSubName] = React.useState("");
   const [newSubImage, setNewSubImage] = React.useState("");
+  const allCategories = React.useMemo(() => {
+    const flatten = (items: Category[], level = 1): Array<Category & { level: number }> =>
+      items.flatMap((item) => [
+        { ...item, level },
+        ...flatten(((item as Category & { children?: Category[]; subCategories?: Category[] }).children ?? (item as Category & { subCategories?: Category[] }).subCategories ?? []) as Category[], level + 1),
+      ]);
+    return flatten(categories as Category[]);
+  }, [categories]);
 
   const handleSheetOpenChange = (open: boolean) => {
     setDrawerOpen(open);
@@ -96,6 +107,7 @@ export default function AdminCategoriesPage() {
     setSlug("");
     setDescription("");
     setImage("");
+    setParentId("");
     setSubCategories([]);
     setNewSubName("");
     setNewSubImage("");
@@ -109,8 +121,9 @@ export default function AdminCategoriesPage() {
       setSlug(category.slug);
       setDescription(category.description || "");
       setImage(category.image || "");
+      setParentId(category.parentId || "");
 
-      const children = categories.filter((c) => c.parentId === category.id);
+      const children = allCategories.filter((c) => c.parentId === category.id);
       setSubCategories(
         children.map((child) => ({
           name: child.name,
@@ -121,7 +134,7 @@ export default function AdminCategoriesPage() {
 
       setDrawerOpen(true);
     },
-    [categories],
+    [allCategories],
   );
 
   const handleNameChange = (val: string) => {
@@ -164,8 +177,16 @@ export default function AdminCategoriesPage() {
         slug,
         description: description || "No description provided.",
         image: image || fallbackImage,
-        parentId: editingCategory.parentId || null,
+        parentId: parentId || null,
       });
+      if (result.success) {
+        const existingChildren = allCategories.filter((category) => category.parentId === editingCategory.id);
+        const additions = subCategories.slice(existingChildren.length);
+        for (const child of additions) {
+          result = await createCategory({ name: child.name, slug: child.slug, description: `Subcategory of ${editingCategory.name}`, image: child.image, parentId: editingCategory.id, subCategories: [] });
+          if (!result.success) break;
+        }
+      }
     } else {
       result = await createCategory({
         name,
@@ -191,7 +212,7 @@ export default function AdminCategoriesPage() {
         accessorKey: "image",
         header: "Photo",
         cell: ({ row }) => (
-          <div className="relative size-10 rounded-xl bg-muted border border-border/40 overflow-hidden shrink-0 select-none">
+          <div className="relative size-10 rounded-md bg-muted border border-border/40 overflow-hidden shrink-0 select-none">
             <Image
               src={row.original.image || fallbackImage}
               alt={row.original.name}
@@ -218,7 +239,7 @@ export default function AdminCategoriesPage() {
         header: "Description",
         cell: ({ row }) => (
           <span className="text-[11px] text-muted-foreground text-wrap block line-clamp-1">
-            {row.original.description}
+            {row.original.description || "—"}
           </span>
         ),
       },
@@ -226,7 +247,7 @@ export default function AdminCategoriesPage() {
         accessorKey: "parentId",
         header: "Hierarchy Level",
         cell: ({ row }) => {
-          const parent = categories.find((c) => c.id === row.original.parentId);
+          const parent = allCategories.find((c) => c.id === row.original.parentId);
           return parent ? (
             <span className="inline-flex items-center gap-1 text-[10px] font-medium text-purple-600 bg-purple-500/5 border border-purple-500/10 px-2.5 py-0.5 rounded-md">
               <FolderTree className="w-3 h-3" />
@@ -243,12 +264,27 @@ export default function AdminCategoriesPage() {
         },
       },
       {
+        id: "level",
+        header: "Level",
+        cell: ({ row }) => <span className="text-xs text-muted-foreground">{(row.original as Category & { level?: number }).level ?? 1}</span>,
+      },
+      {
+        id: "status",
+        header: "Status",
+        cell: ({ row }) => <span className={`text-xs font-medium ${row.original.isActive === false ? "text-muted-foreground" : "text-emerald-600"}`}>{row.original.isActive === false ? "Inactive" : "Active"}</span>,
+      },
+      {
+        accessorKey: "sortOrder",
+        header: "Sort Order",
+        cell: ({ row }) => <span className="text-xs text-muted-foreground">{row.original.sortOrder ?? 0}</span>,
+      },
+      {
         id: "productsCount",
         header: "Total Products",
         cell: ({ row }) => (
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
             <ShoppingBag className="w-3.5 h-3.5 stroke-[1.5]" />
-            <span>{row.original._count?.products ?? 0} items</span>
+            <span>{row.original._count?.products ?? 0} product{(row.original._count?.products ?? 0) === 1 ? "" : "s"}</span>
           </div>
         ),
       },
@@ -262,6 +298,9 @@ export default function AdminCategoriesPage() {
               className="p-1.5 text-muted-foreground hover:text-foreground rounded-md border border-border/40 hover:bg-muted transition-colors cursor-pointer"
               title="Edit Category">
               <Edit2 className="w-3.5 h-3.5" />
+            </button>
+            <button onClick={() => setCategoryStatus?.(row.original.id, row.original.isActive === false)} className="p-1.5 text-muted-foreground hover:text-foreground rounded-md border border-border/40 hover:bg-muted transition-colors cursor-pointer" title={row.original.isActive === false ? "Activate category" : "Deactivate category"}>
+              <Power className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={() =>
@@ -279,7 +318,7 @@ export default function AdminCategoriesPage() {
         ),
       },
     ],
-    [categories, openDeleteDialog, handleEditCategory],
+    [allCategories, openDeleteDialog, handleEditCategory, setCategoryStatus],
   );
 
   if (!createCategory || !updateCategory || !deleteCategory) {
@@ -312,7 +351,7 @@ export default function AdminCategoriesPage() {
 
       <DataTable
         columns={columns}
-        data={categories}
+        data={allCategories}
         getRowId={(row) => row.id}
         isLoading={isLoading}
         renderTabs={
@@ -373,6 +412,14 @@ export default function AdminCategoriesPage() {
                         className="h-10 border-border/60 rounded-full bg-muted/30 font-medium text-xs focus-visible:ring-primary/20"
                       />
                     </div>
+
+                    {editingCategory && <div className="space-y-1.5">
+                      <Label htmlFor="cat-parent" className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Parent Category</Label>
+                      <select id="cat-parent" value={parentId} onChange={(event) => setParentId(event.target.value)} className="h-10 w-full rounded-full border border-border/60 bg-muted/30 px-3 text-xs font-medium">
+                        <option value="">No parent (root)</option>
+                        {allCategories.filter((candidate) => candidate.id !== editingCategory.id).map((candidate) => <option key={candidate.id} value={candidate.id}>{"  ".repeat(Math.max(0, candidate.level - 1))}{candidate.name}</option>)}
+                      </select>
+                    </div>}
 
                     <div className="space-y-1.5">
                       <Label

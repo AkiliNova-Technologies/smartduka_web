@@ -36,8 +36,8 @@ export class ReturnsRefundsService {
 
   static async getVendorReturnById(id: string) { const vendor = await requireVendorContext("vendor:process_orders"); return prisma.returnRequest.findFirst({ where: { id, subOrder: { vendorId: vendor.vendorId } }, select: { id: true, status: true, reason: true, createdAt: true, subOrderId: true, items: { select: { orderItemId: true, quantity: true } } } }); }
   static async getVendorRefundById(id: string) { const vendor = await requireVendorContext("vendor:process_orders"); return prisma.refund.findFirst({ where: { id, subOrder: { vendorId: vendor.vendorId } }, select: { id: true, status: true, amount: true, vendorLiabilityAdjustment: true, currency: true, createdAt: true, subOrderId: true, items: { select: { orderItemId: true, quantity: true, grossAmount: true } } } }); }
-  static async listReturnsForCurrentAdmin() { await requireAdminContext("platform:manage_billing"); return prisma.returnRequest.findMany({ where: { status: { in: ["REQUESTED", "APPROVED", "RECEIVED"] } }, select: { id:true,status:true,subOrderId:true,createdAt:true,reason:true }, orderBy:{createdAt:"asc"} }); }
-  static async listRefundsForCurrentAdmin() { await requireAdminContext("platform:manage_billing"); return prisma.refund.findMany({ where: { status: { in: ["REQUESTED", "APPROVED", "READY_FOR_PROVIDER_REFUND"] } }, select: { id:true,status:true,subOrderId:true,amount:true,currency:true,createdAt:true }, orderBy:{createdAt:"asc"} }); }
+  static async listReturnsForCurrentAdmin() { await requireAdminContext("platform:manage_billing"); return prisma.returnRequest.findMany({ where: { status: { in: ["REQUESTED", "APPROVED", "RECEIVED"] } }, select: { id:true,status:true,subOrderId:true,createdAt:true,reason:true, items:{select:{quantity:true}} }, orderBy:{createdAt:"asc"}, take:100 }); }
+  static async listRefundsForCurrentAdmin() { await requireAdminContext("platform:manage_billing"); return prisma.refund.findMany({ where: { status: { in: ["REQUESTED", "APPROVED", "READY_FOR_PROVIDER_REFUND"] } }, select: { id:true,status:true,subOrderId:true,amount:true,currency:true,createdAt:true,reason:true, items:{select:{quantity:true}} }, orderBy:{createdAt:"asc"}, take:100 }); }
 
   static async cancelSubOrder(subOrderId: string, actor: { userId: string; vendorId?: string; admin?: boolean }) {
     return prisma.$transaction(async (tx) => {
@@ -116,6 +116,9 @@ export class ReturnsRefundsService {
       return tx.refund.update({ where: { id: refund.id }, data: { status: RefundStatus.REJECTED, reason: `${refund.reason}\nRejection: ${cleanReason}`, approvedByUserId: admin.userId } });
     });
   }
+
+  static async getReturnForCurrentAdmin(id: string) { await requireAdminContext("platform:manage_billing"); return prisma.returnRequest.findUnique({ where: { id }, select: { id: true, status: true, reason: true, createdAt: true, receivedAt: true, completedAt: true, subOrderId: true, items: { select: { orderItemId: true, quantity: true, restockedAt: true } } } }); }
+  static async getRefundForCurrentAdmin(id: string) { await requireAdminContext("platform:manage_billing"); return prisma.refund.findUnique({ where: { id }, select: { id: true, status: true, amount: true, currency: true, reason: true, createdAt: true, approvedAt: true, completedAt: true, subOrderId: true, orderId: true, items: { select: { orderItemId: true, quantity: true, grossAmount: true } } } }); }
 
   static async approveReturn(returnId: string) {
     await requireAdminContext("platform:manage_billing");

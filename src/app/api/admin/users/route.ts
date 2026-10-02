@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { connection } from "next/server";
 import { AdminService } from "@/services/admin";
 import { PlatformRole } from "@prisma/client";
 import { successResponse, errorResponse, getErrorMessage } from "@/lib/api-utils";
@@ -10,6 +11,7 @@ function adminError(error: unknown) {
 }
 
 export async function GET(req: NextRequest) {
+  await connection();
   try {
     await requireAdminContext("platform:customer_support");
     const { searchParams } = req.nextUrl;

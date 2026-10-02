@@ -31,6 +31,8 @@ interface AuthContextType {
   uid: string | null;
   email: string | null;
   userRole: string | null;
+  sessionReady: boolean;
+  sessionRevision: number;
   loginWithEmail: (email: string, pass: string) => Promise<AuthResult>;
   registerWithEmail: (
     email: string,
@@ -82,16 +84,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
-  const [userRole, setUserRole] = useState<string | null>(() => {
-    if (typeof window !== "undefined") {
-      return sessionStorage.getItem("userRole");
-    }
-    return null;
-  });
-
-  // Sync guards
-  const isSyncing = useRef(false);
-  const hasSynced = useRef(false);
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [sessionReady, setSessionReady] = useState(false);
+  const [sessionRevision, setSessionRevision] = useState(0);
+  const currentIdentity = useRef<string | null>(null);
 
   // ==========================================
   // FIREBASE AUTH STATE LISTENER
@@ -99,41 +95,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      const identity = firebaseUser?.uid ?? null;
+      currentIdentity.current = identity;
       setUser(firebaseUser);
+      setSessionReady(false);
 
-      if (firebaseUser) {
-        // Sync profile and session only once per session
-        if (!hasSynced.current && !isSyncing.current) {
-          isSyncing.current = true;
-
-          try {
-            // Sync user profile first
-            await AuthService.syncUserProfile(firebaseUser);
-
-            // Then sync session and extract role
-            const sessionData = await AuthService.syncSessionWithBackend(firebaseUser);
-            const role = extractRole(sessionData);
-
-            if (role) {
-              setUserRole(role);
-              sessionStorage.setItem("userRole", role);
-            }
-
-            hasSynced.current = true;
-          } catch (error) {
-            console.error("[AuthProvider] Sync failed:", error);
-          } finally {
-            isSyncing.current = false;
-          }
-        }
-
-        setLoading(false);
-      } else {
-        // User signed out
+      if (!firebaseUser) {
         setUserRole(null);
-        sessionStorage.removeItem("userRole");
+        setSessionRevision((revision) => revision + 1);
         setLoading(false);
-        hasSynced.current = false;
+        return;
+      }
+
+      try {
+        await AuthService.syncUserProfile(firebaseUser);
+        const sessionData = await AuthService.syncSessionWithBackend(firebaseUser);
+        if (currentIdentity.current !== identity) return;
+        setUserRole(extractRole(sessionData));
+        setSessionReady(true);
+        setSessionRevision((revision) => revision + 1);
+      } catch (error) {
+        if (currentIdentity.current === identity) {
+          setUserRole(null);
+          console.error("[AuthProvider] Sync failed:", error);
+        }
+      } finally {
+        if (currentIdentity.current === identity) setLoading(false);
       }
     });
 
@@ -150,14 +137,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const result = await action();
 
-        // Extract and persist role
-        const role = extractRole(result.serverSession);
-        if (role) {
-          setUserRole(role);
-          sessionStorage.setItem("userRole", role);
-        }
-
-        hasSynced.current = true;
+        // AuthService resolves only after the trusted backend session cookie exists.
+        setUser(result.user);
+        setUserRole(extractRole(result.serverSession));
+        setSessionReady(true);
+        setSessionRevision((revision) => revision + 1);
         return result;
       } finally {
         setActionLoading(false);
@@ -188,9 +172,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setActionLoading(true);
     try {
       await AuthService.logout();
+      currentIdentity.current = null;
+      setUser(null);
       setUserRole(null);
-      sessionStorage.removeItem("userRole");
-      hasSynced.current = false;
+      setSessionReady(false);
+      setSessionRevision((revision) => revision + 1);
     } finally {
       setActionLoading(false);
     }
@@ -210,6 +196,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         uid: user?.uid || null,
         email: user?.email || null,
         userRole,
+        sessionReady,
+        sessionRevision,
         loginWithEmail,
         registerWithEmail,
         loginWithGoogle,

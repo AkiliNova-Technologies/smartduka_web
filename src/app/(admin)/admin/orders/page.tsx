@@ -1,203 +1,44 @@
 "use client";
 
 import * as React from "react";
-import {
-  Search, Eye, CheckCircle2, Clock, Truck, XCircle,
-  ShoppingCart, Coins, User, MapPin,
-} from "lucide-react";
+import Link from "next/link";
+import { Eye, Search } from "lucide-react";
 import { type ColumnDef } from "@tanstack/react-table";
-import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/data-table";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAdmin } from "@/hooks/use-admin";
-import { Skeleton } from "@/components/ui/skeleton";
 import { OrderRow } from "@/types/marketplace";
 
-const SUB_STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.ElementType }> = {
-  PENDING: { label: "Pending", color: "text-amber-600 bg-amber-500/5 border-amber-500/10", icon: Clock },
-  PROCESSING: { label: "Processing", color: "text-blue-600 bg-blue-500/5 border-blue-500/10", icon: Clock },
-  READY_FOR_PICKUP: { label: "Ready for Pickup", color: "text-purple-600 bg-purple-500/5 border-purple-500/10", icon: Truck },
-  SHIPPED: { label: "Shipped", color: "text-indigo-600 bg-indigo-500/5 border-indigo-500/10", icon: Truck },
-  DELIVERED: { label: "Delivered", color: "text-emerald-600 bg-emerald-500/5 border-emerald-500/10", icon: CheckCircle2 },
-  CANCELLED: { label: "Cancelled", color: "text-rose-600 bg-rose-500/5 border-rose-500/10", icon: XCircle },
-  REFUNDED: { label: "Refunded", color: "text-zinc-500 bg-zinc-500/5 border-zinc-500/10", icon: XCircle },
-};
+const statuses = ["ALL", "PENDING", "PROCESSING", "READY_FOR_PICKUP", "SHIPPED", "DELIVERED", "CANCELLED", "REFUNDED"] as const;
+const label = (value: string) => value.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+const money = (value: number) => `UGX ${value.toLocaleString("en-UG")}`;
+function Badge({ value }: { value: string }) { const tone = value === "COMPLETED" || value === "DELIVERED" ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-700 dark:text-emerald-300" : value === "FAILED" || value === "REVERSED" || value === "CANCELLED" || value === "REFUNDED" ? "border-rose-500/20 bg-rose-500/5 text-rose-700 dark:text-rose-300" : value === "SHIPPED" || value === "READY_FOR_PICKUP" ? "border-blue-500/20 bg-blue-500/5 text-blue-700 dark:text-blue-300" : "border-amber-500/20 bg-amber-500/5 text-amber-700 dark:text-amber-300"; return <span className={`inline-flex whitespace-nowrap rounded-full border px-2 py-1 text-[10px] font-semibold ${tone}`}>{label(value)}</span>; }
 
 export default function AdminOrdersPage() {
   const { orders, ordersLoading } = useAdmin();
-  const [searchQuery, setSearchQuery] = React.useState("");
-  const [selectedOrder, setSelectedOrder] = React.useState<OrderRow | null>(null);
-
-  const filteredOrders = React.useMemo(() => {
-    if (!searchQuery) return orders;
-    const q = searchQuery.toLowerCase();
-    return orders.filter(
-      (o) =>
-        o.orderNumber.toLowerCase().includes(q) ||
-        o.customerName.toLowerCase().includes(q) ||
-        o.storeName.toLowerCase().includes(q)
-    );
-  }, [orders, searchQuery]);
-
-  const totalOrders = orders.length;
-  const totalRevenue = orders.reduce((sum, o) => sum + o.totalAmount, 0);
-  const pendingOrders = orders.filter((o) => o.subOrderStatus === "PENDING" || o.subOrderStatus === "PROCESSING").length;
-
-  const columns = React.useMemo<ColumnDef<OrderRow, unknown>[]>(
-    () => [
-      {
-        accessorKey: "orderNumber",
-        header: "Order",
-        cell: ({ row }) => (
-          <button onClick={() => setSelectedOrder(row.original)} className="font-mono text-xs font-medium text-primary hover:underline cursor-pointer text-left">
-            {row.original.orderNumber}
-          </button>
-        ),
-      },
-      {
-        accessorKey: "customerName",
-        header: "Customer",
-        cell: ({ row }) => (
-          <div className="space-y-0.5">
-            <span className="font-medium text-foreground text-xs">{row.original.customerName}</span>
-          </div>
-        ),
-      },
-      {
-        accessorKey: "storeName",
-        header: "Store",
-        cell: ({ row }) => <span className="text-xs font-medium text-foreground">{row.original.storeName}</span>,
-      },
-      {
-        accessorKey: "totalAmount",
-        header: "Amount",
-        cell: ({ row }) => <span className="text-xs font-medium text-foreground">UGX {row.original.totalAmount.toLocaleString()}</span>,
-      },
-      {
-        accessorKey: "subOrderStatus",
-        header: "Status",
-        cell: ({ row }) => {
-          const config = SUB_STATUS_CONFIG[row.original.subOrderStatus] || SUB_STATUS_CONFIG.PENDING;
-          const Icon = config.icon;
-          return (
-            <span className={cn("inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-0.5 rounded-full border", config.color)}>
-              <Icon className="w-3 h-3" />{config.label}
-            </span>
-          );
-        },
-      },
-      {
-        accessorKey: "date",
-        header: "Date",
-        cell: ({ row }) => (
-          <span className="text-xs text-muted-foreground">
-            {new Date(row.original.date).toLocaleDateString("en-UG", { day: "numeric", month: "short", year: "numeric" })}
-          </span>
-        ),
-      },
-      {
-        id: "actions",
-        header: () => <div className="text-right">View</div>,
-        cell: ({ row }) => (
-          <div className="flex items-center justify-end">
-            <button onClick={() => setSelectedOrder(row.original)} className="p-1.5 text-muted-foreground hover:text-foreground rounded-lg border border-border/40 hover:bg-muted transition-colors cursor-pointer" title="View order details">
-              <Eye className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        ),
-      },
-    ],
-    [],
-  );
-
-  const loading = ordersLoading && orders.length === 0;
-
-  return (
-    <div className="w-full space-y-6 animate-in fade-in duration-300">
-      <div className="space-y-1 select-none">
-        <h2 className="text-xl font-medium tracking-tight text-foreground">All Orders</h2>
-        <p className="text-xs text-muted-foreground">View every order across all stores. Track payment status and fulfillment progress.</p>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 select-none">
-        {[
-          { label: "Total Orders", value: totalOrders, icon: ShoppingCart, color: "text-blue-600" },
-          { label: "Total Revenue", value: `UGX ${totalRevenue.toLocaleString()}`, icon: Coins, color: "text-emerald-600" },
-          { label: "Pending", value: pendingOrders, icon: Clock, color: "text-amber-600" },
-        ].map((kpi, idx) => (
-          <div key={idx} className="bg-card border border-border/60 rounded-2xl p-4 space-y-2 shadow-2xs">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">{kpi.label}</span>
-              <kpi.icon className={cn("w-4 h-4", kpi.color)} />
-            </div>
-            <p className="text-2xl font-semibold text-foreground tracking-tight">{kpi.value}</p>
-          </div>
-        ))}
-      </div>
-
-      <DataTable
-        columns={columns}
-        data={filteredOrders}
-        getRowId={(row) => row.id}
-        isLoading={loading}
-        renderTabs={
-          <div className="flex items-center gap-3 w-full max-w-xs relative group">
-            <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" />
-            <Input placeholder="Search by order number, customer, or store..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 h-9 border-border/60 rounded-full bg-muted/20 placeholder:text-muted-foreground/40 text-xs focus-visible:ring-primary/20" />
-          </div>
-        }
-      />
-
-      <Sheet open={!!selectedOrder} onOpenChange={(open) => !open && setSelectedOrder(null)}>
-        {selectedOrder && (
-          <SheetContent side="right" className="w-full sm:max-w-md bg-card border-l border-border/60 p-6 overflow-y-auto">
-            <SheetHeader className="text-left px-0">
-              <SheetTitle className="text-base font-medium">Order {selectedOrder.orderNumber}</SheetTitle>
-              <SheetDescription className="text-xs font-mono text-muted-foreground">ID: {selectedOrder.id}</SheetDescription>
-            </SheetHeader>
-
-            <div className="space-y-5 mt-6">
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">Status</span>
-                {(() => {
-                  const config = SUB_STATUS_CONFIG[selectedOrder.subOrderStatus] || SUB_STATUS_CONFIG.PENDING;
-                  const Icon = config.icon;
-                  return (
-                    <span className={cn("inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full border", config.color)}>
-                      <Icon className="w-3 h-3" />{config.label}
-                    </span>
-                  );
-                })()}
-              </div>
-
-              <div className="border-t border-border/40 pt-4 space-y-3">
-                <h4 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Customer</h4>
-                <div className="space-y-2 text-xs">
-                  <div className="flex items-center gap-2 text-muted-foreground"><User className="w-3.5 h-3.5" />{selectedOrder.customerName}</div>
-                  <div className="flex items-center gap-2 text-muted-foreground"><MapPin className="w-3.5 h-3.5" />{selectedOrder.deliveryLocation}</div>
-                </div>
-              </div>
-
-              <div className="border-t border-border/40 pt-4 space-y-3">
-                <h4 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Order Details</h4>
-                <div className="space-y-2 text-xs">
-                  <p><strong className="text-foreground">Store:</strong> {selectedOrder.storeName}</p>
-                  <p><strong className="text-foreground">Amount:</strong> UGX {selectedOrder.totalAmount.toLocaleString()}</p>
-                  <p><strong className="text-foreground">Payment:</strong> {selectedOrder.paymentGateway}</p>
-                  <p><strong className="text-foreground">Date:</strong> {new Date(selectedOrder.date).toLocaleDateString("en-UG", { day: "numeric", month: "long", year: "numeric" })}</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-2 border-t border-border/40 pt-4 mt-6">
-              <Button variant="secondary" onClick={() => setSelectedOrder(null)} className="w-full h-10 rounded-xl text-xs font-medium border cursor-pointer">Close</Button>
-            </div>
-          </SheetContent>
-        )}
-      </Sheet>
-    </div>
-  );
+  const [query, setQuery] = React.useState("");
+  const [tab, setTab] = React.useState<(typeof statuses)[number]>("ALL");
+  const [selected, setSelected] = React.useState<OrderRow | null>(null);
+  const counts = React.useMemo(() => Object.fromEntries(statuses.map((status) => [status, status === "ALL" ? orders.length : orders.filter((order) => order.subOrderStatus === status).length])), [orders]);
+  const filtered = React.useMemo(() => orders.filter((order) => (tab === "ALL" || order.subOrderStatus === tab) && (!query.trim() || [order.orderNumber, order.customerName, order.storeName].some((value) => value.toLowerCase().includes(query.toLowerCase())))), [orders, query, tab]);
+  const columns = React.useMemo<ColumnDef<OrderRow, unknown>[]>(() => [
+    { accessorKey: "orderNumber", header: "Order", cell: ({ row }) => <button onClick={() => setSelected(row.original)} className="max-w-28 truncate font-mono text-xs font-medium text-primary hover:underline" title={row.original.orderNumber}>{row.original.orderNumber}</button> },
+    { accessorKey: "customerName", header: "Customer", cell: ({ row }) => <span className="block max-w-36 truncate text-xs font-medium" title={row.original.customerName}>{row.original.customerName}</span> },
+    { accessorKey: "storeName", header: "Vendor", cell: ({ row }) => <span className="block max-w-36 truncate text-xs font-medium" title={row.original.storeName}>{row.original.storeName}</span> },
+    { accessorKey: "totalAmount", header: "Amount", cell: ({ row }) => <span className="text-xs font-medium tabular-nums">{money(row.original.totalAmount)}</span> },
+    { accessorKey: "paymentStatus", header: "Payment", cell: ({ row }) => <Badge value={row.original.paymentStatus} /> },
+    { accessorKey: "subOrderStatus", header: "Vendor fulfillment", cell: ({ row }) => <Badge value={row.original.subOrderStatus} /> },
+    { accessorKey: "date", header: "Placed", cell: ({ row }) => <span className="whitespace-nowrap text-xs text-muted-foreground">{new Date(row.original.date).toLocaleDateString("en-UG", { day: "numeric", month: "short", year: "numeric" })}</span> },
+    { id: "actions", header: () => <div className="text-right">View</div>, cell: ({ row }) => <div className="flex justify-end"><Button variant="ghost" size="icon-sm" onClick={() => setSelected(row.original)} aria-label={`View ${row.original.orderNumber}`}><Eye className="size-4" /></Button></div> },
+  ], []);
+  return <div className="w-full space-y-6 animate-in fade-in duration-300">
+    <div><h1 className="text-xl font-medium tracking-tight">Orders</h1><p className="mt-1 text-xs text-muted-foreground">Payment and vendor fulfillment are shown separately for each order segment.</p></div>
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><Tabs value={tab} onValueChange={(value) => setTab(value as typeof tab)}><div className="max-w-full overflow-x-auto pb-1"><TabsList className="min-w-max" aria-label="Vendor fulfillment status">{statuses.map((status) => <TabsTrigger key={status} value={status} className="text-xs">{status === "ALL" ? "All" : label(status)} <span className="text-muted-foreground">{counts[status]}</span></TabsTrigger>)}</TabsList></div></Tabs><div className="relative w-full sm:max-w-xs"><Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Order, customer, or vendor" className="h-9 rounded-full pl-9 text-xs" /></div></div>
+    <DataTable columns={columns} data={filtered} getRowId={(row) => row.id} isLoading={ordersLoading && !orders.length} />
+    <Sheet open={!!selected} onOpenChange={(open) => !open && setSelected(null)}>{selected && <SheetContent className="w-full overflow-y-auto sm:max-w-xl"><SheetHeader><SheetTitle>Order {selected.orderNumber}</SheetTitle><SheetDescription className="font-mono">Internal fulfillment ID: {selected.id}</SheetDescription></SheetHeader><div className="space-y-6 px-4 pb-6 text-sm"><section><h2 className="font-semibold">Summary</h2><div className="mt-3 grid grid-cols-2 gap-4"><Detail label="Placed" value={new Date(selected.date).toLocaleDateString("en-UG", { dateStyle: "medium" })} /><div><p className="text-xs text-muted-foreground">Payment status</p><div className="mt-1"><Badge value={selected.paymentStatus} /></div></div><div><p className="text-xs text-muted-foreground">Vendor fulfillment</p><div className="mt-1"><Badge value={selected.subOrderStatus} /></div></div><Detail label="Order total" value={money(selected.totalAmount)} /></div></section><section><h2 className="font-semibold">Items</h2><div className="mt-3 divide-y rounded-xl border">{selected.items.map((item) => <div key={item.id} className="flex justify-between gap-3 p-3"><div className="min-w-0"><p className="font-medium">{item.name}</p>{item.variant && <p className="text-xs text-muted-foreground">{item.variant}</p>}<p className="text-xs text-muted-foreground">{item.quantity} × {money(item.unitPrice)} · {selected.storeName}</p></div><p className="shrink-0 font-medium tabular-nums">{money(item.lineTotal)}</p></div>)}</div><p className="mt-2 text-xs text-muted-foreground">Unit and line amounts are stored at purchase time.</p></section><section className="grid gap-4 sm:grid-cols-2"><div><h2 className="font-semibold">Customer</h2><div className="mt-3 space-y-1 rounded-xl border p-3"><p>{selected.customerName}</p><p className="break-all text-xs text-muted-foreground">{selected.customerEmail || "No email"}</p><p className="text-xs text-muted-foreground">{selected.customerPhone}</p><p className="pt-1 text-xs text-muted-foreground">{selected.deliveryLocation}</p></div></div><div><h2 className="font-semibold">Vendor fulfillment</h2><div className="mt-3 space-y-1 rounded-xl border p-3"><p>{selected.storeName}</p><p className="text-xs text-muted-foreground">Shipping: {money(selected.totalShipping)}</p>{selected.notes && <p className="border-t pt-2 text-xs text-muted-foreground">Note: {selected.notes}</p>}</div></div></section>{selected.paymentAttempt && <section><div className="flex items-center justify-between gap-3"><h2 className="font-semibold">Payment</h2><Link href="/admin/finance/payments" className="text-xs font-medium text-primary hover:underline">View payment investigation</Link></div><div className="mt-3 grid grid-cols-2 gap-3 rounded-xl border p-3 text-xs"><Detail label="Gateway" value={label(selected.paymentGateway)} /><Detail label="Attempt" value={label(selected.paymentAttempt.status)} /><Detail label="Provider status" value={selected.paymentAttempt.providerStatus ? label(selected.paymentAttempt.providerStatus) : "Not reported"} /><Detail label="Verified" value={selected.paymentAttempt.verifiedAt ? new Date(selected.paymentAttempt.verifiedAt).toLocaleDateString("en-UG") : "Not verified"} /></div></section>}{Object.values(selected.issues).some((items) => items.length) && <section><h2 className="font-semibold">Related issues</h2><div className="mt-3 space-y-2 rounded-xl border p-3 text-xs">{selected.issues.returns.map((status, index) => <p key={`return-${index}`}>Return {label(status).toLowerCase()}</p>)}{selected.issues.refunds.map((status, index) => <p key={`refund-${index}`}>Refund {label(status).toLowerCase()}</p>)}{selected.issues.disputes.map((status, index) => <p key={`dispute-${index}`}>Open dispute: {label(status)}</p>)}{selected.issues.riskFlags.map((status, index) => <p key={`risk-${index}`}>Risk flag: {label(status)}</p>)}{selected.issues.financialExceptions.map((type, index) => <p key={`exception-${index}`}>Financial exception: {label(type)}</p>)}<div className="flex gap-3 pt-1"><Link href="/admin/issues" className="font-medium text-primary hover:underline">Customer issues</Link><Link href="/admin/financial-exceptions" className="font-medium text-primary hover:underline">Financial exceptions</Link></div></div></section>}</div></SheetContent>}</Sheet>
+  </div>;
 }
+function Detail({ label, value }: { label: string; value: string }) { return <div><p className="text-xs text-muted-foreground">{label}</p><p className="mt-0.5 font-medium">{value}</p></div>; }

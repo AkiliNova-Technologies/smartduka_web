@@ -3,6 +3,8 @@ import { AuthenticationRequiredError } from "@/lib/auth/session";
 import { requireVendorContext, VendorAuthorizationError } from "@/lib/auth/vendor-context";
 import { errorResponse, getErrorMessage, successResponse } from "@/lib/api-utils";
 import { VendorWithdrawalService, WithdrawalError } from "@/services/vendor-withdrawal";
+import { revalidateTag } from "next/cache";
+import { cacheTags } from "@/lib/cache-policy";
 
 export async function GET() {
   try {
@@ -26,6 +28,7 @@ export async function POST(request: NextRequest) {
       destinationId: body.destinationId,
       withdrawalRequestId: body.withdrawalRequestId,
     });
+    revalidateTag(cacheTags.vendorEarnings(context.vendorId), "max");
     return successResponse({ id: payout.id, amount: payout.amount, currency: payout.currency, status: payout.status, maskedDestination: payout.maskedDestination }, 201);
   } catch (error: unknown) {
     return errorResponse(getErrorMessage(error), error instanceof AuthenticationRequiredError ? 401 : error instanceof VendorAuthorizationError ? 403 : error instanceof WithdrawalError ? 400 : 500);

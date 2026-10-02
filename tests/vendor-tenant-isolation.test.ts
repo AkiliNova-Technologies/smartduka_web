@@ -4,6 +4,8 @@ const mocks = vi.hoisted(() => ({
   requireVendorContext: vi.fn(),
   AuthenticationRequiredError: class AuthenticationRequiredError extends Error {},
   findSubOrders: vi.fn(),
+  countSubOrders: vi.fn(),
+  groupSubOrders: vi.fn(),
   updateSubOrderStatus: vi.fn(),
   findProduct: vi.fn(),
   findDocument: vi.fn(),
@@ -19,7 +21,7 @@ vi.mock("@/lib/auth/session", () => ({
 }));
 vi.mock("@/lib/prisma/client", () => ({
   prisma: {
-    subOrder: { findMany: mocks.findSubOrders },
+    subOrder: { findMany: mocks.findSubOrders, count: mocks.countSubOrders, groupBy: mocks.groupSubOrders },
     product: { findFirst: mocks.findProduct },
     document: { findFirst: mocks.findDocument },
     vendorProfile: { update: mocks.updateVendor },
@@ -28,7 +30,7 @@ vi.mock("@/lib/prisma/client", () => ({
 vi.mock("@/services/order", () => ({
   OrderService: { updateSubOrderStatus: mocks.updateSubOrderStatus },
 }));
-vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn(), revalidateTag: vi.fn(), updateTag: vi.fn(), cacheLife: vi.fn(), cacheTag: vi.fn() }));
 
 import * as vendorOrdersRoute from "@/app/api/vendors/orders/route";
 import * as vendorOrderRoute from "@/app/api/vendors/orders/[subOrderId]/route";
@@ -57,6 +59,8 @@ describe("vendor tenant isolation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.requireVendorContext.mockResolvedValue(vendorAContext);
+    mocks.countSubOrders.mockResolvedValue(0);
+    mocks.groupSubOrders.mockResolvedValue([]);
   });
 
   it("lists only Vendor A orders even when Vendor B is supplied in the URL", async () => {

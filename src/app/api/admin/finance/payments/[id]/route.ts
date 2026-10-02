@@ -1,0 +1,2 @@
+import { NextRequest } from "next/server"; import { AdminFinanceService } from "@/services/admin-finance"; import { errorResponse, getErrorMessage, successResponse } from "@/lib/api-utils";
+export async function GET(_request:NextRequest,{params}:{params:Promise<{id:string}>}){try{const item=await AdminFinanceService.getPayment((await params).id);return item?successResponse(item):errorResponse("Payment attempt not found",404)}catch(error){return errorResponse(getErrorMessage(error),403)}}

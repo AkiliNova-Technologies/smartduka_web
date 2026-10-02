@@ -72,6 +72,7 @@ export interface PublicStore {
   description: string | null;
   city: string | null;
   country: string | null;
+  isVerified: boolean;
   _count: { products: number };
   products: { images: { url: string }[]; categoryId: string | null }[];
 }
@@ -80,12 +81,16 @@ interface VendorSubOrder {
   id: string;
   subOrderNumber: string;
   status: string;
+  allowedActions: { status: string; label: string }[];
   vendorTotal: number;
   customerName: string;
   customerPhone: string;
   deliveryAddress: string;
+  notes: string | null;
+  paymentStatus: string;
   createdAt: string;
-  items: { name: string; quantity: number; price: number }[];
+  items: { name: string; quantity: number; price: number; total: number }[];
+  issues: { returns: string[]; refunds: string[]; disputes: string[] };
 }
 
 interface VendorDataContextType {
@@ -105,7 +110,7 @@ interface VendorDataContextType {
   vendorOrders: VendorSubOrder[];
   vendorOrdersLoading: boolean;
   refreshVendorOrders: () => Promise<void>;
-  updateSubOrderStatus: (subOrderId: string, status: string) => Promise<void>;
+  updateSubOrderStatus: (subOrderId: string, status: string) => Promise<string>;
 }
 
 function getErrorMessage(error: unknown): string {
@@ -227,17 +232,25 @@ export function VendorDataProvider({
 
   const updateSubOrderStatus = useCallback(
     async (subOrderId: string, status: string) => {
-      if (!uid) return;
-      try {
-        await fetch(`/api/vendors/orders/${subOrderId}`, {
-          method: "PATCH",
-          headers: authHeaders(),
-          body: JSON.stringify({ status }),
-        });
-        await refreshVendorOrdersRef.current();
-      } catch {
-        // Silent
+      if (!uid) throw new Error("You must be signed in to update an order.");
+      const response = await fetch(`/api/vendors/orders/${subOrderId}`, {
+        method: "PATCH",
+        headers: authHeaders(),
+        body: JSON.stringify({ status }),
+      });
+      const body = (await response.json().catch(() => ({}))) as {
+        success?: boolean;
+        data?: { status?: string };
+      };
+      if (!response.ok || !body.success || !body.data?.status) {
+        throw new Error(
+          response.status === 409
+            ? "The order changed. Refresh and try again."
+            : "This order can no longer be moved to that status.",
+        );
       }
+      await refreshVendorOrdersRef.current();
+      return body.data.status;
     },
     [uid],
   );
@@ -345,18 +358,26 @@ function setSessionStores(stores: PublicStore[]): void {
 }
 
 export function usePublicStores() {
-  const [stores, setStores] = useState<PublicStore[]>(() => {
-    return cachedStores || getSessionStores() || [];
-  });
-  const [isLoading, setIsLoading] = useState(() => {
-    return !cachedStores && !getSessionStores();
-  });
-  const [error, setError] = useState<string | null>(() => cachedStoresError);
+  // Keep the server and first browser render identical. Browser caches are
+  // restored after hydration so they cannot change the initial page tree.
+  const [stores, setStores] = useState<PublicStore[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
 
-    if (cachedStores) return;
+    const cached = cachedStores || getSessionStores();
+    if (cached) {
+      queueMicrotask(() => {
+        if (!cancelled) {
+          setStores(cached);
+          setError(cachedStoresError);
+          setIsLoading(false);
+        }
+      });
+      return;
+    }
 
     if (storesFetchPromise) {
       storesFetchPromise.then((result) => {

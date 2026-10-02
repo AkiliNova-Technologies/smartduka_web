@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Image from "next/image";
 import {
   Bell,
   Check,
@@ -52,8 +53,10 @@ function getNotificationIcon(type: string) {
   }
 }
 
-function formatTimeAgo(dateString: string): string {
-  const now = Date.now();
+function formatTimeAgo(dateString: string, now: number | null): string {
+  if (now === null) {
+    return new Date(dateString).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  }
   const then = new Date(dateString).getTime();
   const diff = now - then;
 
@@ -79,14 +82,16 @@ function groupNotificationsByDate(
     message: string;
     readAt: string | null;
     createdAt: string;
-  }[]
+  }[],
+  now: number | null,
 ) {
   const today: typeof notifications = [];
   const yesterday: typeof notifications = [];
   const earlier: typeof notifications = [];
 
-  const now = new Date();
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  if (now === null) return { today, yesterday, earlier: notifications };
+  const current = new Date(now);
+  const todayStart = new Date(current.getFullYear(), current.getMonth(), current.getDate()).getTime();
   const yesterdayStart = todayStart - 86400000;
 
   for (const n of notifications) {
@@ -107,17 +112,20 @@ function groupNotificationsByDate(
 // COMPONENT
 // ==========================================
 
-export function NotificationsSheet({ open, onOpenChange }: NotificationsSheetProps) {
-  const {
-    notifications,
-    unreadCount,
-    markAsRead,
-    markAllAsRead,
-  } = useUserData();
+export function NotificationsSheet({
+  open,
+  onOpenChange,
+}: NotificationsSheetProps) {
+  const { notifications, unreadCount, markAsRead, markAllAsRead } =
+    useUserData();
+  const [now, setNow] = React.useState<number | null>(null);
 
-  const grouped = groupNotificationsByDate(notifications);
+  React.useEffect(() => {
+    const timer = window.setTimeout(() => setNow(Date.now()), 0);
+    return () => window.clearTimeout(timer);
+  }, []);
 
-
+  const grouped = groupNotificationsByDate(notifications, now);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -152,18 +160,21 @@ export function NotificationsSheet({ open, onOpenChange }: NotificationsSheetPro
         {/* Notification List */}
         <div className="flex-1 overflow-y-auto">
           {notifications.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-center px-6 py-12 space-y-3">
-              <div className="w-14 h-14 rounded-2xl bg-muted flex items-center justify-center">
-                <Bell className="w-6 h-6 text-muted-foreground/40" />
-              </div>
-              <div className="space-y-1">
-                <p className="text-sm font-semibold text-foreground">
-                  All caught up!
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  No new notifications. We&apos;ll let you know when something arrives.
-                </p>
-              </div>
+            <div className="flex h-full flex-col items-center justify-center px-6 py-10 text-center">
+              <Image
+                src="/illustrations/empty-notifications.svg"
+                alt=""
+                width={144}
+                height={112}
+                className="h-auto w-28"
+                loading="eager"
+              />
+              <p className="mt-4 text-sm font-semibold text-foreground">
+                You’re all caught up
+              </p>
+              <p className="mt-1 max-w-56 text-xs leading-5 text-muted-foreground">
+                No new notifications. We’ll let you know when something arrives.
+              </p>
             </div>
           ) : (
             <div className="divide-y divide-border/40">
@@ -173,6 +184,7 @@ export function NotificationsSheet({ open, onOpenChange }: NotificationsSheetPro
                   label="Today"
                   notifications={grouped.today}
                   onMarkRead={markAsRead}
+                  now={now}
                 />
               )}
 
@@ -182,6 +194,7 @@ export function NotificationsSheet({ open, onOpenChange }: NotificationsSheetPro
                   label="Yesterday"
                   notifications={grouped.yesterday}
                   onMarkRead={markAsRead}
+                  now={now}
                 />
               )}
 
@@ -191,6 +204,7 @@ export function NotificationsSheet({ open, onOpenChange }: NotificationsSheetPro
                   label="Earlier"
                   notifications={grouped.earlier}
                   onMarkRead={markAsRead}
+                  now={now}
                 />
               )}
             </div>
@@ -216,6 +230,7 @@ function NotificationGroup({
   label,
   notifications,
   onMarkRead,
+  now,
 }: {
   label: string;
   notifications: {
@@ -227,6 +242,7 @@ function NotificationGroup({
     createdAt: string;
   }[];
   onMarkRead: (id: string) => void;
+  now: number | null;
 }) {
   return (
     <div>
@@ -245,13 +261,13 @@ function NotificationGroup({
             onClick={() => onMarkRead(notification.id)}
             className={cn(
               "w-full text-left px-5 py-3.5 flex items-start gap-3 hover:bg-muted/30 transition-colors",
-              isUnread && "bg-primary/[0.02]"
+              isUnread && "bg-primary/[0.02]",
             )}>
             {/* Icon */}
             <div
               className={cn(
                 "w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5",
-                color
+                color,
               )}>
               <Icon className="w-4 h-4" />
             </div>
@@ -262,7 +278,7 @@ function NotificationGroup({
                 <p
                   className={cn(
                     "text-xs font-semibold truncate",
-                    isUnread ? "text-foreground" : "text-muted-foreground"
+                    isUnread ? "text-foreground" : "text-muted-foreground",
                   )}>
                   {notification.title}
                 </p>
@@ -274,7 +290,7 @@ function NotificationGroup({
                 {notification.message}
               </p>
               <p className="text-[10px] text-muted-foreground/60 font-medium">
-                {formatTimeAgo(notification.createdAt)}
+                {formatTimeAgo(notification.createdAt, now)}
               </p>
             </div>
           </button>

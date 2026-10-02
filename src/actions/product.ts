@@ -1,193 +1,28 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
+import { cacheTags } from "@/lib/cache-policy";
 import {
   ProductService,
   CreateProductInput,
   UpdateProductInput,
+  serializeProductBasic as serializeProductForClient,
+  serializeMarketplaceProduct,
+  serializePublicProductDetail,
 } from "@/services/product";
 import { withErrorHandling, validateRequiredFields } from "@/lib/api-utils";
 import { Product } from "@/types/marketplace";
 import { requireVendorContext } from "@/lib/auth/vendor-context";
 import { prisma } from "@/lib/prisma/client";
+import type { CatalogSort } from "@/services/product";
+import type { CatalogFilters } from "@/services/product";
 
 // ==========================================
 // TYPE-SAFE SERIALIZATION
 // ==========================================
 
 function serializeProductBasic(prismaProduct: Record<string, unknown>): Product {
-  return {
-    id: prismaProduct.id as string,
-    vendorId: prismaProduct.vendorId as string,
-    categoryId: prismaProduct.categoryId as string | null,
-    subCategoryId: prismaProduct.subCategoryId as string | null | undefined,
-    name: prismaProduct.name as string,
-    slug: prismaProduct.slug as string,
-    brand: prismaProduct.brand as string | null,
-    description: prismaProduct.description as string | null | undefined,
-    basePrice: Number(prismaProduct.basePrice),
-    compareAtPrice: prismaProduct.compareAtPrice != null ? Number(prismaProduct.compareAtPrice) : null,
-    inventoryCount: prismaProduct.inventoryCount as number,
-    sku: (prismaProduct.sku as string) || null,  // ✅ Normalize undefined → null
-    status: prismaProduct.status as Product["status"],
-    rating: prismaProduct.rating as number | undefined,
-    reviews: prismaProduct.reviews as number | undefined,
-    image: (prismaProduct.image as string) || "",
-    images: prismaProduct.images as Product["images"],
-    sizes: prismaProduct.sizes as string[],
-    colors: prismaProduct.colors as string[],
-    specs: prismaProduct.specs as Product["specs"],
-    tags: prismaProduct.tags as string[],
-    createdAt: prismaProduct.createdAt as string | undefined,
-    updatedAt: prismaProduct.updatedAt as string | undefined,
-    category: prismaProduct.category as Product["category"],
-    subCategory: prismaProduct.subCategory as Product["subCategory"],
-    vendor: prismaProduct.vendor as Product["vendor"],
-  };
-}
-
-// ==========================================
-// PUBLIC PRODUCT DETAIL TYPES
-// ==========================================
-
-export interface SerializedPublicProduct {
-  id: string;
-  name: string;
-  slug: string;
-  brand: string | null;
-  description: string;
-  basePrice: number;
-  compareAtPrice: number | null;
-  inventoryCount: number;
-  sku: string | null;  // ✅ No undefined — normalizes to null
-  status: string;
-  sizes: string[];
-  colors: string[];
-  specs: { name: string; value: string }[];
-  tags: string[];
-  images: { id: string; url: string; isFeatured: boolean }[];
-  category: { id: string; name: string; slug: string } | null;
-  subCategory: { id: string; name: string; slug: string } | null;
-  vendor: {
-    id: string;
-    storeName: string;
-    slug: string;
-    logoUrl: string | null;
-    isVerified: boolean;
-  } | null;
-  rating: number;
-  reviewCount: number;
-  reviews: {
-    id: string;
-    user: string;
-    avatarUrl: string | null;
-    rating: number;
-    date: string;
-    comment: string;
-    verifiedPurchase: boolean;
-  }[];
-  availability: string;
-  createdAt: string;
-}
-
-export interface RelatedProduct {
-  id: string;
-  name: string;
-  slug: string;
-  brand: string | null;
-  basePrice: number;
-  compareAtPrice: number | null;
-  image: string;
-  vendorId: string;
-  rating: number;
-  reviews: number;
-}
-
-export interface PublicProductResult {
-  product: SerializedPublicProduct;
-  relatedProducts: RelatedProduct[];
-}
-
-function serializePublicProduct(product: Record<string, unknown>): SerializedPublicProduct {
-  const images = (product.images as { id: string; url: string; isFeatured: boolean }[]) || [];
-  const reviews = (product.reviews as {
-    id: string;
-    rating: number;
-    comment?: string;
-    verifiedPurchase?: boolean;
-    createdAt: string | Date;
-    user?: { name?: string; avatarUrl?: string | null };
-  }[]) || [];
-  const vendor = product.vendor as Record<string, unknown> | null | undefined;
-  const category = product.category as Record<string, unknown> | null | undefined;
-  const subCategory = product.subCategory as Record<string, unknown> | null | undefined;
-  const specs = (product.specs as { name: string; value: string }[]) || [];
-  const createdAt = product.createdAt instanceof Date
-    ? product.createdAt.toISOString()
-    : (product.createdAt as string) || new Date().toISOString();
-
-  return {
-    id: product.id as string,
-    name: product.name as string,
-    slug: product.slug as string,
-    brand: (product.brand as string) || null,
-    description: (product.description as string) || "",
-    basePrice: Number(product.basePrice),
-    compareAtPrice: product.compareAtPrice ? Number(product.compareAtPrice) : null,
-    inventoryCount: product.inventoryCount as number,
-    sku: (product.sku as string) || null,  // ✅ Normalize undefined → null
-    status: product.status as string,
-    sizes: (product.sizes as string[]) || [],
-    colors: (product.colors as string[]) || [],
-    specs,
-    tags: (product.tags as string[]) || [],
-    images: images.map((img) => ({
-      id: img.id,
-      url: img.url,
-      isFeatured: img.isFeatured,
-    })),
-    category: category
-      ? { id: category.id as string, name: category.name as string, slug: category.slug as string }
-      : null,
-    subCategory: subCategory
-      ? { id: subCategory.id as string, name: subCategory.name as string, slug: subCategory.slug as string }
-      : null,
-    vendor: vendor
-      ? {
-          id: vendor.id as string,
-          storeName: vendor.storeName as string,
-          slug: vendor.slug as string,
-          logoUrl: vendor.logoUrl as string | null,
-          isVerified: vendor.isVerified as boolean,
-        }
-      : null,
-    rating:
-      reviews.length > 0
-        ? Number(
-            (
-              reviews.reduce((sum, r) => sum + r.rating, 0) /
-              reviews.length
-            ).toFixed(1)
-          )
-        : 0,
-    reviewCount: ((product._count as { reviews?: number })?.reviews) || 0,
-    reviews: reviews.map((r) => ({
-      id: r.id,
-      user: r.user?.name || "Anonymous",
-      avatarUrl: r.user?.avatarUrl || null,
-      rating: r.rating,
-      date: typeof r.createdAt === "string"
-        ? r.createdAt.split("T")[0]
-        : r.createdAt.toISOString().split("T")[0],
-      comment: r.comment || "",
-      verifiedPurchase: r.verifiedPurchase || false,
-    })),
-    availability:
-      (product.inventoryCount as number) > 0
-        ? "In Stock - Dispatch Available via Boda Riders"
-        : "Out of Stock",
-    createdAt,
-  };
+  return serializeProductForClient(prismaProduct) as unknown as Product;
 }
 
 // ==========================================
@@ -247,6 +82,8 @@ export async function createProductAction(input: CatalogCreateProductInput) {
   return withErrorHandling(async () => {
     const context = await requireVendorContext("vendor:manage_products");
     const product = await ProductService.createProduct({ ...input, vendorId: context.vendorId });
+    updateTag(cacheTags.marketplace.products);
+    updateTag(cacheTags.marketplace.discovery);
     revalidatePath("/vendor/products");
     revalidatePath("/admin/products");
     revalidatePath("/products");
@@ -267,6 +104,11 @@ export async function updateProductAction(input: CatalogUpdateProductInput) {
     const existing = await prisma.product.findFirst({ where: { id: input.id, vendorId: context.vendorId } });
     if (!existing) throw new Error("Product not found.");
     const product = await ProductService.updateProduct(input);
+    updateTag(cacheTags.marketplace.products);
+    updateTag(cacheTags.marketplace.discovery);
+    updateTag(cacheTags.product(product.id));
+    updateTag(cacheTags.productSlug(existing.slug));
+    updateTag(cacheTags.productSlug(product.slug));
     revalidatePath("/vendor/products");
     revalidatePath("/admin/products");
     revalidatePath(`/products/${input.id}`);
@@ -285,35 +127,14 @@ export async function getPublicProductAction(slug: string) {
       throw new Error("Product not found.");
     }
 
-    const serializedProduct = serializePublicProduct(
+    const serializedProduct = serializePublicProductDetail(
       product as unknown as Record<string, unknown>
     );
 
-    const relatedProducts: RelatedProduct[] = [];
-    const categoryId = (product as { categoryId?: string }).categoryId;
-    const productId = (product as { id: string }).id;
-
-    if (categoryId) {
-      const relatedRaw = await ProductService.getRelatedProducts(
-        categoryId,
-        productId,
-        4
-      );
-      for (const p of relatedRaw) {
-        relatedProducts.push({
-          id: p.id,
-          name: p.name,
-          slug: p.slug,
-          brand: p.brand,
-          basePrice: Number(p.basePrice),
-          compareAtPrice: p.compareAtPrice ? Number(p.compareAtPrice) : null,
-          image: p.images[0]?.url || "",
-          vendorId: p.vendorId,
-          rating: 4.5,
-          reviews: 0,
-        });
-      }
-    }
+    const relatedProducts = await ProductService.getRelatedProducts(
+      product,
+      4,
+    );
 
     return { product: serializedProduct, relatedProducts };
   }, "getPublicProductAction");
@@ -337,6 +158,17 @@ export async function getDealsAction() {
   );
 }
 
+export async function getPublicCatalogAction(input?: {
+  search?: string;
+  sort?: CatalogSort;
+} & CatalogFilters) {
+  return withErrorHandling(async () => {
+    const products = await ProductService.getPublicCatalogProducts(input);
+
+    return products;
+  }, "getPublicCatalogAction");
+}
+
 // ==========================================
 // DELETE ACTION
 // ==========================================
@@ -347,6 +179,10 @@ export async function deleteProductAction(id: string) {
     const existing = await prisma.product.findFirst({ where: { id, vendorId: context.vendorId } });
     if (!existing) throw new Error("Product not found.");
     await ProductService.deleteProduct(id);
+    updateTag(cacheTags.marketplace.products);
+    updateTag(cacheTags.marketplace.discovery);
+    updateTag(cacheTags.product(id));
+    updateTag(cacheTags.productSlug(existing.slug));
     revalidatePath("/vendor/products");
     revalidatePath("/admin/products");
     revalidatePath("/products");

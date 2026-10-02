@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import { Store, Search, Boxes, EyeOff, Eye, Package } from "lucide-react";
-import Image from "next/image";
+import { MediaImage } from "@/components/marketplace/media-image";
+import { PRODUCT_IMAGE_FALLBACK } from "@/lib/media";
 import { type ColumnDef } from "@tanstack/react-table";
 import { cn } from "@/lib/utils";
 import { DataTable } from "@/components/data-table";
@@ -16,6 +17,7 @@ import {
 } from "@/components/ui/sheet";
 import { useProducts } from "@/hooks/use-products";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AdminMetricCard } from "@/components/admin/admin-metric-card";
 import type { Product } from "@/types/marketplace";
 
 function ProductsSkeleton() {
@@ -77,20 +79,8 @@ export default function AdminProductsPage() {
         cell: ({ row }) => {
           const imgUrl = getProductImage(row.original);
           return (
-            <div className="relative size-10 rounded-xl bg-muted border border-border/40 overflow-hidden shrink-0">
-              {imgUrl ? (
-                <Image
-                  src={imgUrl}
-                  alt={row.original.name}
-                  fill
-                  sizes="40px"
-                  className="object-cover"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-muted">
-                  <Package className="w-4 h-4 text-muted-foreground/40" />
-                </div>
-              )}
+            <div className="relative size-10 rounded-lg bg-muted border border-border/40 overflow-hidden shrink-0">
+              <MediaImage src={imgUrl} fallback={PRODUCT_IMAGE_FALLBACK} alt={row.original.name} fill sizes="40px" className="object-cover" fallbackClassName="object-cover" />
             </div>
           );
         },
@@ -102,18 +92,14 @@ export default function AdminProductsPage() {
           <div className="space-y-0.5 max-w-[220px]">
             <button
               onClick={() => setSelectedProduct(row.original)}
-              className="font-medium text-foreground text-left truncate hover:text-primary transition-colors cursor-pointer text-sm">
+              className="block line-clamp-2 text-left text-sm font-medium text-foreground transition-colors hover:text-primary cursor-pointer text-wrap" title={row.original.name}>
               {row.original.name}
             </button>
-            <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-              <span className="uppercase tracking-wider">
-                {row.original.brand || "No brand"}
-              </span>
-              <span>•</span>
-              <span className="font-mono">
-                {row.original.sku || row.original.id?.slice(0, 8)}
-              </span>
-            </div>
+            {(row.original.category?.name || row.original.brand) && (
+              <p className="truncate text-[11px] text-muted-foreground" title={row.original.category?.name || row.original.brand || undefined}>
+                {row.original.category?.name || row.original.brand}
+              </p>
+            )}
           </div>
         ),
       },
@@ -144,14 +130,14 @@ export default function AdminProductsPage() {
           return (
             <span
               className={cn(
-                "inline-flex items-center gap-1 text-[10px] font-medium px-2.5 py-0.5 rounded-full border",
+                "inline-flex items-center gap-1 text-xs font-medium leading-none px-2.5 py-1 rounded-full border",
                 status === "ACTIVE" || status === "PUBLISHED"
-                  ? "text-emerald-600 bg-emerald-500/5 border-emerald-500/10"
+                  ? "text-white bg-emerald-600 border-transparent"
                   : status === "DRAFT"
-                    ? "text-amber-600 bg-amber-500/5 border-amber-500/10"
-                    : "text-zinc-500 bg-zinc-500/5 border-zinc-500/10",
+                    ? "text-zinc-700 bg-zinc-100 border-zinc-200 dark:text-zinc-300 dark:bg-zinc-800 dark:border-zinc-700"
+                    : "text-zinc-700 bg-zinc-100 border-zinc-200 dark:text-zinc-300 dark:bg-zinc-800 dark:border-zinc-700",
               )}>
-              {status || "Unknown"}
+              {status ? status.replaceAll("_", " ").toLowerCase().replace(/^./, (letter) => letter.toUpperCase()) : "Unknown"}
             </span>
           );
         },
@@ -169,7 +155,7 @@ export default function AdminProductsPage() {
                   ? "text-amber-500"
                   : "text-foreground",
             )}>
-            {row.original.inventoryCount ?? 0} units
+            {(row.original.inventoryCount ?? 0) === 0 ? "Out of stock" : String(row.original.inventoryCount) + " in stock"}
           </span>
         ),
       },
@@ -206,41 +192,10 @@ export default function AdminProductsPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 select-none">
-        {[
-          {
-            label: "Total Products",
-            value: totalProducts,
-            icon: Boxes,
-            color: "text-blue-600",
-          },
-          {
-            label: "Published",
-            value: publishedProducts,
-            icon: Eye,
-            color: "text-emerald-600",
-          },
-          {
-            label: "Drafts",
-            value: draftProducts,
-            icon: EyeOff,
-            color: "text-amber-600",
-          },
-        ].map((kpi, idx) => (
-          <div
-            key={idx}
-            className="bg-card border border-border/60 rounded-2xl p-4 space-y-2 shadow-2xs">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-                {kpi.label}
-              </span>
-              <kpi.icon className={cn("w-4 h-4", kpi.color)} />
-            </div>
-            <p className="text-2xl font-semibold text-foreground tracking-tight">
-              {kpi.value}
-            </p>
-          </div>
-        ))}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <AdminMetricCard label="Total Products" value={totalProducts} icon={Boxes} />
+        <AdminMetricCard label="Published" value={publishedProducts} icon={Eye} />
+        <AdminMetricCard label="Drafts" value={draftProducts} icon={EyeOff} tone="warning" />
       </div>
 
       {error && (
@@ -289,22 +244,7 @@ export default function AdminProductsPage() {
                   const imgUrl = getProductImage(selectedProduct);
                   return (
                     <div className="relative w-full aspect-square max-w-[280px] mx-auto rounded-2xl bg-muted border border-border/40 overflow-hidden">
-                      {imgUrl ? (
-                        <Image
-                          src={imgUrl}
-                          alt={selectedProduct.name}
-                          fill
-                          className="object-cover"
-                          sizes="280px"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-muted-foreground/40">
-                          <Package className="w-10 h-10" />
-                          <span className="text-[10px] font-medium">
-                            No image
-                          </span>
-                        </div>
-                      )}
+                      <MediaImage src={imgUrl} fallback={PRODUCT_IMAGE_FALLBACK} alt={selectedProduct.name} fill sizes="280px" className="object-cover" fallbackClassName="object-contain p-[18%]" />
                     </div>
                   );
                 })()}

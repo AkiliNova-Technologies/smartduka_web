@@ -7,6 +7,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/providers/AuthProvider";
 import { PublicCatalogProvider } from "@/providers/PublicCatalogProvider";
 import { UserDataProvider } from "@/providers/UserDataProvider";
+import { WorkspaceAccessProvider } from "@/providers/WorkspaceAccessProvider";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -38,12 +39,14 @@ export default function RootLayout({
       )}>
       <body className="min-h-full bg-background text-foreground flex flex-col">
         <AuthProvider>
+          <WorkspaceAccessProvider>
           <UserDataProvider>
             <PublicCatalogProvider>
               <TooltipProvider delayDuration={200}>{children}</TooltipProvider>
               <Toaster position="top-right" closeButton={false} />
             </PublicCatalogProvider>
           </UserDataProvider>
+          </WorkspaceAccessProvider>
         </AuthProvider>
       </body>
     </html>

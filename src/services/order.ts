@@ -11,6 +11,7 @@ import {
 } from "@prisma/client";
 import { Decimal } from "@prisma/client/runtime/client";
 import { MarketplaceEconomicsService } from "@/services/marketplace-economics";
+import { isFulfillmentMethod, type FulfillmentMethod } from "@/lib/fulfillment";
 
 export interface CheckoutIntent {
   items: Array<{
@@ -21,6 +22,7 @@ export interface CheckoutIntent {
   shippingAddress: string;
   shippingPhone: string;
   shippingEmail?: string;
+  fulfillmentSelections?: Array<{ vendorId: string; method: FulfillmentMethod }>;
   paymentGateway: PaymentGateway;
   checkoutRequestId: string;
   notes?: string;
@@ -44,6 +46,13 @@ export class CheckoutError extends Error {
     this.name = "CheckoutError";
   }
 }
+export const SUB_ORDER_ALLOWED_TRANSITIONS: Partial<Record<SubOrderStatus, SubOrderStatus[]>> = {
+  PENDING: [SubOrderStatus.PROCESSING, SubOrderStatus.CANCELLED],
+  PROCESSING: [SubOrderStatus.READY_FOR_PICKUP, SubOrderStatus.SHIPPED, SubOrderStatus.CANCELLED],
+  READY_FOR_PICKUP: [SubOrderStatus.SHIPPED, SubOrderStatus.CANCELLED],
+  SHIPPED: [SubOrderStatus.DELIVERED, SubOrderStatus.CANCELLED],
+};
+
 export interface ResolvedCheckoutLine {
   productId: string;
   variantId: string | null;
@@ -51,11 +60,27 @@ export interface ResolvedCheckoutLine {
   quantity: number;
   unitPrice: Decimal;
   commissionRate: Decimal;
+  productNameSnapshot?: string;
+  variantNameSnapshot?: string | null;
+  variantOptionsSnapshot?: Prisma.InputJsonValue | null;
+  fulfillmentMethods?: FulfillmentMethod[];
+  deliveryFee?: Decimal;
+  deliveryEstimate?: string | null;
+  pickupLocation?: string | null;
+  pickupDirections?: string | null;
+  pickupInstructions?: string | null;
+  returnWindowDays?: number;
+  returnPolicy?: string | null;
+  returnInstructions?: string | null;
+  returnAddress?: string | null;
+  acceptsExchanges?: boolean;
+  exchangePolicy?: string | null;
 }
 export interface CheckoutCalculation {
   items: Array<ResolvedCheckoutLine & { lineSubtotal: Decimal }>;
   vendorGroups: Array<{
     vendorId: string;
+    fulfillmentMethod: FulfillmentMethod;
     subtotal: Decimal;
     shipping: Decimal;
     tax: Decimal;
@@ -84,7 +109,7 @@ export function resolveCommissionRate(value: unknown): Decimal {
   if (!rate.isFinite() || rate.lessThan(0) || rate.greaterThan(100)) throw new CheckoutError("Vendor commission configuration is invalid.", "INVALID_CHECKOUT");
   return rate;
 }
-const SHIPPING_PER_VENDOR = new Decimal(3500); // TEMPORARY DEFAULT SHIPPING POLICY — Phase 4 shipping engine
+const SHIPPING_PER_VENDOR = new Decimal(3500); // Backward-compatible default for shops created before fulfilment settings.
 const paymentGateways = new Set(Object.values(PaymentGateway));
 
 function validateCheckoutIntent(input: CreateOrderInput) {
@@ -93,9 +118,9 @@ function validateCheckoutIntent(input: CreateOrderInput) {
       "Your shopping cart cannot be empty.",
       "INVALID_CHECKOUT",
     );
-  if (!input.shippingAddress?.trim() || !input.shippingPhone?.trim())
+  if (!input.shippingPhone?.trim())
     throw new CheckoutError(
-      "Delivery address and phone number are required.",
+      "A phone number is required.",
       "INVALID_CHECKOUT",
     );
   if (
@@ -141,6 +166,9 @@ export function checkoutRequestHash(input: CheckoutIntent) {
     shippingPhone: input.shippingPhone.trim(),
     shippingEmail: input.shippingEmail?.trim() ?? "",
     paymentGateway: input.paymentGateway,
+    fulfillmentSelections: [...(input.fulfillmentSelections ?? [])]
+      .map(({ vendorId, method }) => ({ vendorId, method }))
+      .sort((a, b) => a.vendorId.localeCompare(b.vendorId)),
     notes: input.notes?.trim() ?? "",
   };
   return createHash("sha256").update(JSON.stringify(intent)).digest("hex");
@@ -160,6 +188,7 @@ function isCheckoutIdempotencyP2002(error: unknown) {
 /** Deterministic money calculation over server-resolved catalogue lines only. */
 export function calculateCheckoutTotals(
   lines: ResolvedCheckoutLine[],
+  selections: Map<string, FulfillmentMethod> = new Map(),
 ): CheckoutCalculation {
   const byVendor = new Map<
     string,
@@ -188,11 +217,19 @@ export function calculateCheckoutTotals(
       (sum, item) => sum.plus(item.lineSubtotal),
       ZERO,
     );
-    const shipping = SHIPPING_PER_VENDOR;
+    const availableMethods = groupItems[0].fulfillmentMethods ?? ["DELIVERY"];
+    const requestedMethod = selections.get(vendorId);
+    const method = requestedMethod ?? (availableMethods.includes("DELIVERY") ? "DELIVERY" : "PICKUP");
+    if (!availableMethods.includes(method))
+      throw new CheckoutError("This shop no longer offers the selected fulfilment method.", "INVALID_CHECKOUT");
+    if (method === "PICKUP" && !groupItems[0].pickupLocation?.trim())
+      throw new CheckoutError("This shop's pickup location is unavailable. Choose delivery or try again later.", "INVALID_CHECKOUT");
+    const shipping = method === "PICKUP" ? ZERO : groupItems[0].deliveryFee ?? SHIPPING_PER_VENDOR;
     const tax = ZERO; // TAX ENGINE NOT YET IMPLEMENTED
     const discount = ZERO; // No order discount engine or schema field.
     return {
       vendorId,
+      fulfillmentMethod: method,
       subtotal,
       shipping,
       tax,
@@ -244,6 +281,17 @@ export class OrderService {
         );
       return existing;
     }
+    const reusablePendingOrder = await prisma.order.findFirst({
+      where: {
+        customerId: input.userId,
+        checkoutRequestHash: requestHash,
+        paymentGateway: input.paymentGateway,
+        paymentStatus: PaymentStatus.PENDING,
+        status: OrderStatus.PENDING,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    if (reusablePendingOrder) return reusablePendingOrder;
     try {
       return await prisma.$transaction(async (tx) => {
         const products = await tx.product.findMany({
@@ -253,7 +301,7 @@ export class OrderService {
           },
           include: {
             variants: true,
-            vendor: {
+        vendor: {
               include: {
                 subscriptions: {
                   where: { status: "ACTIVE" },
@@ -284,6 +332,13 @@ export class OrderService {
               "A selected product option is no longer available.",
               "VARIANT_UNAVAILABLE",
             );
+          if (variant && variant.isActive === false)
+            throw new CheckoutError("A selected product option is no longer available.", "VARIANT_UNAVAILABLE");
+          // Any persisted variant record makes this a variant product.  In particular,
+          // a product whose variants were all retired must not fall back to base price
+          // and parent stock as if it were a genuine simple product.
+          if (!item.variantId && product.variants.length > 0)
+            throw new CheckoutError("Select a product option before checkout.", "VARIANT_UNAVAILABLE");
           return {
             productId: product.id,
             variantId: variant?.id ?? null,
@@ -293,6 +348,21 @@ export class OrderService {
               (variant?.price ?? product.basePrice).toString(),
             ),
             commissionRate: resolveCommissionRate(product.vendor.subscriptions[0]?.plan.commissionRate),
+            productNameSnapshot: product.name,
+            variantNameSnapshot: variant?.name ?? null,
+            variantOptionsSnapshot: variant?.options ?? null,
+            fulfillmentMethods: product.vendor.fulfillmentMethods,
+            deliveryFee: product.vendor.deliveryFee,
+            deliveryEstimate: product.vendor.deliveryEstimate,
+            pickupLocation: product.vendor.pickupLocation,
+            pickupDirections: product.vendor.pickupDirections,
+            pickupInstructions: product.vendor.pickupInstructions,
+            returnWindowDays: product.vendor.returnWindowDays,
+            returnPolicy: product.vendor.returnPolicy,
+            returnInstructions: product.vendor.returnInstructions,
+            returnAddress: product.vendor.returnAddress,
+            acceptsExchanges: product.vendor.acceptsExchanges,
+            exchangePolicy: product.vendor.exchangePolicy,
           };
         });
         const stockRequirements = new Map<
@@ -333,7 +403,15 @@ export class OrderService {
               "INSUFFICIENT_STOCK",
             );
         }
-        const calculation = calculateCheckoutTotals(lines);
+        const selections = new Map<string, FulfillmentMethod>();
+        for (const selection of input.fulfillmentSelections ?? []) {
+          if (!selection?.vendorId || !isFulfillmentMethod(selection.method) || selections.has(selection.vendorId))
+            throw new CheckoutError("Choose a valid fulfilment option for each shop.", "INVALID_CHECKOUT");
+          selections.set(selection.vendorId, selection.method);
+        }
+        const calculation = calculateCheckoutTotals(lines, selections);
+        if (calculation.vendorGroups.some((group) => group.fulfillmentMethod === "DELIVERY") && !input.shippingAddress?.trim())
+          throw new CheckoutError("A delivery address is required for delivery orders.", "INVALID_CHECKOUT");
         const orderNumber = createOrderNumber();
         const order = await tx.order.create({
           data: {
@@ -369,6 +447,23 @@ export class OrderService {
               vendorNetEntitlement: group.vendorNetEntitlement,
               paymentProcessingFee: ZERO,
               status: SubOrderStatus.PENDING,
+              fulfillmentMethod: group.fulfillmentMethod,
+              fulfillmentSnapshot: {
+                method: group.fulfillmentMethod,
+                deliveryFee: group.shipping.toString(),
+                deliveryEstimate: group.items[0].deliveryEstimate ?? null,
+                pickupLocation: group.items[0].pickupLocation ?? null,
+                pickupDirections: group.items[0].pickupDirections ?? null,
+                pickupInstructions: group.items[0].pickupInstructions ?? null,
+              },
+              refundPolicySnapshot: {
+                returnWindowDays: group.items[0].returnWindowDays ?? 7,
+                policy: group.items[0].returnPolicy ?? null,
+                instructions: group.items[0].returnInstructions ?? null,
+                returnAddress: group.items[0].returnAddress ?? null,
+                acceptsExchanges: group.items[0].acceptsExchanges ?? false,
+                exchangePolicy: group.items[0].exchangePolicy ?? null,
+              },
             },
           });
           await tx.orderItem.createMany({
@@ -380,6 +475,9 @@ export class OrderService {
               quantity: item.quantity,
               priceAtPurchase: item.unitPrice,
               totalPrice: item.lineSubtotal,
+              productNameSnapshot: item.productNameSnapshot,
+              variantNameSnapshot: item.variantNameSnapshot,
+              variantOptionsSnapshot: item.variantOptionsSnapshot ?? undefined,
             })),
           });
           await tx.notification.create({
@@ -425,11 +523,13 @@ export class OrderService {
       include: {
         orderItems: {
           include: {
+            productReview: { select: { id: true, rating: true, title: true, comment: true, imageUrls: true } },
             product: {
               select: {
                 id: true,
                 name: true,
                 images: { take: 1, orderBy: { sortOrder: "asc" } },
+                vendor: { select: { storeName: true } },
               },
             },
           },
@@ -439,6 +539,8 @@ export class OrderService {
             id: true,
             status: true,
             subOrderNumber: true,
+            vendor: { select: { storeName: true } },
+            shopReview: { select: { id: true, rating: true, comment: true } },
           },
         },
       },
@@ -449,18 +551,32 @@ export class OrderService {
       id: order.id,
       orderNumber: order.orderNumber,
       status: order.status,
+      paymentStatus: order.paymentStatus,
+      paymentGateway: order.paymentGateway,
       totalAmount: Number(order.totalAmount),
+      subTotal: Number(order.subTotal),
+      totalShipping: Number(order.totalShipping),
       createdAt: order.createdAt.toISOString(),
       items: order.orderItems.map((item) => ({
+        id: item.id,
         productId: item.productId,
-        name: item.product.name,
+        subOrderId: item.subOrderId,
+        variantName: item.variantNameSnapshot,
+        name: item.productNameSnapshot ?? item.product.name,
         quantity: item.quantity,
         price: Number(item.priceAtPurchase),
+        image: item.product.images[0]?.url || null,
+        vendorName: item.product.vendor.storeName,
+        canReview: order.paymentStatus === "COMPLETED" && order.status !== "REFUNDED" && order.status !== "FAILED" && order.subOrders.find((subOrder) => subOrder.id === item.subOrderId)?.status === "DELIVERED",
+        review: item.productReview,
       })),
       subOrders: order.subOrders.map((so) => ({
         id: so.id,
         status: so.status,
         subOrderNumber: so.subOrderNumber,
+        vendorName: so.vendor.storeName,
+        canReview: order.paymentStatus === "COMPLETED" && order.status !== "REFUNDED" && so.status === "DELIVERED",
+        review: so.shopReview,
       })),
     }));
   }
@@ -476,13 +592,7 @@ export class OrderService {
     });
 
     if (!existing) return null;
-    const allowedTransitions: Partial<Record<SubOrderStatus, SubOrderStatus[]>> = {
-      PENDING: [SubOrderStatus.PROCESSING, SubOrderStatus.CANCELLED],
-      PROCESSING: [SubOrderStatus.READY_FOR_PICKUP, SubOrderStatus.SHIPPED, SubOrderStatus.CANCELLED],
-      READY_FOR_PICKUP: [SubOrderStatus.SHIPPED, SubOrderStatus.CANCELLED],
-      SHIPPED: [SubOrderStatus.DELIVERED, SubOrderStatus.CANCELLED],
-    };
-    if (!allowedTransitions[existing.status]?.includes(status))
+    if (!SUB_ORDER_ALLOWED_TRANSITIONS[existing.status]?.includes(status))
       throw new CheckoutError("Invalid SubOrder fulfillment status transition.", "INVALID_CHECKOUT");
 
     const updated = await prisma.subOrder.update({

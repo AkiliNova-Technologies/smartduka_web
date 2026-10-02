@@ -23,6 +23,7 @@ export default function LoginPage() {
         <div className="flex flex-1 items-center justify-center py-8">
           <div className="w-full max-w-xs">
             <LoginForm />
+            <p className="mt-5 text-center text-xs text-muted-foreground"><Link href="/privacy-policy" className="hover:text-primary hover:underline">Privacy Policy</Link><span aria-hidden="true"> · </span><Link href="/cookie-policy" className="hover:text-primary hover:underline">Cookie Policy</Link></p>
           </div>
         </div>
 

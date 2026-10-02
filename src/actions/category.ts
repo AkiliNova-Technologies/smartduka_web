@@ -1,12 +1,13 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
+import { cacheTags } from "@/lib/cache-policy";
 import {
   CategoryService,
   CreateCategoryInput,
   UpdateCategoryInput,
 } from "@/services/category";
-import { withErrorHandling, validateRequiredFields } from "@/lib/api-utils";
+import { withErrorHandling } from "@/lib/api-utils";
 import { requireAdminContext } from "@/lib/auth/admin-context";
 
 export async function getCategoryDetailsAction(id: string) {
@@ -33,14 +34,11 @@ export async function getProductsByCategorySlugAction(slug: string, sort?: strin
 }
 
 export async function createCategoryAction(formData: CreateCategoryInput) {
-  const validationError = validateRequiredFields(formData, ["name", "slug"]);
-  if (validationError) {
-    return { success: false as const, error: validationError };
-  }
-
   return withErrorHandling(async () => {
     await requireAdminContext("platform:manage");
     await CategoryService.createCategoryWithSubs(formData);
+    updateTag(cacheTags.marketplace.categories);
+    updateTag(cacheTags.marketplace.discovery);
     revalidatePath("/admin/categories");
     return { created: true };
   }, "createCategoryAction");
@@ -50,21 +48,44 @@ export async function deleteCategoryAction(id: string) {
   return withErrorHandling(async () => {
     await requireAdminContext("platform:manage");
     await CategoryService.deleteCategory(id);
+    updateTag(cacheTags.marketplace.categories);
+    updateTag(cacheTags.marketplace.discovery);
     revalidatePath("/admin/categories");
     return { deleted: true };
   }, "deleteCategoryAction");
 }
 
 export async function updateCategoryAction(formData: UpdateCategoryInput) {
-  const validationError = validateRequiredFields(formData, ["id", "name", "slug"]);
-  if (validationError) {
-    return { success: false as const, error: validationError };
-  }
-
   return withErrorHandling(async () => {
     await requireAdminContext("platform:manage");
     await CategoryService.updateCategory(formData);
+    updateTag(cacheTags.marketplace.categories);
+    updateTag(cacheTags.marketplace.discovery);
     revalidatePath("/admin/categories");
     return { updated: true };
   }, "updateCategoryAction");
+}
+
+export async function moveCategoryAction(id: string, parentId: string | null) {
+  return withErrorHandling(async () => {
+    await requireAdminContext("platform:manage");
+    await CategoryService.moveCategory(id, parentId);
+    updateTag(cacheTags.marketplace.categories);
+    updateTag(cacheTags.marketplace.discovery);
+    revalidatePath("/admin/categories");
+    revalidatePath("/categories");
+    return { moved: true };
+  }, "moveCategoryAction");
+}
+
+export async function setCategoryStatusAction(id: string, isActive: boolean) {
+  return withErrorHandling(async () => {
+    await requireAdminContext("platform:manage");
+    await CategoryService.setCategoryStatus(id, isActive);
+    updateTag(cacheTags.marketplace.categories);
+    updateTag(cacheTags.marketplace.discovery);
+    revalidatePath("/admin/categories");
+    revalidatePath("/categories");
+    return { updated: true };
+  }, "setCategoryStatusAction");
 }

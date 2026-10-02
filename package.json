@@ -8,7 +8,9 @@
     "dev": "next dev",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "seed:test-marketplace": "node scripts/seed-test-marketplace.js",
+    "seed:test-marketplace:cleanup": "node scripts/seed-test-marketplace.js --cleanup"
   },
   "overrides": {
     "jose": "4.15.5"
@@ -28,6 +30,7 @@
     "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "cn": "^0.4.0",
     "firebase": "^12.16.0",
     "firebase-admin": "^14.1.0",
     "input-otp": "^1.4.2",

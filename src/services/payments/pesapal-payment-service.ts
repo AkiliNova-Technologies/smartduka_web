@@ -7,6 +7,12 @@ import { PesapalClient, PesapalClientError } from "@/services/payments/pesapal-c
 
 export class PesapalPaymentError extends Error { constructor(message: string, readonly code: string) { super(message); this.name = "PesapalPaymentError"; } }
 export function serializePesapalAmount(amount: Decimal): number { const value = amount.toFixed(2); const numeric = Number(value); if (!Number.isFinite(numeric) || !Number.isSafeInteger(Math.round(numeric * 100))) throw new PesapalPaymentError("Amount is unsupported.", "INVALID_AMOUNT"); return numeric; }
+export function paymentInitiationError(error: unknown): unknown {
+  if (error instanceof PesapalClientError && error.code === "PESAPAL_PROVIDER_ERROR" && error.providerError?.code === "amount_exceeds_default_limit") {
+    return new PesapalPaymentError("This order exceeds the merchant's payment limit. Please contact support.", "PESAPAL_AMOUNT_LIMIT");
+  }
+  return error;
+}
 const client = new PesapalClient();
 export class PesapalPaymentService {
   static async initiatePayment(input: { authenticatedUserId: string; orderId: string; initiationRequestId: string }) {
@@ -25,9 +31,10 @@ export class PesapalPaymentService {
       const updated = await prisma.paymentAttempt.update({ where: { id: attempt.id }, data: { providerTrackingId: response.orderTrackingId, redirectUrl: response.redirectUrl, status: PaymentAttemptStatus.INITIATED, initiatedAt: new Date(), providerStatus: "SUBMITTED" } });
       return { orderId: order.id, paymentAttemptId: updated.id, status: updated.status, redirectUrl: response.redirectUrl };
     } catch (error: unknown) {
-      const ambiguous = error instanceof PesapalPaymentError || error instanceof PesapalClientError && ["PESAPAL_NETWORK_ERROR", "PESAPAL_INVALID_RESPONSE"].includes(error.code);
+      const mappedError = paymentInitiationError(error);
+      const ambiguous = mappedError instanceof PesapalPaymentError && mappedError.code === "RECONCILIATION_REQUIRED" || mappedError instanceof PesapalClientError && ["PESAPAL_NETWORK_ERROR", "PESAPAL_INVALID_RESPONSE"].includes(mappedError.code);
       await prisma.paymentAttempt.update({ where: { id: attempt.id }, data: { status: ambiguous ? PaymentAttemptStatus.SUBMISSION_UNKNOWN : PaymentAttemptStatus.FAILED, providerStatus: ambiguous ? "SUBMISSION_UNKNOWN" : "REJECTED" } });
-      throw error;
+      throw mappedError;
     }
   }
 }

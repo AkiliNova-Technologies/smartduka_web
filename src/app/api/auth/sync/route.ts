@@ -1,8 +1,7 @@
 import { NextRequest } from "next/server";
 import { adminAuth } from "@/lib/firebase/admin";
-import { prisma } from "@/lib/prisma/client";
-import { PlatformRole, UserStatus } from "@prisma/client";
-import { successResponse, errorResponse, getErrorMessage } from "@/lib/api-utils";
+import { successResponse, errorResponse } from "@/lib/api-utils";
+import { getAuthSyncErrorResponse, synchronizeFirebaseIdentity } from "@/services/auth-sync";
 
 export async function POST(req: NextRequest) {
   try {
@@ -25,24 +24,12 @@ export async function POST(req: NextRequest) {
       return errorResponse("Email missing from token.", 400);
     }
 
-    const user = await prisma.user.upsert({
-      where: { email },
-      update: {
-        name: name || undefined,
-        avatarUrl: picture || null,
-        emailVerifiedAt: email_verified ? new Date() : null,
-        lastLoginAt: new Date(),
-      },
-      create: {
-        id: uid,
-        email,
-        name: name || email.split("@")[0],
-        avatarUrl: picture || null,
-        status: UserStatus.ACTIVE,
-        platformRole: PlatformRole.CUSTOMER,
-        emailVerifiedAt: email_verified ? new Date() : null,
-        lastLoginAt: new Date(),
-      },
+    const user = await synchronizeFirebaseIdentity({
+      uid,
+      email,
+      name,
+      picture,
+      emailVerified: email_verified,
     });
 
     return successResponse({
@@ -50,7 +37,8 @@ export async function POST(req: NextRequest) {
       platformRole: user.platformRole,
     });
   } catch (error: unknown) {
-    console.error("[Auth Sync API]", error);
-    return errorResponse(getErrorMessage(error), 401);
+    console.error("[Auth Sync API]", error instanceof Error ? error.name : "Unknown auth sync error");
+    const response = getAuthSyncErrorResponse(error);
+    return errorResponse(response.message, response.status, response.code);
   }
 }

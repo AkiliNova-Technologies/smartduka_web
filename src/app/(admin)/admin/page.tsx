@@ -1,273 +1,90 @@
 "use client";
 
-import * as React from "react";
-import {
-  Store,
-  LayoutGrid,
-  Package,
-  FolderTree,
-  Layers,
-  ShoppingBag,
-  Eye,
-  CheckCircle2,
-  Clock,
-  XCircle,
-  FileSearch,
-} from "lucide-react";
-import Image from "next/image";
 import Link from "next/link";
-import { type ColumnDef } from "@tanstack/react-table";
-import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { DataTable } from "@/components/data-table";
-import { useCategories } from "@/hooks/use-categories";
+import { ArrowRight, CheckCircle2, Clock, LayoutGrid, Package, ShoppingCart, Store, Users } from "lucide-react";
+import { AdminMetricCard } from "@/components/admin/admin-metric-card";
 import { useAdmin } from "@/hooks/use-admin";
-import { Category, VendorApplicationRow } from "@/types/marketplace";
-import { VerificationStatus } from "@prisma/client";
 
-type ActiveTab = "categories" | "vendors";
+const reviewStatuses = new Set(["PENDING", "SUBMITTED", "UNDER_REVIEW"]);
 
-const fallbackImage =
-  "https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&w=600&q=80";
+function formatDate(value: string) {
+  return new Date(value).toLocaleDateString("en-UG", { day: "numeric", month: "short", year: "numeric" });
+}
 
-const STATUS_CONFIG: Record<
-  VerificationStatus,
-  { label: string; color: string; icon: React.ElementType }
-> = {
-  PENDING: { label: "Pending", color: "text-amber-600 bg-amber-500/5 border-amber-500/10", icon: Clock },
-  SUBMITTED: { label: "Submitted", color: "text-blue-600 bg-blue-500/5 border-blue-500/10", icon: FileSearch },
-  UNDER_REVIEW: { label: "Under Review", color: "text-purple-600 bg-purple-500/5 border-purple-500/10", icon: FileSearch },
-  APPROVED: { label: "Approved", color: "text-emerald-600 bg-emerald-500/5 border-emerald-500/10", icon: CheckCircle2 },
-  REJECTED: { label: "Rejected", color: "text-rose-600 bg-rose-500/5 border-rose-500/10", icon: XCircle },
-};
+function reviewLabel(status: string) {
+  return status.replaceAll("_", " ").toLowerCase().replace(/^./, (letter) => letter.toUpperCase());
+}
 
 export default function AdminDashboardPage() {
-  const [activeTab, setActiveTab] = React.useState<ActiveTab>("categories");
-
-  const {
-    categories,
-    isLoading: categoriesLoading,
-    error: categoriesError,
-    refresh,
-    deleteCategory,
-  } = useCategories();
-
-  const { vendors, vendorsLoading } = useAdmin();
-
-  const totalCategories = categories.length;
-  const totalProducts = categories.reduce((acc, cat) => acc + (cat._count?.products || 0), 0);
-  const totalVendors = vendors.length;
-  const pendingVendors = vendors.filter(
-    (v) => v.status === "PENDING" || v.status === "SUBMITTED" || v.status === "UNDER_REVIEW",
-  ).length;
-  const approvedVendors = vendors.filter((v) => v.status === "APPROVED").length;
-
-  const categoryColumns = React.useMemo<ColumnDef<Category, unknown>[]>(
-    () => [
-      {
-        accessorKey: "image",
-        header: "Photo",
-        cell: ({ row }) => (
-          <div className="relative size-10 rounded-xl bg-muted border border-border/40 overflow-hidden shrink-0 select-none">
-            <Image src={row.original.image || fallbackImage} alt={row.original.name} fill sizes="40px" className="object-cover" />
-          </div>
-        ),
-      },
-      {
-        accessorKey: "name",
-        header: "Category",
-        cell: ({ row }) => (
-          <div className="space-y-0.5 max-w-[240px]">
-            <span className="font-medium text-foreground block tracking-tight truncate">{row.original.name}</span>
-          </div>
-        ),
-      },
-      {
-        accessorKey: "parentId",
-        header: "Level",
-        cell: ({ row }) => {
-          const parent = categories.find((c) => c.id === row.original.parentId);
-          return parent ? (
-            <span className="inline-flex items-center gap-1 text-[10px] font-medium text-purple-600 bg-purple-500/5 border border-purple-500/10 px-2.5 py-0.5 rounded-md">
-              <FolderTree className="w-3 h-3" />Child of: {parent.name}
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-600 bg-emerald-500/5 border border-emerald-500/10 px-2.5 py-0.5 rounded-md">
-              <Layers className="w-3 h-3" />Main Group
-            </span>
-          );
-        },
-      },
-      {
-        id: "productsCount",
-        header: "Products",
-        cell: ({ row }) => (
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
-            <ShoppingBag className="w-3.5 h-3.5 stroke-[1.5]" />{row.original._count?.products ?? 0} items
-          </div>
-        ),
-      },
-      {
-        id: "actions",
-        header: () => <div className="text-right">View</div>,
-        cell: ({ row }) => (
-          <div className="flex items-center justify-end">
-            <Link href={`/admin/categories`} className="p-1.5 text-muted-foreground hover:text-foreground rounded-md border border-border/40 hover:bg-muted transition-colors cursor-pointer" title="Manage Categories">
-              <Eye className="size-3.5" />
-            </Link>
-          </div>
-        ),
-      },
-    ],
-    [categories],
-  );
-
-  const vendorColumns = React.useMemo<ColumnDef<VendorApplicationRow, unknown>[]>(
-    () => [
-      {
-        accessorKey: "storeName",
-        header: "Store",
-        cell: ({ row }) => (
-          <div className="flex items-center gap-3">
-            <div className="relative size-10 rounded-xl bg-muted border border-border/40 overflow-hidden shrink-0">
-              {row.original.logoUrl ? (
-                <Image src={row.original.logoUrl} alt={row.original.storeName} fill sizes="40px" className="object-cover" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-primary/5">
-                  <Store className="w-4 h-4 text-muted-foreground/50" />
-                </div>
-              )}
-            </div>
-            <div className="space-y-0.5 min-w-0">
-              <p className="text-sm font-semibold text-foreground truncate">{row.original.storeName}</p>
-              <p className="text-[10px] text-muted-foreground truncate">{row.original.storeSlug}</p>
-            </div>
-          </div>
-        ),
-      },
-      {
-        accessorKey: "userName",
-        header: "Owner",
-        cell: ({ row }) => (
-          <div className="space-y-0.5">
-            <p className="text-xs font-medium text-foreground">{row.original.userName}</p>
-            <p className="text-[10px] text-muted-foreground">{row.original.userEmail}</p>
-          </div>
-        ),
-      },
-      {
-        accessorKey: "documentCount",
-        header: "Docs",
-        cell: ({ row }) => (
-          <span className="text-xs font-medium text-muted-foreground">{row.original.documentCount} file{row.original.documentCount !== 1 ? "s" : ""}</span>
-        ),
-      },
-      {
-        accessorKey: "status",
-        header: "Status",
-        cell: ({ row }) => {
-          const config = STATUS_CONFIG[row.original.status];
-          const Icon = config.icon;
-          return (
-            <span className={cn("inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-0.5 rounded-full border", config.color)}>
-              <Icon className="w-3 h-3" />{config.label}
-            </span>
-          );
-        },
-      },
-      {
-        accessorKey: "createdAt",
-        header: "Applied",
-        cell: ({ row }) => (
-          <span className="text-xs text-muted-foreground">{new Date(row.original.createdAt).toLocaleDateString("en-UG", { day: "numeric", month: "short", year: "numeric" })}</span>
-        ),
-      },
-      {
-        id: "actions",
-        header: () => <div className="text-right">View</div>,
-        cell: ({ row }) => (
-          <div className="flex items-center justify-end">
-            <Link href={`/admin/vendors`} className="p-1.5 text-muted-foreground hover:text-foreground rounded-md border border-border/40 hover:bg-muted transition-colors cursor-pointer" title="Manage Vendors">
-              <Eye className="size-3.5" />
-            </Link>
-          </div>
-        ),
-      },
-    ],
-    [],
-  );
-
-  const renderTabSwitcher = (
-    <div className="flex items-center gap-5 select-none">
-      {[
-        { id: "categories", label: "Categories", icon: LayoutGrid },
-        { id: "vendors", label: "Shops & Vendors", icon: Store },
-      ].map((tab) => {
-        const isSelected = activeTab === tab.id;
-        return (
-          <button key={tab.id} onClick={() => setActiveTab(tab.id as ActiveTab)}
-            className={cn("flex items-center gap-2 py-1 text-xs sm:text-sm tracking-tight font-medium transition-all border-b-2 outline-none cursor-pointer -mb-[18px] pb-4",
-              isSelected ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground")}>
-            <tab.icon className="size-4" /><span>{tab.label}</span>
-          </button>
-        );
-      })}
-    </div>
-  );
-
-  if (!deleteCategory) {
-    return (
-      <div className="max-w-8xl mx-auto py-20 text-center">
-        <p className="text-sm text-muted-foreground">Admin dashboard requires VendorCatalogProvider.</p>
-      </div>
-    );
-  }
+  const { vendors, vendorsLoading, orders, ordersLoading } = useAdmin();
+  const pendingVendors = vendors.filter((vendor) => reviewStatuses.has(vendor.status));
+  const recentVendors = vendors.slice(0, 3);
+  const recentOrders = orders.slice(0, 3);
 
   return (
-    <div className="max-w-8xl mx-auto space-y-8 animate-in fade-in duration-300 w-full min-w-0">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/40 pb-6">
-        <div className="space-y-1">
-          <h1 className="text-2xl sm:text-3xl font-medium tracking-tight text-foreground flex items-center gap-2.5">
-            <span>Dashboard Overview</span>
-          </h1>
-          <p className="text-xs text-muted-foreground">Quick overview of your platform — categories, vendors, and store activity.</p>
-        </div>
+    <div className="w-full space-y-8 animate-in fade-in duration-300">
+      <header className="border-b border-border/40 pb-6">
+        <h1 className="text-2xl font-medium tracking-tight text-foreground">Admin dashboard</h1>
+        <p className="mt-1 text-sm text-muted-foreground">Monitor marketplace activity and handle items that need attention.</p>
+      </header>
+
+      <div className="grid max-w-sm grid-cols-1 gap-4 sm:grid-cols-2">
+        <Link href="/admin/vendors" className="rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+          <AdminMetricCard label="Pending vendor reviews" value={vendorsLoading ? "—" : pendingVendors.length} icon={Clock} helper="Applications awaiting review" tone="warning" />
+        </Link>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        {[
-          { label: "Total Categories", value: totalCategories, icon: LayoutGrid, desc: "All groups" },
-          { label: "Total Products", value: totalProducts, icon: Package, desc: "Across all stores" },
-          { label: "Total Vendors", value: totalVendors, icon: Store, desc: `${approvedVendors} approved` },
-          { label: "Pending Review", value: pendingVendors, icon: Clock, desc: "Awaiting approval" },
-        ].map((stat, i) => (
-          <div key={i} className="bg-card text-card-foreground border border-border/60 rounded-2xl p-4 space-y-2 shadow-2xs">
-            <div className="flex justify-between items-center">
-              <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">{stat.label}</span>
-              <stat.icon className="size-4 text-primary shrink-0" />
-            </div>
-            <div className="space-y-0.5">
-              <h3 className="text-2xl font-semibold tracking-tight text-foreground">{stat.value}</h3>
-              <p className="text-[11px] text-muted-foreground font-medium">{stat.desc}</p>
-            </div>
+      <section aria-labelledby="needs-attention-heading" className="space-y-4">
+        <div className="flex items-end justify-between gap-4">
+          <div>
+            <h2 id="needs-attention-heading" className="text-lg font-semibold tracking-tight text-foreground">Needs attention</h2>
+            <p className="mt-1 text-sm text-muted-foreground">Vendor applications that are waiting for an operational decision.</p>
           </div>
-        ))}
-      </div>
-
-      {categoriesError && (
-        <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 text-xs font-medium flex items-center justify-between">
-          <span>{categoriesError}</span>
-          <Button size="sm" variant="outline" onClick={refresh} className="h-7 text-xs rounded-lg">Retry</Button>
+          <Link href="/admin/vendors" className="inline-flex shrink-0 items-center gap-1 text-sm font-medium text-primary hover:underline">View all vendor applications <ArrowRight className="size-4" aria-hidden="true" /></Link>
         </div>
-      )}
 
-      {activeTab === "categories" && (
-        <DataTable columns={categoryColumns} data={categories} getRowId={(row) => row.id} isLoading={categoriesLoading} renderTabs={renderTabSwitcher} />
-      )}
+        <div className="overflow-hidden rounded-xl border border-border bg-card">
+          {vendorsLoading ? (
+            <p className="p-5 text-sm text-muted-foreground">Loading vendor applications…</p>
+          ) : pendingVendors.length === 0 ? (
+            <div className="flex items-center gap-3 p-5"><span className="flex size-9 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"><CheckCircle2 className="size-5" aria-hidden="true" /></span><div><p className="text-sm font-medium text-foreground">You’re all caught up</p><p className="text-sm text-muted-foreground">There are no vendor reviews requiring attention right now.</p></div></div>
+          ) : (
+            <ul className="divide-y divide-border/60">
+              {pendingVendors.slice(0, 5).map((vendor) => (
+                <li key={vendor.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0"><p className="truncate text-sm font-semibold text-foreground">{vendor.storeName}</p><p className="truncate text-sm text-muted-foreground">{vendor.userName} · Applied {formatDate(vendor.createdAt)}</p></div>
+                  <div className="flex items-center justify-between gap-3 sm:justify-end"><span className="rounded-full border border-amber-500/20 bg-amber-500/5 px-2.5 py-1 text-xs font-medium text-amber-700 dark:text-amber-400">{reviewLabel(vendor.status)}</span><Link href="/admin/vendors" className="text-sm font-medium text-primary hover:underline">Review</Link></div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </section>
 
-      {activeTab === "vendors" && (
-        <DataTable columns={vendorColumns} data={vendors} getRowId={(row) => row.id} isLoading={vendorsLoading} renderTabs={renderTabSwitcher} />
-      )}
+      <section aria-labelledby="marketplace-activity-heading" className="space-y-4">
+        <div><h2 id="marketplace-activity-heading" className="text-lg font-semibold tracking-tight text-foreground">Marketplace activity</h2><p className="mt-1 text-sm text-muted-foreground">A compact view of the latest orders and vendor applications.</p></div>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <ActivityCard title="Recent orders" href="/admin/orders" icon={ShoppingCart} empty="No orders have been placed yet." loading={ordersLoading}>
+            {recentOrders.map((order) => <li key={order.id} className="flex items-center justify-between gap-3 py-3"><div className="min-w-0"><p className="truncate font-mono text-sm font-medium text-primary">{order.orderNumber}</p><p className="truncate text-sm text-muted-foreground">{order.customerName} · {order.storeName}</p></div><span className="shrink-0 text-xs text-muted-foreground">{formatDate(order.date)}</span></li>)}
+          </ActivityCard>
+          <ActivityCard title="Recent vendor applications" href="/admin/vendors" icon={Store} empty="No vendor applications have been received yet." loading={vendorsLoading}>
+            {recentVendors.map((vendor) => <li key={vendor.id} className="flex items-center justify-between gap-3 py-3"><div className="min-w-0"><p className="truncate text-sm font-medium text-foreground">{vendor.storeName}</p><p className="truncate text-sm text-muted-foreground">{vendor.userName}</p></div><span className="shrink-0 text-xs text-muted-foreground">{formatDate(vendor.createdAt)}</span></li>)}
+          </ActivityCard>
+        </div>
+      </section>
+
+      <section aria-labelledby="quick-access-heading" className="space-y-3"><h2 id="quick-access-heading" className="text-lg font-semibold tracking-tight text-foreground">Quick access</h2><nav aria-label="Admin quick access" className="flex flex-wrap gap-2">{[
+        { href: "/admin/vendors", label: "Vendor applications", icon: Store },
+        { href: "/admin/orders", label: "Orders", icon: ShoppingCart },
+        { href: "/admin/products", label: "Products", icon: Package },
+        { href: "/admin/categories", label: "Categories", icon: LayoutGrid },
+        { href: "/admin/users", label: "Users", icon: Users },
+      ].map(({ href, label, icon: Icon }) => <Link key={href} href={href} className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><Icon className="size-4 text-muted-foreground" aria-hidden="true" />{label}</Link>)}</nav></section>
     </div>
   );
+}
+
+function ActivityCard({ title, href, icon: Icon, empty, loading, children }: { title: string; href: string; icon: typeof ShoppingCart; empty: string; loading: boolean; children: React.ReactNode }) {
+  const hasChildren = Array.isArray(children) ? children.length > 0 : Boolean(children);
+  return <section className="rounded-xl border border-border bg-card p-4"><div className="flex items-center justify-between gap-3"><h3 className="flex items-center gap-2 text-sm font-semibold text-foreground"><Icon className="size-4 text-muted-foreground" aria-hidden="true" />{title}</h3><Link href={href} className="text-sm font-medium text-primary hover:underline">View all</Link></div>{loading ? <p className="py-5 text-sm text-muted-foreground">Loading…</p> : hasChildren ? <ul className="mt-2 divide-y divide-border/60">{children}</ul> : <p className="py-5 text-sm text-muted-foreground">{empty}</p>}</section>;
 }

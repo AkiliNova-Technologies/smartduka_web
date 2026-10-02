@@ -7,6 +7,7 @@ import { VerificationStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { withErrorHandling } from "@/lib/api-utils";
 import { requireAdminContext } from "@/lib/auth/admin-context";
+import { toVendorProfileDto } from "@/lib/vendor-profile-dto";
 
 export async function getMyVendorApplication() {
   return withErrorHandling(async () => VendorService.getMyApplication((await requireApplicantContext()).userId), "getMyVendorApplication");
@@ -39,7 +40,10 @@ export async function rejectVendorApplication(applicationId: string, notes: stri
 }
 
 export async function getMyVendorProfile() {
-  return withErrorHandling(async () => VendorService.getVendorProfileByOwner(await requireActiveUserId()), "getMyVendorProfile");
+  return withErrorHandling(async () => {
+    const profile = await VendorService.getVendorProfileByOwner(await requireActiveUserId());
+    return profile ? toVendorProfileDto(profile) : null;
+  }, "getMyVendorProfile");
 }
 
 export async function getPublicStoreListings() {

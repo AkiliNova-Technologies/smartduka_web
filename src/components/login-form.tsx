@@ -45,6 +45,7 @@ export function LoginForm({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [formError, setFormError] = useState("");
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -54,22 +55,26 @@ export function LoginForm({
 
   const handleLogin = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setFormError("");
+    if (!email.trim() || !/^\S+@\S+\.\S+$/.test(email)) { setFormError("Enter a valid email address."); return; }
+    if (!password) { setFormError("Enter your password."); return; }
     try {
-      await loginWithEmail(email, password);
+      await loginWithEmail(email.trim(), password);
       toast.success("Welcome back to SmartDuka!");
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "";
-      toast.error(getFriendlyErrorMessage(message));
+      setFormError(getFriendlyErrorMessage(message));
     }
   };
 
   const handleGoogleSignIn = async () => {
+    setFormError("");
     try {
       await loginWithGoogle();
       toast.success("Logged in successfully!");
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "";
-      toast.error(getFriendlyErrorMessage(message));
+      setFormError(getFriendlyErrorMessage(message));
     }
   };
 
@@ -77,15 +82,16 @@ export function LoginForm({
     <div className={cn("flex flex-col gap-6 w-full", className)}>
       <div className="flex flex-col items-center gap-1.5 text-center select-none">
         <h1 className="text-xl font-semibold tracking-tight text-foreground">
-          Login to your account
+          Welcome back
         </h1>
         <p className="text-xs text-muted-foreground px-2 leading-relaxed">
-          Enter your credentials below to access your account.
+          Sign in to continue shopping or manage your SmartDuka workspace.
         </p>
       </div>
 
       <form onSubmit={handleLogin} className="flex flex-col gap-2" {...props}>
         <FieldGroup>
+          {formError && <p role="alert" className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive">{formError}</p>}
           <Field>
             <FieldLabel htmlFor="email" className="text-xs font-medium text-muted-foreground">
               Email Address
@@ -96,7 +102,7 @@ export function LoginForm({
                 type="email" 
                 required 
                 disabled={actionLoading}
-                placeholder="m@example.com"
+                placeholder="you@example.com" autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="px-6 h-11 border-border/60 rounded-full bg-card focus-visible:ring-primary/20 focus-visible:border-primary text-sm"
@@ -114,7 +120,7 @@ export function LoginForm({
                 type={showPassword ? "text" : "password"} 
                 required 
                 disabled={actionLoading}
-                placeholder="••••••••"
+                placeholder="••••••••" autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="pl-6 pr-12 h-11 border-border/60 rounded-full bg-card focus-visible:ring-primary/20 focus-visible:border-primary text-sm w-full"
@@ -123,6 +129,7 @@ export function LoginForm({
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 disabled={actionLoading}
+                aria-label={showPassword ? "Hide password" : "Show password"}
                 className="absolute right-4 p-1 text-muted-foreground/70 hover:text-foreground outline-none cursor-pointer"
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}

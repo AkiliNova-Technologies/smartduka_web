@@ -10,23 +10,7 @@ export async function getUserWishlistAction() {
     const userId = await requireActiveUserId();
     const items = await WishlistService.getUserWishlist(userId);
 
-    return items.map((item) => ({
-      id: item.id,
-      productId: item.productId,
-      name: item.product.name,
-      slug: item.product.slug,
-      brand: item.product.brand,
-      basePrice: Number(item.product.basePrice),
-      compareAtPrice: item.product.compareAtPrice
-        ? Number(item.product.compareAtPrice)
-        : null,
-      image: item.product.images[0]?.url || "",
-      rating: 4.5,
-      reviews: 0,
-      vendorId: item.product.vendorId,
-      vendorName: item.product.vendor?.storeName || "Unknown Store",
-      addedAt: item.createdAt.toISOString(),
-    }));
+    return items;
   }, "getUserWishlistAction");
 }
 

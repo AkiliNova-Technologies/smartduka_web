@@ -67,6 +67,11 @@ enum SubOrderStatus {
   REFUNDED
 }
 
+enum FulfillmentMethod {
+  DELIVERY
+  PICKUP
+}
+
 enum PaymentStatus {
   PENDING
   AUTHORIZED
@@ -283,6 +288,37 @@ enum VerificationStatus {
   REJECTED
 }
 
+enum PromotionStatus {
+  DRAFT
+  ACTIVE
+  DISABLED
+}
+enum PromotionPlacement {
+  HOMEPAGE
+  PRODUCTS
+  SHOPS
+}
+enum PromotionCtaType {
+  PRODUCT
+  SHOP
+  CATEGORY
+  INTERNAL_PATH
+  EXTERNAL_URL
+}
+
+enum ReviewStatus {
+  PUBLISHED
+  PENDING
+  HIDDEN
+  REMOVED
+}
+
+enum ReviewReportStatus {
+  OPEN
+  RESOLVED
+  DISMISSED
+}
+
 // ==========================================
 // NEXT-AUTH REQUIRED MODELS
 // ==========================================
@@ -362,6 +398,10 @@ model User {
   recentlyViewed    RecentlyViewed[]
   customerOrders    Order[]          @relation("CustomerOrders")
   reviewsWritten    ProductReview[]
+  shopReviewsWritten ShopReview[]
+  reviewReplies      ReviewReply[]
+  reviewReports      ReviewReport[] @relation("ReviewReporter")
+  reviewReportsResolved ReviewReport[] @relation("ReviewReportResolver")
   auditLogs         AuditLog[]
   notifications     Notification[]
   returnRequests    ReturnRequest[]  @relation("ReturnRequester")
@@ -376,6 +416,58 @@ model User {
   @@index([status])
   @@index([vendorId])
   @@index([platformRole])
+}
+
+model Promotion {
+  id String @id @default(uuid())
+  title String
+  subtitle String?
+  desktopImageUrl String
+  mobileImageUrl String?
+  status PromotionStatus @default(DRAFT)
+  priority Int @default(100)
+  startsAt DateTime?
+  endsAt DateTime?
+  primaryCtaLabel String?
+  primaryCtaType PromotionCtaType?
+  primaryCtaValue String?
+  secondaryCtaLabel String?
+  secondaryCtaType PromotionCtaType?
+  secondaryCtaValue String?
+  placements PromotionPlacement[]
+  createdByUserId String
+  updatedByUserId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([status, priority])
+}
+
+model FeaturedProduct {
+  id String @id @default(uuid())
+  productId String @unique
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  priority Int @default(100)
+  isActive Boolean @default(true)
+  startsAt DateTime?
+  endsAt DateTime?
+  createdByUserId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([isActive, priority])
+}
+
+model FeaturedShop {
+  id String @id @default(uuid())
+  vendorId String @unique
+  vendor VendorProfile @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  priority Int @default(100)
+  isActive Boolean @default(true)
+  startsAt DateTime?
+  endsAt DateTime?
+  createdByUserId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([isActive, priority])
 }
 
 // ==========================================
@@ -524,6 +616,19 @@ model VendorProfile {
   bankAccountNumber String?
   bankName          String?
 
+  fulfillmentMethods  FulfillmentMethod[] @default([DELIVERY])
+  deliveryFee         Decimal              @default(3500.00) @db.Decimal(18, 2)
+  deliveryEstimate    String?
+  pickupLocation      String?
+  pickupDirections    String?              @db.Text
+  pickupInstructions  String?              @db.Text
+  returnWindowDays    Int                  @default(7)
+  returnPolicy        String?              @db.Text
+  returnInstructions  String?              @db.Text
+  returnAddress       String?              @db.Text
+  acceptsExchanges    Boolean              @default(false)
+  exchangePolicy      String?              @db.Text
+
   trialEndsAt DateTime?
   activatedAt DateTime?
   suspendedAt DateTime?
@@ -542,8 +647,11 @@ model VendorProfile {
   auditLogs         AuditLog[]
   documents         Document[]
   vendorApplication VendorApplication?
+  featuredEntry FeaturedShop?
   disputes          Dispute[]
   riskFlags         RiskFlag[]
+  shopReviews       ShopReview[]
+  reviewReplies     ReviewReply[] @relation("VendorReviewReplies")
 
   @@index([status])
   @@index([createdAt])
@@ -559,6 +667,8 @@ model ProductCategory {
   slug        String  @unique
   description String?
   image       String?
+  isActive    Boolean @default(true)
+  sortOrder   Int     @default(0)
 
   parentId String?
   parent   ProductCategory?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
@@ -611,12 +721,15 @@ model Product {
   reviews        ProductReview[]
   wishlistItems  WishlistItem[]
   recentlyViewed RecentlyViewed[]
+  featuredEntry FeaturedProduct?
 
   @@unique([vendorId, slug])
   @@index([vendorId])
   @@index([categoryId])
   @@index([subCategoryId])
   @@index([status])
+  @@index([categoryId, status, createdAt])
+  @@index([subCategoryId, status, createdAt])
 }
 
 model ProductImage {
@@ -641,13 +754,17 @@ model ProductVariant {
   price          Decimal @db.Decimal(18, 2)
   inventoryCount Int     @default(0)
   options        Json
+  optionKey      String
+  isActive       Boolean @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   orderItems OrderItem[]
+  reviews    ProductReview[]
 
   @@index([productId])
+  @@unique([productId, optionKey])
 }
 
 model ProductReview {
@@ -656,17 +773,86 @@ model ProductReview {
   product          Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
   userId           String
   user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Legacy reviews predate purchase proof and remain hidden. New writes are
+  // required by ReviewService to provide an order item.
+  orderItemId      String?   @unique
+  orderItem        OrderItem? @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
+  variantId        String?
+  variant          ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
   rating           Int       @default(5)
+  title            String?   @db.VarChar(120)
   comment          String?   @db.Text
-  reply            String?
-  replyAt          DateTime?
+  imageUrls        String[]  @default([])
+  status           ReviewStatus @default(PUBLISHED)
   verifiedPurchase Boolean   @default(false)
+  vendorReplies    ReviewReply[]
+  reports          ReviewReport[]
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  @@unique([productId, userId])
   @@index([productId])
+  @@index([productId, status, createdAt])
   @@index([userId])
+}
+
+model ShopReview {
+  id          String        @id @default(uuid())
+  vendorId    String
+  vendor      VendorProfile @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subOrderId  String        @unique
+  subOrder    SubOrder      @relation(fields: [subOrderId], references: [id], onDelete: Restrict)
+  rating      Int
+  comment     String?       @db.Text
+  status      ReviewStatus  @default(PUBLISHED)
+  vendorReplies ReviewReply[]
+  reports     ReviewReport[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([vendorId, status, createdAt])
+  @@index([userId])
+}
+
+model ReviewReply {
+  id              String         @id @default(uuid())
+  productReviewId String?
+  productReview   ProductReview? @relation(fields: [productReviewId], references: [id], onDelete: Cascade)
+  shopReviewId    String?
+  shopReview      ShopReview?    @relation(fields: [shopReviewId], references: [id], onDelete: Cascade)
+  vendorId        String
+  vendor          VendorProfile  @relation("VendorReviewReplies", fields: [vendorId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  body            String         @db.Text
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@unique([productReviewId])
+  @@unique([shopReviewId])
+  @@index([vendorId])
+}
+
+model ReviewReport {
+  id              String             @id @default(uuid())
+  productReviewId String?
+  productReview   ProductReview?     @relation(fields: [productReviewId], references: [id], onDelete: Cascade)
+  shopReviewId    String?
+  shopReview      ShopReview?        @relation(fields: [shopReviewId], references: [id], onDelete: Cascade)
+  reporterId      String
+  reporter        User               @relation("ReviewReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  reason          String             @db.Text
+  status          ReviewReportStatus @default(OPEN)
+  resolvedById    String?
+  resolvedBy      User?              @relation("ReviewReportResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+  resolution      String?            @db.Text
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@unique([productReviewId, reporterId])
+  @@unique([shopReviewId, reporterId])
+  @@index([status, createdAt])
 }
 
 model WishlistItem {
@@ -760,6 +946,9 @@ model SubOrder {
   deliveryConfirmedByUserId  String?
   deliveryConfirmationSource DeliveryConfirmationSource?
   notes                      String?
+  fulfillmentMethod          FulfillmentMethod            @default(DELIVERY)
+  fulfillmentSnapshot        Json?
+  refundPolicySnapshot       Json?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -769,6 +958,7 @@ model SubOrder {
   refunds        Refund[]
   disputes       Dispute[]
   riskFlags      RiskFlag[]
+  shopReview     ShopReview?
 
   @@index([orderId])
   @@index([vendorId])
@@ -820,11 +1010,15 @@ model OrderItem {
   quantity        Int     @default(1)
   priceAtPurchase Decimal @db.Decimal(18, 2)
   totalPrice      Decimal @db.Decimal(18, 2)
+  productNameSnapshot String?
+  variantNameSnapshot String?
+  variantOptionsSnapshot Json?
 
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
   returnItems ReturnItem[]
   refundItems RefundItem[]
+  productReview ProductReview?
 
   @@index([orderId])
   @@index([subOrderId])

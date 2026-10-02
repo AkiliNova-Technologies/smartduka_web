@@ -16,4 +16,10 @@ describe("public API error handling", () => {
       "Missing required field: email",
     );
   });
+
+  it("gives a safe retry message for an expired Prisma transaction", () => {
+    expect(getErrorMessage({ code: "P2028" })).toBe(
+      "Product creation took too long. Please try again.",
+    );
+  });
 });

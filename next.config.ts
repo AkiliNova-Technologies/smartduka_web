@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  cacheComponents: true,
   serverExternalPackages: [
     "firebase-admin",
     "firebase-admin/app",
@@ -18,7 +19,7 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: "https",
-        hostname: "pxhluidlhpiodespjyke.supabase.co",
+        hostname: "wqfsgjuedluwsvwzelal.supabase.co",
         port: "",
         pathname: "/storage/v1/object/public/**",
       },

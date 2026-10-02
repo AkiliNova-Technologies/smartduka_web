@@ -13,6 +13,7 @@ import { fetchApi, authHeaders } from "@/lib/providers/useProviderFetch";
 import { toast } from "sonner";
 import { trackProductViewAction } from "@/actions/recently-viewed";
 import { getRecentlyViewedAction } from "@/actions/recently-viewed";
+import type { MarketplaceProduct } from "@/components/marketplace/product-card";
 
 export interface UserSettings {
   id: string;
@@ -43,19 +44,14 @@ export interface CartItem {
   vendorName: string;
   /** Display-only snapshot; checkout derives ownership and price on the server. */
   variantId?: string | null;
+  variantName?: string | null;
+  variantOptions?: Record<string, string> | null;
 }
 
-export interface WishlistItem {
+export interface WishlistItem extends Omit<MarketplaceProduct, "id"> {
+  id?: string;
   productId: string;
-  name: string;
-  slug?: string;
-  brand?: string | null;
-  image: string;
   price: number;
-  basePrice?: number;
-  compareAtPrice?: number | null;
-  vendorId?: string;
-  vendorName?: string;
   addedAt: string;
 }
 
@@ -63,9 +59,14 @@ export interface UserOrder {
   id: string;
   orderNumber: string;
   status: string;
+  paymentStatus: string;
+  paymentGateway: string;
   totalAmount: number;
+  subTotal: number;
+  totalShipping: number;
   createdAt: string;
-  items: { productId: string; name: string; quantity: number; price: number }[];
+  items: { id: string; productId: string; subOrderId: string; name: string; variantName: string | null; quantity: number; price: number; image: string | null; vendorName: string; canReview: boolean; review: { id: string; rating: number; title: string | null; comment: string | null; imageUrls: string[] } | null }[];
+  subOrders: { id: string; status: string; subOrderNumber: string; vendorName: string; canReview: boolean; review: { id: string; rating: number; comment: string | null } | null }[];
 }
 
 export interface UserNotification {
@@ -103,8 +104,8 @@ interface UserDataContextType {
   cartCount: number;
   cartTotal: number;
   addToCart: (item: Omit<CartItem, "quantity"> & { quantity?: number }) => void;
-  removeFromCart: (productId: string) => void;
-  updateCartQuantity: (productId: string, quantity: number) => void;
+  removeFromCart: (productId: string, variantId?: string | null) => void;
+  updateCartQuantity: (productId: string, quantity: number, variantId?: string | null) => void;
   clearCart: () => void;
   refreshCart: () => Promise<void>;
   wishlist: WishlistItem[];
@@ -121,10 +122,11 @@ interface UserDataContextType {
     items: { productId: string; variantId?: string | null; quantity: number }[];
     shippingAddress: string;
     shippingPhone: string;
-    paymentGateway: "CASH_ON_DELIVERY" | "MTN_MOMO" | "AIRTEL_MONEY";
+    fulfillmentSelections?: { vendorId: string; method: "DELIVERY" | "PICKUP" }[];
+    paymentGateway: "PESAPAL";
     checkoutRequestId: string;
     notes?: string;
-  }) => Promise<{ success: boolean; error?: string }>;
+  }) => Promise<{ success: boolean; error?: string; orderId?: string }>;
   notifications: UserNotification[];
   unreadCount: number;
   notificationsLoading: boolean;
@@ -225,13 +227,21 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
     [uid, settings],
   );
 
-  const [cart, setCart] = useState<CartItem[]>(() =>
-    loadFromStorage<CartItem[]>("smartduka-cart", []),
-  );
-  const [cartLoading] = useState(false);
+  // Keep server and first client renders identical; load browser storage after hydration.
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [cartLoading, setCartLoading] = useState(true);
+  const cartHydratedRef = useRef(false);
 
   useEffect(() => {
-    saveToStorage("smartduka-cart", cart);
+    queueMicrotask(() => {
+      setCart(loadFromStorage<CartItem[]>("smartduka-cart", []));
+      cartHydratedRef.current = true;
+      setCartLoading(false);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (cartHydratedRef.current) saveToStorage("smartduka-cart", cart);
   }, [cart]);
 
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
@@ -240,10 +250,10 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
   const addToCart = useCallback(
     (item: Omit<CartItem, "quantity"> & { quantity?: number }) => {
       setCart((prev) => {
-        const existing = prev.find((i) => i.productId === item.productId);
+        const existing = prev.find((i) => i.productId === item.productId && (i.variantId ?? null) === (item.variantId ?? null));
         if (existing) {
           return prev.map((i) =>
-            i.productId === item.productId ? { ...i, quantity: i.quantity + (item.quantity || 1) } : i,
+            i.productId === item.productId && (i.variantId ?? null) === (item.variantId ?? null) ? { ...i, quantity: i.quantity + (item.quantity || 1) } : i,
           );
         }
         return [...prev, { ...item, quantity: item.quantity || 1 }];
@@ -253,18 +263,18 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
     [],
   );
 
-  const removeFromCart = useCallback((productId: string) => {
-    setCart((prev) => prev.filter((i) => i.productId !== productId));
+  const removeFromCart = useCallback((productId: string, variantId?: string | null) => {
+    setCart((prev) => prev.filter((i) => i.productId !== productId || (i.variantId ?? null) !== (variantId ?? null)));
   }, []);
 
   const updateCartQuantity = useCallback(
-    (productId: string, quantity: number) => {
+    (productId: string, quantity: number, variantId?: string | null) => {
       if (quantity <= 0) {
-        removeFromCart(productId);
+        removeFromCart(productId, variantId);
         return;
       }
       setCart((prev) =>
-        prev.map((i) => (i.productId === productId ? { ...i, quantity } : i)),
+        prev.map((i) => (i.productId === productId && (i.variantId ?? null) === (variantId ?? null) ? { ...i, quantity } : i)),
       );
     },
     [removeFromCart],
@@ -367,7 +377,8 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
       items: { productId: string; variantId?: string | null; quantity: number }[];
       shippingAddress: string;
       shippingPhone: string;
-      paymentGateway: "CASH_ON_DELIVERY" | "MTN_MOMO" | "AIRTEL_MONEY";
+      fulfillmentSelections?: { vendorId: string; method: "DELIVERY" | "PICKUP" }[];
+      paymentGateway: "PESAPAL";
       checkoutRequestId: string;
       notes?: string;
     }) => {
@@ -379,8 +390,12 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
           body: JSON.stringify(input),
         });
         if (response.ok) {
+          const body = await response.json().catch(() => ({}));
           await refreshOrders();
-          return { success: true };
+          return {
+            success: true,
+            orderId: typeof body?.data?.order?.id === "string" ? body.data.order.id : undefined,
+          };
         }
         const body = await response.json().catch(() => ({}));
         return { success: false, error: body.error || "Failed to place order" };

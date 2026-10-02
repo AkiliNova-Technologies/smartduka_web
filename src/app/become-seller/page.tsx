@@ -80,7 +80,7 @@ export default function BecomeSellerPage() {
             href="/help"
             className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
           >
-            KYC Requirements
+            Seller help
           </Link>
         </div>
 
@@ -88,10 +88,10 @@ export default function BecomeSellerPage() {
           <div className="w-full max-w-md">
             <div className="space-y-1.5 mb-6 text-center select-none">
               <h1 className="text-2xl font-bold tracking-tight text-foreground">
-                Open Your Storefront
+                Start selling on SmartDuka
               </h1>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                Complete your vendor profile to begin selling. Review typically takes 24 hours.
+                Tell us about your business so we can review your seller application.
               </p>
             </div>
 
@@ -100,7 +100,7 @@ export default function BecomeSellerPage() {
         </div>
 
         <div className="text-center text-[10px] text-muted-foreground/50 select-none">
-          Protected by SmartDuka Vendor Compliance
+          Seller applications are reviewed before shops can start selling.
         </div>
       </div>
     </div>

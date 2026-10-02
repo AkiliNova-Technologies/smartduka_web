@@ -1,9 +1,9 @@
 "server-only";
 
 import { adminAuth } from "@/lib/firebase/admin";
-import { prisma } from "@/lib/prisma/client"; 
+import { prisma } from "@/lib/prisma/client";
+import { getAuthSyncErrorResponse, synchronizeFirebaseIdentity } from "@/services/auth-sync";
 import { cookies } from "next/headers";
-import { PlatformRole, UserStatus } from "@prisma/client";
 import { createToken, SESSION_MAX_AGE_SECONDS } from "@/lib/auth/jwt";
 
 export async function handleServerSession(idToken: string, provider: string = "google") {
@@ -14,23 +14,12 @@ export async function handleServerSession(idToken: string, provider: string = "g
     if (!email) {
       return { success: false, error: "Email missing from OAuth provider token" };
     }
-    const user = await prisma.user.upsert({
-      where: { email },
-      update: {
-        lastLoginAt: new Date(),
-        avatarUrl: picture || null,
-        emailVerifiedAt: email_verified ? new Date() : null
-      },
-      create: {
-        id: uid,
-        email,
-        name: name || email.split("@")[0],
-        avatarUrl: picture || null,
-        status: UserStatus.ACTIVE,
-        platformRole: PlatformRole.CUSTOMER,
-        emailVerifiedAt: email_verified ? new Date() : null,
-        lastLoginAt: new Date(),
-      },
+    const user = await synchronizeFirebaseIdentity({
+      uid,
+      email,
+      name,
+      picture,
+      emailVerified: email_verified,
     });
 
     await prisma.account.upsert({
@@ -56,8 +45,7 @@ export async function handleServerSession(idToken: string, provider: string = "g
 
     return { success: true, role: user.platformRole };
   } catch (error: unknown) {
-    console.error("Firebase Sync Error:", error);
-    const message = error instanceof Error ? error.message : "Authentication failed";
-    return { success: false, error: message };
+    console.error("Firebase Sync Error:", error instanceof Error ? error.name : "Unknown auth error");
+    return { success: false, error: getAuthSyncErrorResponse(error).message };
   }
 }

@@ -34,7 +34,18 @@ function required(environment: PesapalEnvironmentValues, name: string): string {
   return value;
 }
 
-function urlValue(environment: PesapalEnvironmentValues, name: string, production: boolean): string {
+function isLocalOrPrivateHost(hostname: string): boolean {
+  const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host === "::1" || host === "0.0.0.0") return true;
+  const octets = host.split(".").map(Number);
+  return octets.length === 4 && octets.every(Number.isInteger) && (
+    octets[0] === 10 || octets[0] === 127 ||
+    (octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31) ||
+    (octets[0] === 192 && octets[1] === 168)
+  );
+}
+
+function urlValue(environment: PesapalEnvironmentValues, name: string): string {
   const value = required(environment, name);
   let parsed: URL;
   try {
@@ -42,8 +53,11 @@ function urlValue(environment: PesapalEnvironmentValues, name: string, productio
   } catch {
     throw new PesapalConfigError(`${name} must be an absolute URL.`);
   }
-  if (production && parsed.protocol !== "https:") {
-    throw new PesapalConfigError(`${name} must use HTTPS in production.`);
+  if (parsed.protocol !== "https:") {
+    throw new PesapalConfigError(`${name} must use HTTPS.`);
+  }
+  if (isLocalOrPrivateHost(parsed.hostname)) {
+    throw new PesapalConfigError(`${name} must use a publicly reachable host.`);
   }
   return parsed.toString();
 }
@@ -55,7 +69,6 @@ export function getPesapalConfig(environment: PesapalEnvironmentValues = process
     throw new PesapalConfigError("PESAPAL_ENV must be exactly sandbox or production.");
   }
 
-  const production = selected === "production";
   const ipnId = required(environment, "PESAPAL_IPN_ID");
   if (!IPN_ID_PATTERN.test(ipnId)) {
     throw new PesapalConfigError("PESAPAL_IPN_ID must be a GUID issued by Pesapal.");
@@ -68,8 +81,8 @@ export function getPesapalConfig(environment: PesapalEnvironmentValues = process
     consumerKey: required(environment, "PESAPAL_CONSUMER_KEY"),
     consumerSecret: required(environment, "PESAPAL_CONSUMER_SECRET"),
     ipnId,
-    ipnUrl: urlValue(environment, "PESAPAL_IPN_URL", production),
-    callbackUrl: urlValue(environment, "PESAPAL_CALLBACK_URL", production),
-    cancellationUrl: cancellation ? urlValue({ ...environment, PESAPAL_CANCELLATION_URL: cancellation }, "PESAPAL_CANCELLATION_URL", production) : undefined,
+    ipnUrl: urlValue(environment, "PESAPAL_IPN_URL"),
+    callbackUrl: urlValue(environment, "PESAPAL_CALLBACK_URL"),
+    cancellationUrl: cancellation ? urlValue({ ...environment, PESAPAL_CANCELLATION_URL: cancellation }, "PESAPAL_CANCELLATION_URL") : undefined,
   };
 }

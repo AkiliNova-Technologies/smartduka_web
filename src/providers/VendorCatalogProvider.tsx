@@ -17,6 +17,7 @@ import {
   createCategoryAction,
   updateCategoryAction,
   deleteCategoryAction,
+  setCategoryStatusAction,
 } from "@/actions/category";
 import { fetchApi } from "@/lib/providers/useProviderFetch";
 import type { Product, CategoryTree } from "@/types/marketplace";
@@ -42,6 +43,7 @@ interface CreateProductHookInput {
   status?: string;
   tags?: string[];
   images?: { url: string; isFeatured?: boolean; sortOrder?: number }[];
+  variants?: { id?: string; sku?: string; name: string; price: number; inventoryCount: number; options: Record<string, string>; isActive?: boolean }[];
 }
 
 interface UpdateProductHookInput {
@@ -60,6 +62,7 @@ interface UpdateProductHookInput {
   colors?: string[];
   specs?: Record<string, string>[];
   tags?: string[];
+  variants?: { id?: string; sku?: string; name: string; price: number; inventoryCount: number; options: Record<string, string>; isActive?: boolean }[];
 }
 
 interface VendorCatalogContextType {
@@ -71,7 +74,9 @@ interface VendorCatalogContextType {
     slug: string;
     description: string;
     image: string;
-    subCategories: { name: string; slug: string; image: string }[];
+    parentId?: string | null;
+    sortOrder?: number;
+    subCategories?: { name: string; slug: string; image: string; description?: string; sortOrder?: number }[];
   }) => Promise<{ success: boolean; error?: string }>;
   updateCategory: (input: {
     id: string;
@@ -82,6 +87,7 @@ interface VendorCatalogContextType {
     parentId?: string | null;
   }) => Promise<{ success: boolean; error?: string }>;
   deleteCategory: (id: string) => Promise<{ success: boolean; error?: string }>;
+  setCategoryStatus: (id: string, isActive: boolean) => Promise<{ success: boolean; error?: string }>;
   refreshCategories: () => void;
 
   // Products
@@ -118,9 +124,11 @@ export const VendorCatalogContext = createContext<VendorCatalogContextType | und
 export function VendorCatalogProvider({
   children,
   vendorId,
+  includeInactiveCategories = false,
 }: {
   children: React.ReactNode;
   vendorId?: string; // ✅ Optional — when absent, fetches ALL products (admin mode)
+  includeInactiveCategories?: boolean;
 }) {
   const [categories, setCategories] = useState<CategoryTree[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -128,22 +136,19 @@ export function VendorCatalogProvider({
   const [productsLoading, setProductsLoading] = useState(true);
   const [isMutating, setIsMutating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const categoriesRequestRef = React.useRef<Promise<void> | null>(null);
+  const productsRequestRef = React.useRef<Promise<void> | null>(null);
 
   // ==========================================
   // FETCH CATEGORIES
   // ==========================================
 
   const fetchCategories = useCallback(async () => {
-    setCategoriesLoading(true);
-    try {
-      const data = await fetchApi<CategoryTree[]>("/api/categories?mode=tree");
-      setCategories(data);
-    } catch {
-      // Categories are non-critical — silent failure
-    } finally {
-      setCategoriesLoading(false);
-    }
-  }, []);
+    if (categoriesRequestRef.current) return categoriesRequestRef.current;
+    const request = (async () => { setCategoriesLoading(true); try { const data = await fetchApi<CategoryTree[]>(`/api/categories?mode=tree${includeInactiveCategories ? "&includeInactive=true" : ""}`); setCategories(data); } catch { /* Categories are non-critical. */ } finally { setCategoriesLoading(false); } })();
+    categoriesRequestRef.current = request;
+    try { await request; } finally { categoriesRequestRef.current = null; }
+  }, [includeInactiveCategories]);
 
   const refreshCategories = useCallback(() => {
     fetchCategories();
@@ -159,7 +164,9 @@ export function VendorCatalogProvider({
       slug: string;
       description: string;
       image: string;
-      subCategories: { name: string; slug: string; image: string }[];
+      parentId?: string | null;
+      sortOrder?: number;
+      subCategories?: { name: string; slug: string; image: string; description?: string; sortOrder?: number }[];
     }) => {
       setIsMutating(true);
       try {
@@ -217,6 +224,18 @@ export function VendorCatalogProvider({
     [fetchCategories]
   );
 
+  const setCategoryStatus = useCallback(async (id: string, isActive: boolean) => {
+    setIsMutating(true);
+    try {
+      const result = await setCategoryStatusAction(id, isActive);
+      if (!result.success) throw new Error(result.error);
+      await fetchCategories();
+      return { success: true as const };
+    } catch (err: unknown) {
+      return { success: false as const, error: getErrorMessage(err) };
+    } finally { setIsMutating(false); }
+  }, [fetchCategories]);
+
   // ==========================================
   // FETCH PRODUCTS
   // ==========================================
@@ -224,17 +243,10 @@ export function VendorCatalogProvider({
   const buildProductsUrl = useCallback(() => vendorId ? "/api/vendor/products" : "/api/products", [vendorId]);
 
   const fetchProducts = useCallback(async () => {
-    setProductsLoading(true);
-    setError(null);
-    try {
-      const url = buildProductsUrl();
-      const data = await fetchApi<Product[]>(url);
-      setProducts(data);
-    } catch (err: unknown) {
-      setError(getErrorMessage(err));
-    } finally {
-      setProductsLoading(false);
-    }
+    if (productsRequestRef.current) return productsRequestRef.current;
+    const request = (async () => { setProductsLoading(true); setError(null); try { const data = await fetchApi<Product[]>(buildProductsUrl()); setProducts(data); } catch (err: unknown) { setError(getErrorMessage(err)); } finally { setProductsLoading(false); } })();
+    productsRequestRef.current = request;
+    try { await request; } finally { productsRequestRef.current = null; }
   }, [buildProductsUrl]);
 
   const refreshProducts = useCallback(() => {
@@ -329,6 +341,7 @@ export function VendorCatalogProvider({
         createCategory,
         updateCategory,
         deleteCategory,
+        setCategoryStatus,
         refreshCategories,
         products,
         productsLoading,
