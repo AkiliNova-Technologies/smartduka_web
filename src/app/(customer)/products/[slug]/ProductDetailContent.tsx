@@ -497,8 +497,9 @@ export function ProductDetailContent({
           </div>
         </section>
       </div>
-      <div className="mt-10 grid gap-8 border-t pt-8 lg:grid-cols-[minmax(0,1fr)_30rem]">
-        <section>
+
+      <div className="mt-8 grid min-w-0 gap-6 border-t pt-6 sm:mt-10 sm:gap-8 sm:pt-8 lg:grid-cols-[minmax(0,1fr)_30rem]">
+        <section className="min-w-0">
           <h2 className="text-xl font-semibold">About this product</h2>
           <p className="mt-3 max-w-3xl whitespace-pre-line text-sm leading-7 text-muted-foreground">
             {product.description ||
@@ -588,7 +589,7 @@ export function ProductDetailContent({
                       </p>
                     ) : null}
                     {review.imageUrls.length ? (
-                      <div className="mt-2 flex gap-2">
+                      <div className="mt-2 flex flex-wrap gap-2">
                         {review.imageUrls.map((url) => (
                           <a
                             key={url}
@@ -705,7 +706,7 @@ function DeliveryReturnsCard({ vendor }: { vendor: FulfillmentVendor }) {
 
   return (
     <aside
-      className="h-fit min-w-md w-full rounded-xl border border-border/70 bg-card p-5 shadow-sm sm:p-6"
+      className="h-fit min-w-0 w-full rounded-xl border border-border/70 bg-card p-4 shadow-sm sm:p-6"
       aria-labelledby="delivery-returns-title">
       <h2
         id="delivery-returns-title"
@@ -855,9 +856,9 @@ function WishlistButton({
 }
 function Detail({ label, value }: { label: string; value: string }) {
   return (
-    <div className="grid grid-cols-[9rem_1fr] gap-4 py-3">
+    <div className="grid grid-cols-1 gap-1 py-3 sm:grid-cols-[9rem_minmax(0,1fr)] sm:gap-4">
       <dt className="text-muted-foreground">{label}</dt>
-      <dd className="font-medium">{value}</dd>
+      <dd className="break-words font-medium">{value}</dd>
     </div>
   );
 }
