@@ -7,7 +7,7 @@ const source = (file: string) =>
 
 describe("product detail reviews and fulfilment", () => {
   const detail = source("src/app/(customer)/products/[slug]/ProductDetailContent.tsx");
-  const action = source("src/actions/product.ts");
+  const productService = source("src/services/product.ts");
 
   it("uses a contained review empty state and keeps eligible review entry concise", () => {
     expect(detail).toContain("No reviews yet");
@@ -24,13 +24,15 @@ describe("product detail reviews and fulfilment", () => {
 
   it("projects and conditionally renders public delivery, pickup, returns, and exchanges settings", () => {
     for (const token of ["fulfillmentMethods", "deliveryEstimate", "pickupLocation", "returnWindowDays", "returnInstructions", "acceptsExchanges"]) {
-      expect(action).toContain(token);
+      expect(productService).toContain(token);
       expect(detail).toContain(token);
     }
     expect(detail).toContain("Delivery available");
     expect(detail).toContain("Pickup available");
     expect(detail).toContain("Exchanges available");
-    expect(detail).toContain("View delivery &amp; returns");
+    expect(detail).toContain("Review delivery &amp; return policy");
+    expect(detail).toContain("Return eligible items within");
+    expect(detail).not.toContain("line-clamp-2 text-muted-foreground");
   });
 
   it("preserves related products through the shared ProductCard", () => {

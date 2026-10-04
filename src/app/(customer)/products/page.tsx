@@ -23,12 +23,21 @@ function FilterToolbarFallback() {
 
 type ProductsPageProps = { searchParams: Promise<MarketplaceProductSearchParams> };
 
-function ProductsPageFallback() {
-  return <PageContainer className="py-6 sm:py-8 lg:py-10"><div className="space-y-6"><div className="h-8 w-52 rounded bg-muted" /><div className="h-5 w-80 max-w-full rounded bg-muted" /><MarketplaceSearchFallback /><FilterToolbarFallback /><ProductGridSkeleton /></div></PageContainer>;
+function ProductsResultsFallback() {
+  return <div className="space-y-6"><FilterToolbarFallback /><ProductGridSkeleton /></div>;
 }
 
 export default function ProductsPage({ searchParams }: ProductsPageProps) {
-  return <Suspense fallback={<ProductsPageFallback />}><ProductsRuntime searchParams={searchParams} /></Suspense>;
+  return (
+    <PageContainer className="py-6 sm:py-8 lg:py-10">
+      <div className="space-y-6">
+        <PromotionSection placement="PRODUCTS" />
+        <PageHeader title="Browse products" description="Browse products from local shops on SmartDuka." />
+        <div className="md:hidden"><Suspense fallback={<MarketplaceSearchFallback />}><MarketplaceSearch /></Suspense></div>
+        <Suspense fallback={<ProductsResultsFallback />}><ProductsRuntime searchParams={searchParams} /></Suspense>
+      </div>
+    </PageContainer>
+  );
 }
 
 async function ProductsRuntime({ searchParams }: ProductsPageProps) {
@@ -39,31 +48,9 @@ async function ProductsRuntime({ searchParams }: ProductsPageProps) {
     ProductService.getPublicCatalogBrands(),
     ProductService.getPublicCatalogVariantFacets(filterInput),
   ]);
-  const title = search ? `Search results for “${search}”` : "Browse products";
   return (
-    <PageContainer className="py-6 sm:py-8 lg:py-10">
-      <div className="space-y-6">
-        <PromotionSection placement="PRODUCTS" />
-        <PageHeader
-          title={title}
-          description={
-            search
-              ? "Browse matching products from SmartDuka shops."
-              : "Browse products from local shops on SmartDuka."
-          }
-          actions={
-            search ? (
-              <Link
-                href="/products"
-                className="inline-flex h-11 items-center gap-2 rounded-full border border-border px-4 text-sm font-medium text-foreground hover:bg-muted">
-                <RotateCcw className="size-4" />
-                Clear search
-              </Link>
-            ) : undefined
-          }
-        />
-        <div className="md:hidden"><Suspense fallback={<MarketplaceSearchFallback />}><MarketplaceSearch /></Suspense></div>
-        <>
+    <div className="space-y-6">
+        {search ? <div className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-muted-foreground">Search results for “{search}”</p><Link href="/products" className="inline-flex h-10 items-center gap-2 rounded-full border border-border px-3 text-sm font-medium text-foreground hover:bg-muted"><RotateCcw className="size-4" />Clear search</Link></div> : null}
             <Suspense fallback={<FilterToolbarFallback />}><FilterToolbar count={products.length} sort={catalogSort}>
               <CatalogFilters categories={categories} brands={brands} sizes={facets.sizes} colors={facets.colors} />
             </FilterToolbar></Suspense>
@@ -95,8 +82,6 @@ async function ProductsRuntime({ searchParams }: ProductsPageProps) {
                 }
               />
             )}
-        </>
-      </div>
-    </PageContainer>
+    </div>
   );
 }

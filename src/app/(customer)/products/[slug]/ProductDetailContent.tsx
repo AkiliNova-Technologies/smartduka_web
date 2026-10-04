@@ -10,17 +10,16 @@ import {
   Dot,
   Heart,
   Minus,
-  MapPin,
   Plus,
-  RefreshCcw,
-  RotateCcw,
   Star,
-  Truck,
 } from "lucide-react";
 import { IconRosetteDiscountCheckFilled } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { PriceDisplay } from "@/components/marketplace/price-display";
-import { ProductCard, type MarketplaceProduct } from "@/components/marketplace/product-card";
+import {
+  ProductCard,
+  type MarketplaceProduct,
+} from "@/components/marketplace/product-card";
 import { useUserData } from "@/providers/UserDataProvider";
 import { ReviewEntryPoint } from "@/components/reviews/ReviewEntryPoint";
 
@@ -90,7 +89,8 @@ export function ProductDetailContent({
   product: ProductData;
   relatedProducts: MarketplaceProduct[];
 }) {
-  const { addToCart, isWishlisted, toggleWishlist, trackProductView } = useUserData();
+  const { addToCart, isWishlisted, toggleWishlist, trackProductView } =
+    useUserData();
   const trackedProductId = useRef<string | null>(null);
   useEffect(() => {
     // This runs only after a valid public detail has rendered. The provider keeps
@@ -178,15 +178,15 @@ export function ProductDetailContent({
         className="flex items-center gap-2 text-sm text-muted-foreground">
         <Link
           href="/products"
-          className="inline-flex items-center gap-1 hover:text-primary">
-          <ChevronLeft className="size-4" /> Products
+          className="inline-flex items-center gap-1 rounded-sm hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+          <ChevronLeft aria-hidden="true" className="size-4" /> Products
         </Link>
         {product.category && (
           <>
-            <span>/</span>
+            <span aria-hidden="true">/</span>
             <Link
               href={`/categories/${product.category.slug}`}
-              className="hover:text-primary">
+              className="rounded-sm hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
               {product.category.name}
             </Link>
           </>
@@ -205,7 +205,7 @@ export function ProductDetailContent({
                 <MediaImage
                   src={imageUrl}
                   fallback={PRODUCT_IMAGE_FALLBACK}
-                  alt={product.name}
+                  alt={`${product.name}, image ${activeImage + 1} of ${realImages.length}`}
                   fill
                   priority
                   sizes="(max-width: 1024px) 100vw, 56vw"
@@ -214,18 +214,23 @@ export function ProductDetailContent({
                 />
               </div>
               {realImages.length > 1 && (
-                <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+                <div
+                  className="mt-3 flex gap-2 overflow-x-auto pb-1"
+                  role="list"
+                  aria-label="Product images">
                   {realImages.map((image, index) => (
                     <button
                       key={image.id}
                       aria-label={`View product image ${index + 1}`}
+                      aria-current={activeImage === index ? "true" : undefined}
                       onClick={() => setActiveImage(index)}
                       className={cn(
-                        "relative size-16 shrink-0 overflow-hidden rounded-lg border-2",
+                        "relative size-16 shrink-0 overflow-hidden rounded-lg border-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                         activeImage === index
                           ? "border-primary"
                           : "border-transparent hover:border-muted-foreground/40",
-                      )}>
+                      )}
+                      role="listitem">
                       <MediaImage
                         src={image.url}
                         fallback={PRODUCT_IMAGE_FALLBACK}
@@ -263,27 +268,36 @@ export function ProductDetailContent({
               {product.category && (
                 <Link
                   href={`/categories/${product.category.slug}`}
-                  className="hover:text-primary">
+                  className="rounded-sm hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
                   {product.category.name}
                 </Link>
               )}
-              {product.category && product.subCategory && <span><Dot className="size-5" /></span>}
+              {product.category && product.subCategory && (
+                <span aria-hidden="true">
+                  <Dot className="size-5" />
+                </span>
+              )}
               {product.subCategory && (
                 <Link
                   href={`/categories/${product.subCategory.slug}`}
-                  className="hover:text-primary">
+                  className="rounded-sm hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
                   {product.subCategory.name}
                 </Link>
               )}
             </div>
           )}
           {product.reviewCount > 0 && (
-            <div className="mt-3 flex items-center gap-1.5 text-sm text-muted-foreground">
-              <Star className="size-4 fill-amber-400 text-amber-400" />
+            <div
+              className="mt-3 flex items-center gap-1.5 text-sm text-muted-foreground"
+              aria-label={`${product.rating.toFixed(1)} out of 5 stars from ${product.reviewCount} reviews`}>
+              <Star
+                aria-hidden="true"
+                className="size-4 fill-amber-400 text-amber-400"
+              />
               <span className="font-medium text-foreground">
                 {product.rating.toFixed(1)}
               </span>
-              <span>
+              <span aria-hidden="true">
                 ({product.reviewCount} review
                 {product.reviewCount === 1 ? "" : "s"})
               </span>
@@ -320,9 +334,12 @@ export function ProductDetailContent({
             <div className="mt-6 space-y-4 border-t pt-5">
               {variantProduct ? (
                 Object.entries(optionGroups).map(([group, values]) => (
-                  <div key={group}>
-                    <p className="text-sm font-medium">{group}</p>
-                    <div className="mt-2 flex flex-wrap gap-2">
+                  <fieldset key={group}>
+                    <legend className="text-sm font-medium">{group}</legend>
+                    <div
+                      className="mt-2 flex flex-wrap gap-2"
+                      role="group"
+                      aria-label={`Select ${group}`}>
                       {values.map((value) => {
                         const possible = activeVariants.some(
                           (variant) =>
@@ -338,6 +355,7 @@ export function ProductDetailContent({
                           <button
                             key={value}
                             disabled={!possible}
+                            aria-pressed={selectedOptions[group] === value}
                             onClick={() =>
                               setSelectedOptions((current) => ({
                                 ...current,
@@ -345,7 +363,7 @@ export function ProductDetailContent({
                               }))
                             }
                             className={cn(
-                              "min-h-10 min-w-10 rounded-full border px-3 text-sm font-medium",
+                              "min-h-10 min-w-10 rounded-full border px-3 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                               selectedOptions[group] === value
                                 ? "border-primary bg-primary text-primary-foreground"
                                 : "hover:border-foreground/40 disabled:cursor-not-allowed disabled:opacity-40",
@@ -355,7 +373,7 @@ export function ProductDetailContent({
                         );
                       })}
                     </div>
-                  </div>
+                  </fieldset>
                 ))
               ) : (
                 <>
@@ -389,8 +407,9 @@ export function ProductDetailContent({
               </div>
             ) : (
               <>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3 sm:flex-nowrap">
                   <div
+                    role="group"
                     aria-label="Quantity"
                     className="flex h-11 items-center rounded-full border">
                     <button
@@ -398,12 +417,15 @@ export function ProductDetailContent({
                       onClick={() =>
                         setQuantity((value) => Math.max(1, value - 1))
                       }
-                      className="grid size-11 place-items-center hover:bg-muted">
-                      <Minus className="size-4" />
+                      disabled={quantity <= 1}
+                      className="grid size-11 place-items-center rounded-l-full hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                      <Minus aria-hidden="true" className="size-4" />
                     </button>
-                    <span className="w-8 text-center text-sm font-medium">
+                    <output
+                      aria-live="polite"
+                      className="w-8 text-center text-sm font-medium">
                       {quantity}
-                    </span>
+                    </output>
                     <button
                       aria-label="Increase quantity"
                       onClick={() =>
@@ -411,8 +433,9 @@ export function ProductDetailContent({
                           Math.min(availableStock, value + 1),
                         )
                       }
-                      className="grid size-11 place-items-center hover:bg-muted">
-                      <Plus className="size-4" />
+                      disabled={quantity >= availableStock}
+                      className="grid size-11 place-items-center rounded-r-full hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                      <Plus aria-hidden="true" className="size-4" />
                     </button>
                   </div>
                   <button
@@ -420,7 +443,7 @@ export function ProductDetailContent({
                     disabled={
                       outOfStock || (variantProduct && !selectedVariant)
                     }
-                    className="flex h-11 flex-1 items-center justify-center gap-2 rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground hover:opacity-90">
+                    className="flex h-11 min-w-36 flex-1 items-center justify-center gap-2 rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
                     {outOfStock
                       ? "Out of stock"
                       : variantProduct && !selectedVariant
@@ -474,7 +497,7 @@ export function ProductDetailContent({
           </div>
         </section>
       </div>
-      <div className="mt-10 grid gap-8 border-t pt-8 lg:grid-cols-[minmax(0,1fr)_20rem]">
+      <div className="mt-10 grid gap-8 border-t pt-8 lg:grid-cols-[minmax(0,1fr)_30rem]">
         <section>
           <h2 className="text-xl font-semibold">About this product</h2>
           <p className="mt-3 max-w-3xl whitespace-pre-line text-sm leading-7 text-muted-foreground">
@@ -499,28 +522,66 @@ export function ProductDetailContent({
               </dl>
             </div>
           )}
-          <div className="mt-8">
+          <section className="mt-8" aria-labelledby="reviews-title">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-xl font-semibold">Customer reviews</h2>
-              <ReviewEntryPoint kind="product" resourceId={product.id} label={product.name} image={featuredImage} showEligibilityMessage={false} />
+              <h2 id="reviews-title" className="text-xl font-semibold">
+                Customer reviews
+              </h2>
+              <ReviewEntryPoint
+                kind="product"
+                resourceId={product.id}
+                label={product.name}
+                image={featuredImage}
+                showEligibilityMessage={false}
+              />
             </div>
             {product.reviews.length ? (
               <div className="mt-4 space-y-4 rounded-xl border bg-card p-4 sm:p-5">
                 <div className="flex flex-wrap items-center gap-3 border-b pb-4">
-                  <span className="text-3xl font-semibold">{product.rating.toFixed(1)}</span>
-                  <span className="flex items-center gap-1 text-amber-500"><Star className="size-4 fill-current" /> {product.reviewCount} {product.reviewCount === 1 ? "review" : "reviews"}</span>
+                  <span className="text-3xl font-semibold">
+                    {product.rating.toFixed(1)}
+                  </span>
+                  <span className="flex items-center gap-1 text-amber-500">
+                    <Star className="size-4 fill-current" />{" "}
+                    {product.reviewCount}{" "}
+                    {product.reviewCount === 1 ? "review" : "reviews"}
+                  </span>
                 </div>
                 {product.reviews.slice(0, 3).map((review) => (
-                  <article key={review.id} className="border-b pb-4 last:border-0 last:pb-0">
+                  <article
+                    key={review.id}
+                    className="border-b pb-4 last:border-0 last:pb-0">
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
                       <span className="font-medium">{review.user}</span>
-                      <span className="flex items-center gap-0.5 text-amber-500">{Array.from({ length: review.rating }).map((_, index) => <Star key={index} className="size-3 fill-current" />)}</span>
-                      <span className="text-xs text-muted-foreground">{new Date(review.date).toLocaleDateString("en-UG", { day: "numeric", month: "short", year: "numeric" })}</span>
+                      <span
+                        className="flex items-center gap-0.5 text-amber-500"
+                        aria-label={`${review.rating} out of 5 stars`}>
+                        {Array.from({ length: review.rating }).map(
+                          (_, index) => (
+                            <Star
+                              key={index}
+                              aria-hidden="true"
+                              className="size-3 fill-current"
+                            />
+                          ),
+                        )}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(review.date).toLocaleDateString("en-UG", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        })}
+                      </span>
                     </div>
                     {review.title ? (
                       <p className="mt-2 text-sm font-medium">{review.title}</p>
                     ) : null}
-                    {review.comment ? <p className="mt-1 text-sm leading-6 text-muted-foreground">{review.comment}</p> : null}
+                    {review.comment ? (
+                      <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                        {review.comment}
+                      </p>
+                    ) : null}
                     {review.variantName ? (
                       <p className="mt-1 text-xs text-muted-foreground">
                         Purchased: {review.variantName}
@@ -563,12 +624,22 @@ export function ProductDetailContent({
               </div>
             ) : (
               <div className="mt-4 flex min-h-48 flex-col items-center justify-center rounded-xl border border-dashed bg-card px-5 py-6 text-center">
-                <MediaImage src="/illustrations/empty-notifications.svg" fallback="/illustrations/empty-products.svg" alt="" width={112} height={88} className="h-20 w-24 object-contain opacity-80" />
+                <MediaImage
+                  src="/illustrations/empty-notifications.svg"
+                  fallback="/illustrations/empty-products.svg"
+                  alt=""
+                  width={112}
+                  height={88}
+                  className="h-20 w-24 object-contain opacity-80"
+                />
                 <h3 className="mt-3 font-semibold">No reviews yet</h3>
-                <p className="mt-1 max-w-sm text-sm leading-6 text-muted-foreground">Be the first verified customer to share your experience with this product.</p>
+                <p className="mt-1 max-w-sm text-sm leading-6 text-muted-foreground">
+                  Be the first verified customer to share your experience with
+                  this product.
+                </p>
               </div>
             )}
-          </div>
+          </section>
         </section>
         <DeliveryReturnsCard vendor={product.vendor} />
       </div>
@@ -589,11 +660,17 @@ export function ProductDetailContent({
       {!outOfStock && (
         <div className="fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-30 border-t bg-background/95 p-3 backdrop-blur lg:hidden">
           <div className="mx-auto flex max-w-lg items-center gap-3">
-            <PriceDisplay price={product.basePrice} />
+            <PriceDisplay
+              price={displayedPrice}
+              compareAtPrice={product.compareAtPrice}
+            />
             <button
               onClick={addItem}
-              className="ml-auto h-11 rounded-lg bg-primary px-5 text-sm font-semibold text-primary-foreground">
-              Add to cart
+              disabled={variantProduct && !selectedVariant}
+              className="ml-auto h-11 shrink-0 rounded-lg bg-primary px-5 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+              {variantProduct && !selectedVariant
+                ? "Select options"
+                : "Add to cart"}
             </button>
           </div>
         </div>
@@ -607,8 +684,15 @@ function DeliveryReturnsCard({ vendor }: { vendor: FulfillmentVendor }) {
   if (!vendor) return null;
   const offersDelivery = vendor.fulfillmentMethods.includes("DELIVERY");
   const offersPickup = vendor.fulfillmentMethods.includes("PICKUP");
-  const hasReturns = vendor.returnWindowDays !== null || Boolean(vendor.returnPolicy);
-  if (!offersDelivery && !offersPickup && !hasReturns && !vendor.acceptsExchanges) return null;
+  const hasReturns =
+    vendor.returnWindowDays !== null || Boolean(vendor.returnPolicy);
+  if (
+    !offersDelivery &&
+    !offersPickup &&
+    !hasReturns &&
+    !vendor.acceptsExchanges
+  )
+    return null;
 
   const deliveryFee =
     vendor.deliveryFee !== null
@@ -620,16 +704,133 @@ function DeliveryReturnsCard({ vendor }: { vendor: FulfillmentVendor }) {
       : null;
 
   return (
-    <aside className="h-fit rounded-xl border bg-card p-5" aria-labelledby="delivery-returns-title">
-      <h2 id="delivery-returns-title" className="text-base font-semibold">Delivery &amp; Returns</h2>
-      <div className="mt-4 space-y-4 text-sm">
-        {offersDelivery ? <div className="flex gap-3"><Truck className="mt-0.5 size-4 shrink-0 text-primary" /><div><p className="font-medium">Delivery available</p>{vendor.deliveryEstimate || deliveryFee ? <p className="mt-0.5 text-muted-foreground">{[vendor.deliveryEstimate, deliveryFee].filter(Boolean).join(" · ")}</p> : null}</div></div> : null}
-        {offersPickup ? <div className="flex gap-3"><MapPin className="mt-0.5 size-4 shrink-0 text-primary" /><div><p className="font-medium">Pickup available</p>{vendor.pickupLocation ? <p className="mt-0.5 text-muted-foreground">{vendor.pickupLocation}</p> : null}</div></div> : null}
-        {hasReturns ? <div className="flex gap-3"><RotateCcw className="mt-0.5 size-4 shrink-0 text-primary" /><div><p className="font-medium">{vendor.returnWindowDays !== null ? `${vendor.returnWindowDays}-day returns` : "Returns accepted"}</p>{vendor.returnPolicy ? <p className="mt-0.5 line-clamp-2 text-muted-foreground">{vendor.returnPolicy}</p> : null}</div></div> : null}
-        {vendor.acceptsExchanges ? <div className="flex gap-3"><RefreshCcw className="mt-0.5 size-4 shrink-0 text-primary" /><p className="font-medium">Exchanges available</p></div> : null}
-      </div>
-      {(vendor.returnPolicy || vendor.returnInstructions || vendor.exchangePolicy || offersDelivery || offersPickup) ? <details className="mt-5 border-t pt-4 text-sm"><summary className="cursor-pointer font-medium text-primary">View delivery &amp; returns</summary><div className="mt-3 space-y-3 leading-6 text-muted-foreground">{offersDelivery && vendor.deliveryEstimate ? <p><span className="font-medium text-foreground">Delivery: </span>{vendor.deliveryEstimate}{deliveryFee ? ` · ${deliveryFee}` : ""}</p> : null}{offersPickup && vendor.pickupLocation ? <p><span className="font-medium text-foreground">Pickup: </span>{vendor.pickupLocation}</p> : null}{vendor.returnPolicy ? <p><span className="font-medium text-foreground">Returns: </span>{vendor.returnPolicy}</p> : null}{vendor.returnInstructions ? <p><span className="font-medium text-foreground">How to return: </span>{vendor.returnInstructions}</p> : null}{vendor.acceptsExchanges && vendor.exchangePolicy ? <p><span className="font-medium text-foreground">Exchanges: </span>{vendor.exchangePolicy}</p> : null}</div></details> : null}
+    <aside
+      className="h-fit min-w-md w-full rounded-xl border border-border/70 bg-card p-5 shadow-sm sm:p-6"
+      aria-labelledby="delivery-returns-title">
+      <h2
+        id="delivery-returns-title"
+        className="text-lg font-semibold tracking-tight">
+        Delivery &amp; Returns
+      </h2>
+      <ul className="mt-5 space-y-4 text-sm">
+        {offersDelivery ? (
+          <PolicyRow
+            title="Delivery available"
+            description={
+              [vendor.deliveryEstimate, deliveryFee]
+                .filter(Boolean)
+                .join(" · ") || undefined
+            }
+          />
+        ) : null}
+        {offersPickup ? (
+          <PolicyRow
+            title="Pickup available"
+            description={
+              [vendor.storeName, vendor.pickupLocation]
+                .filter(Boolean)
+                .join(" · ") || undefined
+            }
+          />
+        ) : null}
+        {hasReturns ? (
+          <PolicyRow
+            title={
+              vendor.returnWindowDays !== null
+                ? `${vendor.returnWindowDays}-day returns`
+                : "Returns accepted"
+            }
+            description={
+              vendor.returnWindowDays !== null
+                ? `Return eligible items within ${vendor.returnWindowDays} days of delivery or pickup.`
+                : "Review the full policy for return eligibility."
+            }
+          />
+        ) : null}
+        {vendor.acceptsExchanges ? (
+          <PolicyRow
+            title="Exchanges available"
+            description={
+              vendor.exchangePolicy
+                ? "Exchange terms are available in the full policy."
+                : undefined
+            }
+          />
+        ) : null}
+      </ul>
+      {vendor.returnPolicy ||
+      vendor.returnInstructions ||
+      vendor.exchangePolicy ||
+      offersDelivery ||
+      offersPickup ? (
+        <details className="group mt-6 border-t border-border/70 pt-4 text-sm">
+          <summary className="flex h-11 cursor-pointer list-none items-center justify-between rounded-lg border border-border bg-background px-4 font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <span>Review delivery &amp; return policy</span>
+            <ArrowRight
+              className="size-4 transition-transform group-open:translate-x-0.5"
+              aria-hidden="true"
+            />
+          </summary>
+          <div className="mt-4 space-y-3 leading-6 text-muted-foreground">
+            {offersDelivery && vendor.deliveryEstimate ? (
+              <p>
+                <span className="font-medium text-foreground">Delivery: </span>
+                {vendor.deliveryEstimate}
+                {deliveryFee ? ` · ${deliveryFee}` : ""}
+              </p>
+            ) : null}
+            {offersPickup && vendor.pickupLocation ? (
+              <p>
+                <span className="font-medium text-foreground">Pickup: </span>
+                {vendor.pickupLocation}
+              </p>
+            ) : null}
+            {vendor.returnPolicy ? (
+              <p>
+                <span className="font-medium text-foreground">Returns: </span>
+                {vendor.returnPolicy}
+              </p>
+            ) : null}
+            {vendor.returnInstructions ? (
+              <p>
+                <span className="font-medium text-foreground">
+                  How to return:{" "}
+                </span>
+                {vendor.returnInstructions}
+              </p>
+            ) : null}
+            {vendor.acceptsExchanges && vendor.exchangePolicy ? (
+              <p>
+                <span className="font-medium text-foreground">Exchanges: </span>
+                {vendor.exchangePolicy}
+              </p>
+            ) : null}
+          </div>
+        </details>
+      ) : null}
     </aside>
+  );
+}
+
+function PolicyRow({
+  title,
+  description,
+}: {
+  title: string;
+  description?: string;
+}) {
+  return (
+    <li className="flex items-start gap-3">
+      <span className="pt-0.5 text-primary" aria-hidden="true">
+        •
+      </span>
+      <div className="min-w-0 pt-0.5">
+        <p className="font-medium text-foreground">{title}</p>
+        {description ? (
+          <p className="mt-1 leading-5 text-muted-foreground">{description}</p>
+        ) : null}
+      </div>
+    </li>
   );
 }
 function WishlistButton({

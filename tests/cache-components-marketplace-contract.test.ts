@@ -19,7 +19,8 @@ describe("Cache Components marketplace boundaries", () => {
   it("streams top-level marketplace query data beneath route boundaries", () => {
     const products = source("src/app/(customer)/products/page.tsx");
     const shops = source("src/app/(customer)/shops/page.tsx");
-    expect(products).toContain("<Suspense fallback={<ProductsPageFallback />}>");
+    expect(products).toContain("<Suspense fallback={<ProductsResultsFallback />}>");
+    expect(products).not.toContain("ProductsPageFallback");
     expect(products).toContain("async function ProductsRuntime");
     expect(shops).toContain("ShopsGridFallback stores={stores}");
     expect(shops).toContain("async function ShopsGrid");
