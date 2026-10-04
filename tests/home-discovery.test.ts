@@ -4,7 +4,7 @@ import type { HomepageCategory } from "@/services/category";
 import type { FeaturedShopDto } from "@/lib/marketing-client";
 
 const category = (id: string): HomepageCategory => ({ id, name: `Category ${id}`, slug: `category-${id}`, image: "", productCount: 1 });
-const shop = (id: string): FeaturedShopDto => ({ id, name: `Shop ${id}`, slug: `shop-${id}`, logoUrl: null, bannerUrl: null, description: null, city: null, country: null, productCount: 1, verified: false });
+const shop = (id: string): FeaturedShopDto => ({ id, storeName: `Shop ${id}`, slug: `shop-${id}`, logoUrl: null, bannerUrl: null, description: null, city: null, country: null, isVerified: false, fulfillmentMethods: ["DELIVERY"], deliveryFee: 3500, deliveryEstimate: null, productCount: 1 });
 
 describe("homepage discovery selection", () => {
   it.each([0, 1, 3])("hides sparse category discovery with %i eligible categories", (count) => {

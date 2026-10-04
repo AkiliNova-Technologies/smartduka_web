@@ -62,16 +62,18 @@ export class AdminService {
   }
 
   static async getPlatformMetrics() {
-    const [totalUsers, totalCustomers, totalVendors, totalAdmins, totalOrders, totalProducts, totalRevenue] = await Promise.all([
+    const [totalUsers, totalCustomers, totalVendors, totalAdmins, totalOrders, totalProducts, activeShops, totalRevenue] = await Promise.all([
       prisma.user.count(),
       prisma.user.count({ where: { platformRole: "CUSTOMER" } }),
       prisma.user.count({ where: { platformRole: "VENDOR" } }),
       prisma.user.count({ where: { platformRole: { in: ["ADMIN", "SUPER_ADMIN"] } } }),
       prisma.order.count(),
       prisma.product.count({ where: { deletedAt: null } }),
-      prisma.subOrder.aggregate({ where: { order: { status: "PAID" } }, _sum: { vendorTotal: true } }),
+      prisma.vendorProfile.count({ where: { status: "ACTIVE", deletedAt: null } }),
+      // Marketplace sales only include successfully completed payments.
+      prisma.subOrder.aggregate({ where: { order: { paymentStatus: "COMPLETED" } }, _sum: { vendorTotal: true } }),
     ]);
-    return { totalUsers, totalCustomers, totalVendors, totalAdmins, totalOrders, totalProducts, totalRevenue: Number(totalRevenue._sum.vendorTotal || 0) };
+    return { totalUsers, totalCustomers, totalVendors, totalAdmins, totalOrders, totalProducts, activeShops, totalRevenue: Number(totalRevenue._sum.vendorTotal || 0) };
   }
 
    static async getAllVendorApplications(filters?: { status?: VerificationStatus; search?: string }) {

@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { getProductsByIdsAction } from "@/actions/recently-viewed";
+import { getRecommendationsAction } from "@/actions/recommendations";
 import { useUserData } from "@/providers/UserDataProvider";
 import { ProductCardGrid } from "@/components/marketplace/product-grid";
 import type { MarketplaceProduct } from "@/components/marketplace/product-card";
@@ -16,15 +17,24 @@ export function ProductGrid({
   deals: ProductItem[];
   newArrivals: ProductItem[];
 }) {
-  const { recentlyViewedIds } = useUserData();
-  const [recentlyViewed, setRecentlyViewed] = useState<ProductItem[]>([]);
+  const { recentlyViewedIds, cart } = useUserData();
+  const [recommendations, setRecommendations] = useState<ProductItem[]>([]);
+  const [recommendationsPersonalized, setRecommendationsPersonalized] = useState(false);
+  const cartProductIds = useMemo(() => cart.map((item) => item.productId), [cart]);
   useEffect(() => {
-    if (recentlyViewedIds.length)
-      getProductsByIdsAction(recentlyViewedIds.slice(0, 5)).then((result) => {
-        if (result.success)
-          setRecentlyViewed((result.data ?? []) as ProductItem[]);
-      });
-  }, [recentlyViewedIds]);
+    let current = true;
+    getRecommendationsAction({
+      recentProductIds: recentlyViewedIds,
+      cartProductIds,
+      limit: 8,
+    }).then((result) => {
+      if (current && result.success && result.data) {
+        setRecommendations(result.data.products as ProductItem[]);
+        setRecommendationsPersonalized(result.data.personalized);
+      }
+    }).catch(() => {});
+    return () => { current = false; };
+  }, [recentlyViewedIds, cartProductIds]);
   const section = (
     title: string,
     description: string,
@@ -52,22 +62,57 @@ export function ProductGrid({
     <div className="w-full space-y-10">
       {section(
         "Current offers",
-        "Savings currently available from SmartDuka shops.",
+        "Savings from SmartDuka shops.",
         deals,
         "/deals",
       )}
       {section(
         "New arrivals",
-        "Recently listed products from local shops.",
+        "Fresh picks from local shops.",
         newArrivals,
         "/new-arrivals",
       )}
       {section(
-        "Recently viewed",
-        "Continue where you left off.",
-        recentlyViewed,
+        recommendationsPersonalized ? "Recommended for you" : "Discover products",
+        recommendationsPersonalized
+          ? "Picked from what you’ve been exploring."
+          : "Popular picks from across SmartDuka.",
+        recommendations,
         "/products",
       )}
     </div>
+  );
+}
+
+/** Kept separate from discovery: this is a lightweight continuation aid. */
+export function RecentlyViewedSection() {
+  const { recentlyViewedIds, recentlyViewedProducts } = useUserData();
+  const [guestRecentlyViewed, setGuestRecentlyViewed] = useState<ProductItem[]>([]);
+  const historyIds = useMemo(
+    () => [...new Set(recentlyViewedIds)].slice(0, 8),
+    [recentlyViewedIds],
+  );
+
+  useEffect(() => {
+    if (recentlyViewedProducts.length || !historyIds.length) return;
+    let current = true;
+    getProductsByIdsAction(historyIds).then((result) => {
+      if (current && result.success) setGuestRecentlyViewed((result.data ?? []) as ProductItem[]);
+    }).catch(() => {});
+    return () => { current = false; };
+  }, [historyIds, recentlyViewedProducts]);
+
+  const recentlyViewed = recentlyViewedProducts.length
+    ? recentlyViewedProducts.slice(0, 8) as ProductItem[]
+    : historyIds.length ? guestRecentlyViewed : [];
+  if (!recentlyViewed.length) return null;
+  return (
+    <section className="space-y-3" aria-labelledby="recently-viewed-heading">
+      <div className="space-y-0.5">
+        <h2 id="recently-viewed-heading" className="text-lg font-semibold tracking-tight text-foreground">Recently viewed</h2>
+        <p className="text-sm text-muted-foreground">Continue where you left off.</p>
+      </div>
+      <ProductCardGrid products={recentlyViewed} />
+    </section>
   );
 }

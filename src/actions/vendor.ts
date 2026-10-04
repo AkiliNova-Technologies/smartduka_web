@@ -4,10 +4,11 @@ import { VendorService } from "@/services/vendor";
 import { requireActiveUserId } from "@/lib/auth/session";
 import { requireApplicantContext } from "@/lib/auth/applicant-context";
 import { VerificationStatus } from "@prisma/client";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { withErrorHandling } from "@/lib/api-utils";
 import { requireAdminContext } from "@/lib/auth/admin-context";
 import { toVendorProfileDto } from "@/lib/vendor-profile-dto";
+import { cacheTags } from "@/lib/cache-policy";
 
 export async function getMyVendorApplication() {
   return withErrorHandling(async () => VendorService.getMyApplication((await requireApplicantContext()).userId), "getMyVendorApplication");
@@ -24,8 +25,10 @@ export async function approveVendorApplication(applicationId: string, notes?: st
   return withErrorHandling(async () => {
     const admin = await requireAdminContext("platform:manage_vendors");
     const result = await VendorService.updateApplicationStatus(applicationId, "APPROVED", notes, admin.userId);
+    updateTag(cacheTags.marketplace.shops);
     revalidatePath("/admin/vendors");
     revalidatePath("/vendor");
+    revalidatePath("/shops");
     return result;
   }, "approveVendorApplication");
 }

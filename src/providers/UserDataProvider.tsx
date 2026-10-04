@@ -450,19 +450,26 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
   const [recentlyViewedIds, setRecentlyViewedIds] = useState<string[]>(() =>
     loadFromStorage<string[]>("smartduka-recently-viewed", []),
   );
+  const [recentlyViewedTimestamps, setRecentlyViewedTimestamps] = useState<Record<string, string>>(() =>
+    loadFromStorage<Record<string, string>>("smartduka-recently-viewed-timestamps", {}),
+  );
   const [recentlyViewedProducts, setRecentlyViewedProducts] = useState<RecentlyViewedProduct[]>([]);
   const [recentlyViewedLoading, setRecentlyViewedLoading] = useState(false);
 
   useEffect(() => {
     saveToStorage("smartduka-recently-viewed", recentlyViewedIds);
   }, [recentlyViewedIds]);
+  useEffect(() => {
+    saveToStorage("smartduka-recently-viewed-timestamps", recentlyViewedTimestamps);
+  }, [recentlyViewedTimestamps]);
 
   const trackProductView = useCallback(
     (productId: string) => {
       setRecentlyViewedIds((prev) => {
         const filtered = prev.filter((id) => id !== productId);
-        return [productId, ...filtered].slice(0, 10);
+        return [productId, ...filtered].slice(0, 24);
       });
+      setRecentlyViewedTimestamps((prev) => ({ ...prev, [productId]: new Date().toISOString() }));
       if (uid) {
         trackProductViewAction(productId).catch(() => {});
       }
@@ -474,13 +481,13 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     fetchRecentlyViewedRef.current = async () => {
-      if (!uid || recentlyViewedIds.length === 0) {
+      if (!uid) {
         setRecentlyViewedProducts([]);
         return;
       }
       setRecentlyViewedLoading(true);
       try {
-        const result = await getRecentlyViewedAction(10);
+        const result = await getRecentlyViewedAction(12);
         if (result.success) {
           setRecentlyViewedProducts(result.data);
         }
@@ -526,14 +533,9 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
     }
   }, [uid, recentlyViewedIds.length]);
 
-  const prevIdCountRef = useRef(0);
-
   useEffect(() => {
-    if (uid && recentlyViewedIds.length !== prevIdCountRef.current) {
-      prevIdCountRef.current = recentlyViewedIds.length;
-      fetchRecentlyViewedRef.current();
-    }
-  }, [uid, recentlyViewedIds.length]);
+    if (uid) fetchRecentlyViewedRef.current();
+  }, [uid, recentlyViewedIds]);
 
   // ==========================================
   // AUTH-DEPENDENT DATA FETCHING

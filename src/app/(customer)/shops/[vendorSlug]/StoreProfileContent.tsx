@@ -21,8 +21,6 @@ interface StoreData {
   banner: string | null;
   verified: boolean;
   description: string | null;
-  email: string | null;
-  phone: string | null;
   city: string | null;
   country: string | null;
   returnWindowDays: number;

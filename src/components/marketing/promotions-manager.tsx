@@ -6,6 +6,9 @@ import { IllustratedEmptyState } from "@/components/marketplace/illustrated-empt
 import { useAdminMarketing } from "@/hooks/use-admin-marketing";
 import { PromotionForm } from "./admin/promotion/promotion-form";
 import { PromotionPreview } from "./admin/promotion/promotion-preview";
+import { DataTable } from "@/components/data-table";
+import { MediaImage } from "@/components/marketplace/media-image";
+import type { ColumnDef } from "@tanstack/react-table";
 import {
   emptyPromotion,
   type PromotionFormValue,
@@ -22,6 +25,21 @@ export function PromotionsManager() {
   const [selected, setSelected] = React.useState<PromotionDto | null>(null);
   const [saving, setSaving] = React.useState(false);
   const [message, setMessage] = React.useState<string | null>(null);
+  const [scheduleNow, setScheduleNow] = React.useState<number | null>(null);
+  React.useEffect(() => {
+    const timer = window.setTimeout(() => setScheduleNow(Date.now()), 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+  const openEdit = React.useCallback((promotion: PromotionDto) => {
+    setEditing({ id: promotion.id, mode: "edit", value: { ...emptyPromotion, ...promotion, startsAt: promotion.startsAt?.slice(0, 16) || "", endsAt: promotion.endsAt?.slice(0, 16) || "" } });
+  }, []);
+  const columns = React.useMemo<ColumnDef<PromotionDto>[]>(() => [
+    { id: "promotion", header: "Promotion", cell: ({ row }) => <button type="button" onClick={() => setSelected(row.original)} className="flex min-w-0 items-center gap-3 text-left"><MediaImage src={row.original.desktopImageUrl} fallback="/illustrations/empty-deals.svg" alt="" width={48} height={28} className="h-8 w-12 rounded object-cover" /><span className="truncate font-medium">{row.original.title || "Untitled promotion"}</span></button> },
+    { id: "placement", header: "Placement", cell: ({ row }) => <span>{row.original.placements?.join(", ") || "—"}</span> },
+    { accessorKey: "status", header: "Status", cell: ({ row }) => <span className="capitalize">{promotionStatus(row.original, scheduleNow)}</span> },
+    { accessorKey: "priority", header: "Priority" },
+    { id: "actions", header: "Actions", cell: ({ row }) => <Button size="sm" variant="outline" onClick={() => openEdit(row.original)}>Edit</Button> },
+  ], [openEdit, scheduleNow]);
   const openCreate = () => {
     setMessage(null);
     setEditing({ id: "", mode: "create", value: emptyPromotion });
@@ -56,14 +74,14 @@ export function PromotionsManager() {
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Hero Promotions</h1>
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Marketing</p>
+          <h1 className="text-2xl font-semibold">Promotions</h1>
           <p className="text-sm text-muted-foreground">
-            Create promotional banners and control where and when customers see
-            them.
+            Create and manage promotional banners displayed across the marketplace.
           </p>
         </div>
         {admin.promotions.length > 0 && (
-          <Button onClick={openCreate}>Create promotion</Button>
+          <Button onClick={openCreate}>New promotion</Button>
         )}
       </div>
       {message && (
@@ -80,54 +98,7 @@ export function PromotionsManager() {
         />
       ) : (
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1.65fr)_minmax(280px,1fr)]">
-          <div className="overflow-hidden rounded-xl border bg-card">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-left text-muted-foreground">
-                  <th className="p-3">Promotion</th>
-                  <th>Placement</th>
-                  <th>Status</th>
-                  <th>Priority</th>
-                  <th className="p-3" />
-                </tr>
-              </thead>
-              <tbody>
-                {admin.promotions.map((p) => (
-                  <tr
-                    key={p.id}
-                    onClick={() => setSelected(p)}
-                    className="cursor-pointer border-b hover:bg-muted/40">
-                    <td className="p-3 font-medium">
-                      {p.title || "Untitled promotion"}
-                    </td>
-                    <td>{p.placements?.join(", ") || "—"}</td>
-                    <td>{p.status}</td>
-                    <td>{p.priority}</td>
-                    <td className="p-3">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditing({
-                            id: p.id,
-                            mode: "edit",
-                            value: {
-                              ...emptyPromotion,
-                              ...p,
-                              startsAt: p.startsAt?.slice(0, 16) || "",
-                              endsAt: p.endsAt?.slice(0, 16) || "",
-                            },
-                          });
-                        }}>
-                        Edit
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable columns={columns} data={admin.promotions} getRowId={(promotion) => promotion.id} features={{ search: true, columnVisibility: false, footer: false }} searchPlaceholder="Search promotions" />
           <div>
             {selected ? (
               <PromotionPreview
@@ -160,4 +131,12 @@ export function PromotionsManager() {
       )}
     </div>
   );
+}
+
+function promotionStatus(promotion: PromotionDto, now: number | null) {
+  if (promotion.status === "DISABLED") return "Disabled";
+  if (promotion.status !== "ACTIVE") return "Draft";
+  if (now !== null && promotion.startsAt && new Date(promotion.startsAt).getTime() > now) return "Scheduled";
+  if (now !== null && promotion.endsAt && new Date(promotion.endsAt).getTime() <= now) return "Expired";
+  return "Live";
 }

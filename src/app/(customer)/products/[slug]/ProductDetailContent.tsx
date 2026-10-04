@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { MediaImage } from "@/components/marketplace/media-image";
 import { PRODUCT_IMAGE_FALLBACK, SHOP_LOGO_FALLBACK } from "@/lib/media";
 import Link from "next/link";
@@ -90,7 +90,16 @@ export function ProductDetailContent({
   product: ProductData;
   relatedProducts: MarketplaceProduct[];
 }) {
-  const { addToCart, isWishlisted, toggleWishlist } = useUserData();
+  const { addToCart, isWishlisted, toggleWishlist, trackProductView } = useUserData();
+  const trackedProductId = useRef<string | null>(null);
+  useEffect(() => {
+    // This runs only after a valid public detail has rendered. The provider keeps
+    // the UI responsive and treats the persisted write as non-critical.
+    if (trackedProductId.current !== product.id) {
+      trackedProductId.current = product.id;
+      trackProductView(product.id);
+    }
+  }, [product.id, trackProductView]);
   const realImages = product.images.filter((image) => image.url);
   const hasRealImages = realImages.length > 0;
   const [activeImage, setActiveImage] = useState(0);

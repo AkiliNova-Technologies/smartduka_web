@@ -1,5 +1,5 @@
 import { HomeDiscovery } from "@/components/home/HomeDiscovery";
-import { ProductGrid } from "@/components/home/ProductGrid";
+import { ProductGrid, RecentlyViewedSection } from "@/components/home/ProductGrid";
 import { PageContainer } from "@/components/marketplace/page-container";
 import { getDealsAction, getNewArrivalsAction } from "@/actions/product";
 import { PromotionSection } from "@/components/marketing/promotion-section";
@@ -16,8 +16,9 @@ export default async function HomePage() {
       <PromotionSection placement="HOMEPAGE" />
       <HomeDiscovery categories={categories} />
       <FeaturedProductsSection products={featuredProducts} />
-      <FeaturedShopsSection shops={featuredShops} />
       <ProductGrid deals={deals} newArrivals={newArrivals} />
+      <FeaturedShopsSection shops={featuredShops} />
+      <RecentlyViewedSection />
     </PageContainer>
   );
 }

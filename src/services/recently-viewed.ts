@@ -1,4 +1,24 @@
 import { prisma } from "@/lib/prisma/client";
+import { serializeMarketplaceProduct } from "@/services/product";
+import type { Prisma } from "@prisma/client";
+
+export const RECENTLY_VIEWED_HISTORY_LIMIT = 24;
+export const RECENTLY_VIEWED_DISPLAY_LIMIT = 12;
+
+const publicProductInclude = {
+  images: { take: 1, orderBy: [{ isFeatured: "desc" as const }, { sortOrder: "asc" as const }] },
+  vendor: { select: { id: true, storeName: true, slug: true } },
+  category: { select: { id: true, name: true, slug: true, parent: { select: { id: true, name: true, slug: true } } } },
+  subCategory: { select: { id: true, name: true, slug: true, parent: { select: { id: true, name: true, slug: true } } } },
+  variants: { select: { isActive: true, inventoryCount: true, price: true, options: true } },
+  reviews: { where: { status: "PUBLISHED" as const }, select: { rating: true } },
+} satisfies Prisma.ProductInclude;
+
+const publicProductWhere: Prisma.ProductWhereInput = {
+  status: { in: ["ACTIVE", "PUBLISHED"] },
+  deletedAt: null,
+  vendor: { status: "ACTIVE" as const, deletedAt: null },
+};
 
 // ==========================================
 // RECENTLY VIEWED SERVICE
@@ -9,45 +29,33 @@ export class RecentlyViewedService {
    * Track a product view for a user
    */
   static async trackView(userId: string, productId: string) {
-    return prisma.recentlyViewed.upsert({
+    // Only valid public product pages may become part of a customer's history.
+    const product = await prisma.product.findFirst({ where: { id: productId, ...publicProductWhere }, select: { id: true } });
+    if (!product) return null;
+    const item = await prisma.recentlyViewed.upsert({
       where: { userId_productId: { userId, productId } },
       update: { viewedAt: new Date() },
       create: { userId, productId },
     });
+    await this.trimHistory(userId);
+    return item;
   }
 
   /**
    * Get recently viewed products for a user
    */
-  static async getRecentlyViewed(userId: string, limit = 10) {
+  static async getRecentlyViewed(userId: string, limit = RECENTLY_VIEWED_DISPLAY_LIMIT) {
     const items = await prisma.recentlyViewed.findMany({
-      where: { userId },
+      where: { userId, product: publicProductWhere },
       include: {
-        product: {
-          include: {
-            images: { take: 1, orderBy: { sortOrder: "asc" } },
-            vendor: { select: { id: true, storeName: true, slug: true } },
-          },
-        },
+        product: { include: publicProductInclude },
       },
       orderBy: { viewedAt: "desc" },
-      take: limit,
+      take: Math.min(Math.max(1, limit), RECENTLY_VIEWED_DISPLAY_LIMIT),
     });
 
     return items.map((item) => ({
-      id: item.product.id,
-      name: item.product.name,
-      slug: item.product.slug,
-      brand: item.product.brand,
-      basePrice: Number(item.product.basePrice),
-      compareAtPrice: item.product.compareAtPrice
-        ? Number(item.product.compareAtPrice)
-        : null,
-      image: item.product.images[0]?.url || "",
-      vendorId: item.product.vendorId,
-      vendorName: item.product.vendor?.storeName || "Unknown Store",
-      rating: 4.5,
-      reviews: 0,
+      ...serializeMarketplaceProduct(item.product as unknown as Record<string, unknown>),
       viewedAt: item.viewedAt.toISOString(),
     }));
   }
@@ -57,17 +65,11 @@ export class RecentlyViewedService {
    */
   static async mergeGuestViews(userId: string, productIds: string[]) {
     if (productIds.length === 0) return;
-
-    const data = productIds.map((productId) => ({
-      userId,
-      productId,
-      viewedAt: new Date(),
-    }));
-
-    await prisma.recentlyViewed.createMany({
-      data,
-      skipDuplicates: true,
-    });
+    // Preserve the guest's recency order while avoiding unbounded request input.
+    for (const productId of [...new Set(productIds)].slice(0, RECENTLY_VIEWED_HISTORY_LIMIT).reverse()) {
+      await this.trackView(userId, productId);
+    }
+    await this.trimHistory(userId);
   }
 
   /**
@@ -77,15 +79,8 @@ export class RecentlyViewedService {
     if (productIds.length === 0) return [];
 
     const products = await prisma.product.findMany({
-      where: {
-        id: { in: productIds },
-        status: { in: ["ACTIVE", "PUBLISHED"] },
-        deletedAt: null,
-      },
-      include: {
-        images: { take: 1, orderBy: { sortOrder: "asc" } },
-        vendor: { select: { id: true, storeName: true, slug: true } },
-      },
+      where: { id: { in: productIds.slice(0, RECENTLY_VIEWED_HISTORY_LIMIT) }, ...publicProductWhere },
+      include: publicProductInclude,
     });
 
     // Preserve the order of productIds
@@ -93,20 +88,13 @@ export class RecentlyViewedService {
     return productIds
       .map((id) => productMap.get(id))
       .filter(Boolean)
-      .map((p) => ({
-        id: p!.id,
-        name: p!.name,
-        slug: p!.slug,
-        brand: p!.brand,
-        basePrice: Number(p!.basePrice),
-        compareAtPrice: p!.compareAtPrice
-          ? Number(p!.compareAtPrice)
-          : null,
-        image: p!.images[0]?.url || "",
-        vendorId: p!.vendorId,
-        vendorName: p!.vendor?.storeName || "Unknown Store",
-        rating: 4.5,
-        reviews: 0,
-      }));
+      .map((p) => serializeMarketplaceProduct(p! as unknown as Record<string, unknown>));
+  }
+
+  private static async trimHistory(userId: string) {
+    const stale = await prisma.recentlyViewed.findMany({
+      where: { userId }, orderBy: { viewedAt: "desc" }, skip: RECENTLY_VIEWED_HISTORY_LIMIT, select: { id: true },
+    });
+    if (stale.length) await prisma.recentlyViewed.deleteMany({ where: { id: { in: stale.map((item) => item.id) } } });
   }
 }

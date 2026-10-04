@@ -6,7 +6,7 @@ const source = (file: string) =>
   readFileSync(resolve(process.cwd(), file), "utf8");
 
 describe("DataTable feature configuration", () => {
-  const table = source("src/components/data-table.tsx");
+  const table = source("src/components/data-table-runtime.tsx");
   const variants = source("src/components/vendor/ProductVariantEditor.tsx");
 
   it("keeps the established defaults while making optional features configurable", () => {

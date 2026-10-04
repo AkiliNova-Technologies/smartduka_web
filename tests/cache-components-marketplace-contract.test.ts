@@ -21,8 +21,8 @@ describe("Cache Components marketplace boundaries", () => {
     const shops = source("src/app/(customer)/shops/page.tsx");
     expect(products).toContain("<Suspense fallback={<ProductsPageFallback />}>");
     expect(products).toContain("async function ProductsRuntime");
-    expect(shops).toContain("<Suspense fallback={<ShopsPageFallback />}>");
-    expect(shops).toContain("async function ShopsRuntime");
+    expect(shops).toContain("ShopsGridFallback stores={stores}");
+    expect(shops).toContain("async function ShopsGrid");
   });
 
   it("caches public shop data by slug and tags it for shop mutations", () => {

@@ -38,6 +38,7 @@ interface PlatformMetrics {
   totalAdmins: number;
   totalOrders: number;
   totalProducts: number;
+  activeShops: number;
   totalRevenue: number;
 }
 

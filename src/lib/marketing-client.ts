@@ -3,6 +3,7 @@ import type {
   PromotionPlacement,
   PromotionStatus,
 } from "@prisma/client";
+import type { PublicShopListing } from "@/lib/public-shop-dto";
 
 export type PublicPromotion = {
   id: string;
@@ -28,18 +29,7 @@ export type FeaturedProductDto = {
   vendorName: string;
   category: { id: string; name: string; slug: string } | null;
 };
-export type FeaturedShopDto = {
-  id: string;
-  name: string;
-  slug: string;
-  logoUrl: string | null;
-  bannerUrl: string | null;
-  description: string | null;
-  city: string | null;
-  country: string | null;
-  productCount: number;
-  verified: boolean;
-};
+export type FeaturedShopDto = PublicShopListing;
 export type PromotionDto = PublicPromotion & {
   status: PromotionStatus;
   priority: number;

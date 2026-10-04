@@ -1,90 +1,78 @@
 "use client";
 
+import * as React from "react";
 import Link from "next/link";
-import { ArrowRight, CheckCircle2, Clock, LayoutGrid, Package, ShoppingCart, Store, Users } from "lucide-react";
-import { AdminMetricCard } from "@/components/admin/admin-metric-card";
+import { type ColumnDef } from "@tanstack/react-table";
+import { ArrowRight, CircleDollarSign, Clock, ShoppingCart, Store, Users } from "lucide-react";
+import { DataTable } from "@/components/data-table";
+import { DashboardMetricCard } from "@/components/dashboard-metric-card";
 import { useAdmin } from "@/hooks/use-admin";
+import type { OrderRow, VendorApplicationRow } from "@/types/marketplace";
 
 const reviewStatuses = new Set(["PENDING", "SUBMITTED", "UNDER_REVIEW"]);
+const previewFeatures = { pagination: false, search: false, columnVisibility: false, sorting: false, filtering: false, rowSelection: false, toolbar: false, footer: false };
 
-function formatDate(value: string) {
-  return new Date(value).toLocaleDateString("en-UG", { day: "numeric", month: "short", year: "numeric" });
+type DashboardUser = { id: string; name: string; email: string; status: string; platformRole: string | null; createdAt: Date | string };
+
+const date = (value: string | Date) => new Intl.DateTimeFormat("en-UG", { day: "numeric", month: "short", year: "numeric" }).format(new Date(value));
+const money = (value: number) => `UGX ${value.toLocaleString("en-UG", { maximumFractionDigits: 0 })}`;
+const label = (value: string) => value.replaceAll("_", " ").toLowerCase().replace(/^./, (letter) => letter.toUpperCase());
+
+function StatusBadge({ value }: { value: string }) {
+  const tone = ["COMPLETED", "DELIVERED", "APPROVED", "ACTIVE"].includes(value) ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-700 dark:text-emerald-400" : ["REJECTED", "CANCELLED", "REFUNDED", "SUSPENDED"].includes(value) ? "border-rose-500/20 bg-rose-500/5 text-rose-700 dark:text-rose-400" : "border-amber-500/20 bg-amber-500/5 text-amber-700 dark:text-amber-400";
+  return <span className={`inline-flex whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] font-medium ${tone}`}>{label(value)}</span>;
 }
 
-function reviewLabel(status: string) {
-  return status.replaceAll("_", " ").toLowerCase().replace(/^./, (letter) => letter.toUpperCase());
+function SectionHeader({ title, description, href, action }: { title: string; description: string; href: string; action: string }) {
+  return <div className="flex flex-wrap items-end justify-between gap-3"><div><h2 className="text-lg font-semibold tracking-tight text-foreground">{title}</h2><p className="mt-1 text-sm text-muted-foreground">{description}</p></div><Link href={href} className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">{action}<ArrowRight className="size-4" aria-hidden="true" /></Link></div>;
 }
 
 export default function AdminDashboardPage() {
-  const { vendors, vendorsLoading, orders, ordersLoading } = useAdmin();
-  const pendingVendors = vendors.filter((vendor) => reviewStatuses.has(vendor.status));
-  const recentVendors = vendors.slice(0, 3);
-  const recentOrders = orders.slice(0, 3);
+  const { vendors, vendorsLoading, orders, ordersLoading, users, usersLoading, metrics, metricsLoading } = useAdmin();
+  const pendingVendors = React.useMemo(() => vendors.filter((vendor) => reviewStatuses.has(vendor.status)), [vendors]);
+  const recentOrders = React.useMemo(() => orders.slice(0, 6), [orders]);
+  const recentCustomers = React.useMemo(() => (users as DashboardUser[]).filter((user) => user.platformRole === "CUSTOMER").slice(0, 6), [users]);
 
-  return (
-    <div className="w-full space-y-8 animate-in fade-in duration-300">
-      <header className="border-b border-border/40 pb-6">
-        <h1 className="text-2xl font-medium tracking-tight text-foreground">Admin dashboard</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Monitor marketplace activity and handle items that need attention.</p>
-      </header>
+  const orderColumns = React.useMemo<ColumnDef<OrderRow, unknown>[]>(() => [
+    { accessorKey: "orderNumber", header: "Order", cell: ({ row }) => <span className="font-mono text-xs font-semibold text-primary">{row.original.orderNumber}</span> },
+    { accessorKey: "customerName", header: "Customer", cell: ({ row }) => <span className="block max-w-36 truncate text-sm font-medium">{row.original.customerName}</span> },
+    { accessorKey: "storeName", header: "Shop", cell: ({ row }) => <span className="block max-w-36 truncate text-sm text-muted-foreground">{row.original.storeName}</span> },
+    { accessorKey: "totalAmount", header: "Total", cell: ({ row }) => <span className="whitespace-nowrap text-sm font-medium tabular-nums">{money(row.original.totalAmount)}</span> },
+    { accessorKey: "paymentStatus", header: "Payment", cell: ({ row }) => <StatusBadge value={row.original.paymentStatus} /> },
+    { accessorKey: "subOrderStatus", header: "Fulfilment", cell: ({ row }) => <StatusBadge value={row.original.subOrderStatus} /> },
+    { accessorKey: "date", header: "Date", cell: ({ row }) => <span className="whitespace-nowrap text-xs text-muted-foreground">{date(row.original.date)}</span> },
+  ], []);
 
-      <div className="grid max-w-sm grid-cols-1 gap-4 sm:grid-cols-2">
-        <Link href="/admin/vendors" className="rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
-          <AdminMetricCard label="Pending vendor reviews" value={vendorsLoading ? "—" : pendingVendors.length} icon={Clock} helper="Applications awaiting review" tone="warning" />
-        </Link>
-      </div>
+  const vendorColumns = React.useMemo<ColumnDef<VendorApplicationRow, unknown>[]>(() => [
+    { accessorKey: "storeName", header: "Shop / applicant", cell: ({ row }) => <div className="min-w-32"><p className="truncate text-sm font-medium">{row.original.storeName}</p><p className="truncate text-xs text-muted-foreground">{row.original.userName}</p></div> },
+    { accessorKey: "status", header: "Status", cell: ({ row }) => <StatusBadge value={row.original.status} /> },
+    { accessorKey: "createdAt", header: "Submitted", cell: ({ row }) => <span className="whitespace-nowrap text-xs text-muted-foreground">{date(row.original.createdAt)}</span> },
+    { id: "action", header: "", cell: () => <Link href="/admin/vendors" className="text-sm font-medium text-primary hover:underline">Review</Link> },
+  ], []);
 
-      <section aria-labelledby="needs-attention-heading" className="space-y-4">
-        <div className="flex items-end justify-between gap-4">
-          <div>
-            <h2 id="needs-attention-heading" className="text-lg font-semibold tracking-tight text-foreground">Needs attention</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Vendor applications that are waiting for an operational decision.</p>
-          </div>
-          <Link href="/admin/vendors" className="inline-flex shrink-0 items-center gap-1 text-sm font-medium text-primary hover:underline">View all vendor applications <ArrowRight className="size-4" aria-hidden="true" /></Link>
-        </div>
+  const userColumns = React.useMemo<ColumnDef<DashboardUser, unknown>[]>(() => [
+    { accessorKey: "name", header: "Customer", cell: ({ row }) => <div className="min-w-36"><p className="truncate text-sm font-medium">{row.original.name || "Unnamed customer"}</p><p className="truncate text-xs text-muted-foreground">{row.original.email}</p></div> },
+    { accessorKey: "status", header: "Status", cell: ({ row }) => <StatusBadge value={row.original.status} /> },
+    { accessorKey: "createdAt", header: "Joined", cell: ({ row }) => <span className="whitespace-nowrap text-xs text-muted-foreground">{date(row.original.createdAt)}</span> },
+  ], []);
 
-        <div className="overflow-hidden rounded-xl border border-border bg-card">
-          {vendorsLoading ? (
-            <p className="p-5 text-sm text-muted-foreground">Loading vendor applications…</p>
-          ) : pendingVendors.length === 0 ? (
-            <div className="flex items-center gap-3 p-5"><span className="flex size-9 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"><CheckCircle2 className="size-5" aria-hidden="true" /></span><div><p className="text-sm font-medium text-foreground">You’re all caught up</p><p className="text-sm text-muted-foreground">There are no vendor reviews requiring attention right now.</p></div></div>
-          ) : (
-            <ul className="divide-y divide-border/60">
-              {pendingVendors.slice(0, 5).map((vendor) => (
-                <li key={vendor.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="min-w-0"><p className="truncate text-sm font-semibold text-foreground">{vendor.storeName}</p><p className="truncate text-sm text-muted-foreground">{vendor.userName} · Applied {formatDate(vendor.createdAt)}</p></div>
-                  <div className="flex items-center justify-between gap-3 sm:justify-end"><span className="rounded-full border border-amber-500/20 bg-amber-500/5 px-2.5 py-1 text-xs font-medium text-amber-700 dark:text-amber-400">{reviewLabel(vendor.status)}</span><Link href="/admin/vendors" className="text-sm font-medium text-primary hover:underline">Review</Link></div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </section>
+  return <div className="w-full space-y-8 animate-in fade-in duration-300">
+    <header className="flex flex-wrap items-end justify-between gap-4 border-b border-border/40 pb-6"><div><h1 className="text-2xl font-semibold tracking-tight text-foreground">Dashboard</h1><p className="mt-1 text-sm text-muted-foreground">Monitor marketplace performance, activity and items requiring attention.</p></div><Link href="/admin/vendors" className="inline-flex min-h-10 items-center rounded-lg border border-border bg-card px-3 text-sm font-medium text-foreground hover:bg-muted">Review vendor applications</Link></header>
 
-      <section aria-labelledby="marketplace-activity-heading" className="space-y-4">
-        <div><h2 id="marketplace-activity-heading" className="text-lg font-semibold tracking-tight text-foreground">Marketplace activity</h2><p className="mt-1 text-sm text-muted-foreground">A compact view of the latest orders and vendor applications.</p></div>
-        <div className="grid gap-4 lg:grid-cols-2">
-          <ActivityCard title="Recent orders" href="/admin/orders" icon={ShoppingCart} empty="No orders have been placed yet." loading={ordersLoading}>
-            {recentOrders.map((order) => <li key={order.id} className="flex items-center justify-between gap-3 py-3"><div className="min-w-0"><p className="truncate font-mono text-sm font-medium text-primary">{order.orderNumber}</p><p className="truncate text-sm text-muted-foreground">{order.customerName} · {order.storeName}</p></div><span className="shrink-0 text-xs text-muted-foreground">{formatDate(order.date)}</span></li>)}
-          </ActivityCard>
-          <ActivityCard title="Recent vendor applications" href="/admin/vendors" icon={Store} empty="No vendor applications have been received yet." loading={vendorsLoading}>
-            {recentVendors.map((vendor) => <li key={vendor.id} className="flex items-center justify-between gap-3 py-3"><div className="min-w-0"><p className="truncate text-sm font-medium text-foreground">{vendor.storeName}</p><p className="truncate text-sm text-muted-foreground">{vendor.userName}</p></div><span className="shrink-0 text-xs text-muted-foreground">{formatDate(vendor.createdAt)}</span></li>)}
-          </ActivityCard>
-        </div>
-      </section>
+    <section aria-label="Marketplace metrics" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <DashboardMetricCard href="/admin/finance/payments" label="Gross marketplace sales" value={metricsLoading ? "—" : money(metrics?.totalRevenue ?? 0)} description="Completed payments" icon={CircleDollarSign} tone="success" />
+      <DashboardMetricCard href="/admin/orders" label="Orders" value={metricsLoading ? "—" : metrics?.totalOrders ?? 0} description="All recorded orders" icon={ShoppingCart} />
+      <DashboardMetricCard href="/admin/vendors" label="Active shops" value={metricsLoading ? "—" : metrics?.activeShops ?? 0} description="Publicly eligible shops" icon={Store} tone="info" />
+      <DashboardMetricCard href="/admin/users" label="Customers" value={metricsLoading ? "—" : metrics?.totalCustomers ?? 0} description="Registered customer accounts" icon={Users} />
+    </section>
 
-      <section aria-labelledby="quick-access-heading" className="space-y-3"><h2 id="quick-access-heading" className="text-lg font-semibold tracking-tight text-foreground">Quick access</h2><nav aria-label="Admin quick access" className="flex flex-wrap gap-2">{[
-        { href: "/admin/vendors", label: "Vendor applications", icon: Store },
-        { href: "/admin/orders", label: "Orders", icon: ShoppingCart },
-        { href: "/admin/products", label: "Products", icon: Package },
-        { href: "/admin/categories", label: "Categories", icon: LayoutGrid },
-        { href: "/admin/users", label: "Users", icon: Users },
-      ].map(({ href, label, icon: Icon }) => <Link key={href} href={href} className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><Icon className="size-4 text-muted-foreground" aria-hidden="true" />{label}</Link>)}</nav></section>
+    <section className="space-y-4" aria-labelledby="recent-orders"><SectionHeader title="Recent orders" description="Latest marketplace orders and their payment and fulfilment state." href="/admin/orders" action="View all orders" /><DataTable columns={orderColumns} data={recentOrders} getRowId={(order) => order.id} features={previewFeatures} isLoading={ordersLoading} emptyStateContent={<p className="py-5 text-sm text-muted-foreground">No recent orders. New marketplace orders will appear here.</p>} /></section>
+
+    <div className="grid gap-6 xl:grid-cols-[minmax(0,1.7fr)_minmax(18rem,0.8fr)]">
+      <section className="space-y-4" aria-labelledby="vendor-attention"><SectionHeader title="Vendors requiring attention" description="Applications awaiting an operational decision." href="/admin/vendors" action="View all applications" /><DataTable columns={vendorColumns} data={pendingVendors.slice(0, 5)} getRowId={(vendor) => vendor.id} features={previewFeatures} isLoading={vendorsLoading} emptyStateContent={<p className="py-5 text-sm text-muted-foreground">No vendors awaiting review.</p>} /></section>
+      <aside className="rounded-xl border border-border/60 bg-card p-5" aria-labelledby="operational-attention"><h2 id="operational-attention" className="text-lg font-semibold tracking-tight">Operational attention</h2><p className="mt-1 text-sm text-muted-foreground">Items that need an administrative decision.</p><div className="mt-5 divide-y divide-border/60"><Link href="/admin/vendors" className="flex items-center justify-between gap-3 py-3 text-sm hover:text-primary"><span>Pending vendor reviews</span><span className="rounded-full bg-amber-500/10 px-2.5 py-1 text-xs font-semibold tabular-nums text-amber-700 dark:text-amber-400">{vendorsLoading ? "—" : pendingVendors.length}</span></Link><Link href="/admin/orders" className="flex items-center justify-between gap-3 py-3 text-sm hover:text-primary"><span>Orders requiring fulfilment</span><span className="rounded-full bg-muted px-2.5 py-1 text-xs font-semibold tabular-nums">{ordersLoading ? "—" : orders.filter((order) => ["PENDING", "PROCESSING", "READY_FOR_PICKUP"].includes(order.subOrderStatus)).length}</span></Link></div></aside>
     </div>
-  );
-}
 
-function ActivityCard({ title, href, icon: Icon, empty, loading, children }: { title: string; href: string; icon: typeof ShoppingCart; empty: string; loading: boolean; children: React.ReactNode }) {
-  const hasChildren = Array.isArray(children) ? children.length > 0 : Boolean(children);
-  return <section className="rounded-xl border border-border bg-card p-4"><div className="flex items-center justify-between gap-3"><h3 className="flex items-center gap-2 text-sm font-semibold text-foreground"><Icon className="size-4 text-muted-foreground" aria-hidden="true" />{title}</h3><Link href={href} className="text-sm font-medium text-primary hover:underline">View all</Link></div>{loading ? <p className="py-5 text-sm text-muted-foreground">Loading…</p> : hasChildren ? <ul className="mt-2 divide-y divide-border/60">{children}</ul> : <p className="py-5 text-sm text-muted-foreground">{empty}</p>}</section>;
+    <section className="space-y-4" aria-labelledby="recent-customers"><SectionHeader title="Recent customers" description="Recently registered marketplace customer accounts." href="/admin/users" action="View all users" /><DataTable columns={userColumns} data={recentCustomers} getRowId={(user) => user.id} features={previewFeatures} isLoading={usersLoading} emptyStateContent={<p className="py-5 text-sm text-muted-foreground">No customer accounts yet.</p>} /></section>
+  </div>;
 }

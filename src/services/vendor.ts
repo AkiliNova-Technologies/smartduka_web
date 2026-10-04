@@ -4,6 +4,11 @@ import { cacheLife, cacheTag } from "next/cache";
 import { cacheProfiles, cacheTags } from "@/lib/cache-policy";
 import { serializeMarketplaceProduct } from "@/services/product";
 import { ReviewService } from "@/services/reviews";
+import type { MarketplaceProduct } from "@/components/marketplace/product-card";
+import {
+  serializePublicShopListing,
+  type PublicShopListing,
+} from "@/lib/public-shop-dto";
 
 // ==========================================
 // TYPES
@@ -57,6 +62,41 @@ export interface VendorApplicationFilters {
   status?: VerificationStatus;
   search?: string;
 }
+
+export type PublicShopDetail = {
+  store: {
+    id: string;
+    name: string;
+    slug: string;
+    logo: string | null;
+    banner: string | null;
+    verified: boolean;
+    description: string | null;
+    city: string | null;
+    country: string | null;
+    returnWindowDays: number;
+    returnPolicy: string | null;
+    acceptsExchanges: boolean;
+    exchangePolicy: string | null;
+    totalProducts: number;
+    rating: number;
+    reviewCount: number;
+    reviews: {
+      id: string;
+      rating: number;
+      comment: string | null;
+      customer: string;
+      reply: string | null;
+      createdAt: string;
+    }[];
+    joinedAt: string;
+  };
+  products: Array<MarketplaceProduct & {
+    categoryId: string | null;
+    subCategoryName: string | null;
+  }>;
+  categories: { id: string; name: string }[];
+};
 
 // ==========================================
 // VENDOR SERVICE
@@ -231,50 +271,69 @@ export class VendorService {
   }
 
   /**
-   * Get all active vendor profiles for the public shops/stores listing page
+   * Get all active vendor profiles for the public shops/stores listing page.
+   * The cache always contains the serialized, client-safe card DTO.
    */
-  static async getPublicStoreListings() {
+  static async getPublicStoreListings(): Promise<PublicShopListing[]> {
     "use cache";
     cacheLife(cacheProfiles.marketplace);
     cacheTag(cacheTags.marketplace.shops);
-    return prisma.vendorProfile.findMany({
+    const vendors = await prisma.vendorProfile.findMany({
       where: {
         status: "ACTIVE",
         deletedAt: null,
       },
-      include: {
+      select: {
+        id: true,
+        storeName: true,
+        slug: true,
+        logoUrl: true,
+        bannerUrl: true,
+        description: true,
+        city: true,
+        country: true,
+        isVerified: true,
+        fulfillmentMethods: true,
+        deliveryFee: true,
+        deliveryEstimate: true,
         _count: { select: { products: true } },
-        products: {
-          take: 1,
-          orderBy: { createdAt: "desc" },
-          select: {
-            images: {
-              take: 1,
-              orderBy: { sortOrder: "asc" },
-              select: { url: true },
-            },
-            categoryId: true,
-          },
-        },
       },
       orderBy: { createdAt: "desc" },
     });
+    return vendors.map(serializePublicShopListing);
   }
 
   /** Public storefront data only. The slug argument is part of this cache entry's identity. */
-  static async getPublicShopBySlug(vendorSlug: string) {
+  static async getPublicShopBySlug(vendorSlug: string): Promise<PublicShopDetail | null> {
     "use cache";
     cacheLife(cacheProfiles.marketplace);
     cacheTag(cacheTags.marketplace.shops, cacheTags.shopSlug(vendorSlug));
     const vendorProfile = await prisma.vendorProfile.findUnique({
       where: { slug: vendorSlug, status: "ACTIVE", deletedAt: null },
-      include: {
+      select: {
+        id: true,
+        storeName: true,
+        slug: true,
+        logoUrl: true,
+        bannerUrl: true,
+        isVerified: true,
+        description: true,
+        city: true,
+        country: true,
+        returnWindowDays: true,
+        returnPolicy: true,
+        acceptsExchanges: true,
+        exchangePolicy: true,
+        createdAt: true,
         products: {
           where: { status: { in: ["ACTIVE", "PUBLISHED"] }, deletedAt: null },
-          include: {
-            images: { orderBy: [{ isFeatured: "desc" }, { sortOrder: "asc" }] },
-            category: { include: { parent: { include: { parent: true } } } },
-            subCategory: { include: { parent: { include: { parent: true } } } },
+          select: {
+            id: true, name: true, slug: true, brand: true, basePrice: true,
+            compareAtPrice: true, inventoryCount: true, vendorId: true,
+            categoryId: true, createdAt: true,
+            images: { select: { url: true }, orderBy: [{ isFeatured: "desc" }, { sortOrder: "asc" }] },
+            category: { select: { id: true, name: true, slug: true, parent: { select: { id: true, name: true, slug: true, parent: { select: { id: true, name: true, slug: true } } } } } },
+            subCategory: { select: { id: true, name: true, slug: true, parent: { select: { id: true, name: true, slug: true, parent: { select: { id: true, name: true, slug: true } } } } } },
             variants: { select: { isActive: true, inventoryCount: true, price: true } },
             reviews: { where: { status: "PUBLISHED" }, select: { rating: true } },
           },
@@ -291,7 +350,7 @@ export class VendorService {
     return {
       store: {
         id: vendorProfile.id, name: vendorProfile.storeName, slug: vendorProfile.slug, logo: vendorProfile.logoUrl, banner: vendorProfile.bannerUrl || null, verified: vendorProfile.isVerified,
-        description: vendorProfile.description || null, email: vendorProfile.email || null, phone: vendorProfile.phone || null, website: vendorProfile.website || null, address: vendorProfile.address || null,
+        description: vendorProfile.description || null,
         city: vendorProfile.city || "Kampala", country: vendorProfile.country || "Uganda", returnWindowDays: vendorProfile.returnWindowDays, returnPolicy: vendorProfile.returnPolicy,
         acceptsExchanges: vendorProfile.acceptsExchanges, exchangePolicy: vendorProfile.exchangePolicy, totalProducts: vendorProfile._count.products, rating: reviewSummary.average, reviewCount: reviewSummary.count,
         reviews: shopReviews.map((review) => ({ id: review.id, rating: review.rating, comment: review.comment, customer: review.user.name, reply: review.vendorReplies[0]?.body ?? null, createdAt: review.createdAt.toISOString() })), joinedAt: vendorProfile.createdAt.toISOString(),
