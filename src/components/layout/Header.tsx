@@ -220,12 +220,12 @@ export function Header() {
         </button>
         <Link
           href="/"
-          className="flex shrink-0 items-center gap-2 text-base font-bold tracking-tight text-foreground"
+          className="flex min-w-0 flex-1 items-center gap-2 text-base font-bold tracking-tight text-foreground md:flex-none"
         >
           <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <ShoppingBag className="size-4" />
           </span>
-          <span className="hidden sm:inline">
+          <span>
             Smart<span className="text-primary">Duka</span>
           </span>
         </Link>
@@ -236,7 +236,7 @@ export function Header() {
         >
           <MarketplaceSearch className="hidden max-w-2xl flex-1 md:block" />
         </Suspense>
-        <MarketplaceSearch mobileTrigger className="md:hidden" />
+        <MarketplaceSearch mobileTrigger className="hidden" />
         <nav
           aria-label="Marketplace shortcuts"
           className="hidden items-center gap-1 lg:flex"
@@ -255,9 +255,21 @@ export function Header() {
           </Link>
         </nav>
         <div className="ml-auto flex shrink-0 items-center gap-1">
-          <CartButton />
-          <NotificationsButton />
-          <ProfileSection />
+          <div className="hidden md:block">
+            <CartButton />
+          </div>
+          <div className="md:hidden">
+            <NotificationsButton />
+          </div>
+          <div className="hidden md:block">
+            <NotificationsButton />
+          </div>
+          <div className="hidden md:block">
+            <ProfileSection />
+          </div>
+          <div className="md:hidden">
+            <ProfileSection />
+          </div>
         </div>
       </div>
       <CustomerNavigationSheet open={menuOpen} onOpenChange={setMenuOpen} />

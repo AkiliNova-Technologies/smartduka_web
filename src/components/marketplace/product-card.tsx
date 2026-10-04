@@ -291,7 +291,7 @@ export function ProductCard({ product }: { product: MarketplaceProduct }) {
                         <Select
                           value={selectedOptions[name] ?? ""}
                           onValueChange={(value) => selectOption(name, value)}>
-                          <SelectTrigger aria-label={`Choose ${name}`} className="min-h-10 w-full">
+                          <SelectTrigger aria-label={`Choose ${name}`} className="min-h-10 w-full rounded-full">
                             <SelectValue placeholder={`Choose ${name}`} />
                           </SelectTrigger>
                           <SelectContent className="p-2">

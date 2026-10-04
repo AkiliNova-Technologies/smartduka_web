@@ -178,8 +178,14 @@ export function ProductDetailContent({
         className="flex items-center gap-2 text-sm text-muted-foreground">
         <Link
           href="/products"
+          aria-label="Back to products"
+          className="inline-flex size-8 items-center justify-center rounded-full outline outline-1 outline-border hover:bg-muted hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+          <ChevronLeft aria-hidden="true" className="size-4" />
+        </Link>
+        <Link
+          href="/products"
           className="inline-flex items-center gap-1 rounded-sm hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
-          <ChevronLeft aria-hidden="true" className="size-4" /> Products
+          Products
         </Link>
         {product.category && (
           <>
@@ -668,7 +674,7 @@ export function ProductDetailContent({
             <button
               onClick={addItem}
               disabled={variantProduct && !selectedVariant}
-              className="ml-auto h-11 shrink-0 rounded-lg bg-primary px-5 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+              className="ml-auto h-11 shrink-0 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
               {variantProduct && !selectedVariant
                 ? "Select options"
                 : "Add to cart"}
@@ -765,7 +771,7 @@ function DeliveryReturnsCard({ vendor }: { vendor: FulfillmentVendor }) {
       offersDelivery ||
       offersPickup ? (
         <details className="group mt-6 border-t border-border/70 pt-4 text-sm">
-          <summary className="flex h-11 cursor-pointer list-none items-center justify-between rounded-lg border border-border bg-background px-4 font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <summary className="flex h-11 cursor-pointer list-none items-center justify-between rounded-full border border-border bg-background px-4 font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
             <span>Review delivery &amp; return policy</span>
             <ArrowRight
               className="size-4 transition-transform group-open:translate-x-0.5"

@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import {
   BadgePercent,
+  Bell,
   CircleHelp,
   Heart,
   Home,
@@ -24,6 +25,8 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { useWorkspaceAccess } from "@/hooks/use-workspace-access";
 import { isRouteActive } from "@/components/layout/nav-utils";
+import { NotificationsSheet } from "@/components/notifications/NotificationsSheet";
+import { useUserData } from "@/providers/UserDataProvider";
 import {
   Sheet,
   SheetContent,
@@ -61,6 +64,8 @@ export function CustomerNavigationSheet({
   const { canAccessVendor, canAccessAdmin, loading: workspaceLoading } =
     useWorkspaceAccess();
   const [avatarFailed, setAvatarFailed] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const { unreadCount } = useUserData();
   const { theme, setTheme, mounted } = useTheme();
   const name = user?.displayName || user?.email?.split("@")[0] || "Account";
   const navigate = () => onOpenChange(false);
@@ -136,12 +141,29 @@ export function CustomerNavigationSheet({
             onNavigate={navigate}
           />
           {isAuthenticated && (
-            <NavGroup
-              label="Your account"
-              items={accountItems}
-              pathname={pathname}
-              onNavigate={navigate}
-            />
+            <>
+              <NavGroup
+                label="Your account"
+                items={accountItems}
+                pathname={pathname}
+                onNavigate={navigate}
+              />
+              <section className="mb-5">
+                <button
+                  type="button"
+                  onClick={() => setNotificationsOpen(true)}
+                  className="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-sm font-medium text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <Bell className="size-4" />
+                  Notifications
+                  {unreadCount > 0 ? (
+                    <span className="ml-auto rounded-full bg-primary px-1.5 text-[10px] font-bold leading-5 text-primary-foreground">
+                      {unreadCount > 99 ? "99+" : unreadCount}
+                    </span>
+                  ) : null}
+                </button>
+              </section>
+            </>
           )}
           {!workspaceLoading && (canAccessVendor || canAccessAdmin) && (
             <NavGroup
@@ -182,6 +204,10 @@ export function CustomerNavigationSheet({
           </SheetFooter>
         )}
       </SheetContent>
+      <NotificationsSheet
+        open={notificationsOpen}
+        onOpenChange={setNotificationsOpen}
+      />
     </Sheet>
   );
 }

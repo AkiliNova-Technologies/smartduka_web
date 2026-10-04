@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Grid2X2, Home, Search, ShoppingCart, UserRound } from "lucide-react";
+import { House, LayoutGrid, Search, ShoppingCart, UserRound } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useUserData } from "@/providers/UserDataProvider";
 import { isRouteActive } from "@/components/layout/nav-utils";
 
 const items = [
-  { label: "Home", href: "/", icon: Home },
-  { label: "Categories", href: "/categories", icon: Grid2X2 },
+  { label: "Home", href: "/", icon: House },
+  { label: "Categories", href: "/categories", icon: LayoutGrid },
   { label: "Search", href: "/products", icon: Search },
   { label: "Cart", href: "/cart", icon: ShoppingCart },
 ];
@@ -23,7 +23,7 @@ export function MobileCommerceNavFallback() {
     >
       <div className="mx-auto grid max-w-lg grid-cols-5">
         {[...items, { label: "Account", href: "/login", icon: UserRound }].map(({ label, icon: Icon }) => (
-          <div key={label} className="flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-muted-foreground">
+          <div key={label} className="flex min-h-14 flex-col items-center justify-center gap-1 text-[11px] font-medium text-muted-foreground">
             <Icon className="size-5" />
             <span>{label}</span>
           </div>
@@ -56,7 +56,7 @@ export function MobileCommerceNav() {
               key={item.label}
               href={item.href}
               aria-current={active ? "page" : undefined}
-              className={`relative flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium ${active ? "text-primary" : "text-muted-foreground"}`}
+              className={`relative flex min-h-14 flex-col items-center justify-center gap-1 text-[11px] ${active ? "font-semibold text-primary" : "font-medium text-muted-foreground"}`}
             >
               <Icon className="size-5" />
               {item.label === "Cart" && cartCount > 0 ? (
