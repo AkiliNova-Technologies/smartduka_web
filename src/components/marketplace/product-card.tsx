@@ -75,17 +75,22 @@ export function ProductCard({ product }: { product: MarketplaceProduct }) {
   const promotionalBadge = isDeal ? "Deal" : isNew ? "New" : null;
   const secondaryMetadata = subCategoryName ?? categoryName;
   const openQuickAdd = async () => {
-    setQuickAddOpen(true);
     setQuickAddLoading(true);
-    const result = await getPublicProductAction(product.slug);
-    if (result.success && result.data) {
-      const variants = result.data.product.variants.filter(
-        (variant) => variant.isActive,
-      );
-      setQuickAddProduct({ variants });
-      setSelectedOptions({});
+    setQuickAddProduct(null);
+    setSelectedOptions({});
+    setQuickAddOpen(true);
+
+    try {
+      const result = await getPublicProductAction(product.slug);
+      if (result.success && result.data) {
+        const variants = result.data.product.variants.filter(
+          (variant) => variant.isActive,
+        );
+        setQuickAddProduct({ variants });
+      }
+    } finally {
+      setQuickAddLoading(false);
     }
-    setQuickAddLoading(false);
   };
   const optionGroups =
     quickAddProduct?.variants.reduce<Record<string, string[]>>(
@@ -247,6 +252,7 @@ export function ProductCard({ product }: { product: MarketplaceProduct }) {
         ) : product.requiresVariantSelection ? (
           <Dialog.Root open={quickAddOpen} onOpenChange={setQuickAddOpen}>
             <Dialog.Trigger asChild>
+              {/* TODO: when its a mobile device i want the Choose Options word to be hidden and only the icon is shown */}
               <button
                 type="button"
                 onClick={() => void openQuickAdd()}
@@ -264,7 +270,7 @@ export function ProductCard({ product }: { product: MarketplaceProduct }) {
                 <Dialog.Description className="mt-1 text-sm text-muted-foreground">
                   Select an available combination for {product.name}.
                 </Dialog.Description>
-                {quickAddLoading ? (
+                {quickAddLoading || !quickAddProduct ? (
                   <div
                     className="mt-5 space-y-4"
                     aria-busy="true"
@@ -333,8 +339,8 @@ export function ProductCard({ product }: { product: MarketplaceProduct }) {
                         });
                         setQuickAddOpen(false);
                       }}
-                      className="flex h-11 w-full items-center justify-center gap-2 rounded-full bg-primary text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground">
-                      <ShoppingCart className="size-4" />
+                      className="flex h-11 w-full items-center justify-center gap-2 rounded-full bg-primary text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground disabled:outline disabled:outline-1 disabled:outline-border">
+                      <ShoppingCart className="size-4" /> Add to Cart
                     </button>
                   </div>
                 )}
@@ -342,6 +348,7 @@ export function ProductCard({ product }: { product: MarketplaceProduct }) {
             </Dialog.Portal>
           </Dialog.Root>
         ) : (
+          <>
           <button
             type="button"
             aria-label={`Add ${product.name} to cart`}
@@ -360,8 +367,9 @@ export function ProductCard({ product }: { product: MarketplaceProduct }) {
             className={cn(
               "flex h-10 shrink-0 items-center gap-2 rounded-full bg-primary px-3 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
             )}>
-            <ShoppingCart className="size-4" /> Add to Cart
+            <ShoppingCart className="size-4" /> <span className="hidden sm:inline">Add to Cart</span>
           </button>
+          </>
         )}
       </div>
     </article>
