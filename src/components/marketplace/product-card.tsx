@@ -252,13 +252,13 @@ export function ProductCard({ product }: { product: MarketplaceProduct }) {
         ) : product.requiresVariantSelection ? (
           <Dialog.Root open={quickAddOpen} onOpenChange={setQuickAddOpen}>
             <Dialog.Trigger asChild>
-              {/* TODO: when its a mobile device i want the Choose Options word to be hidden and only the icon is shown */}
               <button
                 type="button"
                 onClick={() => void openQuickAdd()}
                 aria-label={`Choose options for ${product.name}`}
-                className="flex h-10 shrink-0 items-center gap-2 rounded-full bg-primary px-3 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
-                <SlidersHorizontal className="size-4" /> Choose Options
+                className="flex h-10 shrink-0 items-center gap-0 rounded-full bg-primary px-3 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:gap-2">
+                <SlidersHorizontal className="size-4" />
+                <span className="hidden sm:inline">Choose Options</span>
               </button>
             </Dialog.Trigger>
             <Dialog.Portal>
