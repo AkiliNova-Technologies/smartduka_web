@@ -706,7 +706,7 @@ function DeliveryReturnsCard({ vendor }: { vendor: FulfillmentVendor }) {
 
   return (
     <aside
-      className="h-fit min-w-0 w-full rounded-xl border border-border/70 bg-card p-4 shadow-sm sm:p-6"
+      className="h-fit min-w-0 w-full rounded-xl border border-border/70 bg-card p-4 dark:shadow-sm sm:p-6"
       aria-labelledby="delivery-returns-title">
       <h2
         id="delivery-returns-title"
