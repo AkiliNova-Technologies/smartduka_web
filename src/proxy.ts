@@ -10,13 +10,50 @@ const CHECKOUT_PREFIX = "/checkout";
 // API routes that authenticate via userId in request body
 const BODY_AUTH_API_PREFIXES = ["/api/vendors"];
 
-// API routes that are fully public — no auth required
-const PUBLIC_API_PREFIXES = [
+// Legacy API routes that are fully public — no auth required.
+// Keep these routes while their clients are still supported.
+const LEGACY_PUBLIC_API_PREFIXES = [
   "/api/categories",
   "/api/products",
   "/api/vendors/public",
-  "/api/webhooks/pesapal",
 ];
+const PUBLIC_WEBHOOK_PATH = "/api/webhooks/pesapal";
+
+function normalizePathname(pathname: string): string {
+  return pathname === "/" ? pathname : pathname.replace(/\/+$/, "");
+}
+
+function hasPathPrefix(pathname: string, prefix: string): boolean {
+  return pathname === prefix || pathname.startsWith(`${prefix}/`);
+}
+
+function isLegacyPublicApiRequest(method: string, pathname: string): boolean {
+  return method === "GET" && LEGACY_PUBLIC_API_PREFIXES.some((prefix) => hasPathPrefix(pathname, prefix));
+}
+
+/**
+ * Returns true only for guest-readable marketplace catalogue endpoints.
+ * Visibility filtering remains the responsibility of each route/service.
+ */
+export function isPublicMarketplaceRead(method: string, pathname: string): boolean {
+  if (method !== "GET") return false;
+
+  const normalizedPathname = normalizePathname(pathname);
+  return (
+    hasPathPrefix(normalizedPathname, "/api/v1/products") ||
+    normalizedPathname === "/api/v1/categories" ||
+    normalizedPathname === "/api/v1/marketplace/home"
+  );
+}
+
+function isPublicApiRequest(method: string, pathname: string): boolean {
+  const normalizedPathname = normalizePathname(pathname);
+  return (
+    normalizedPathname === PUBLIC_WEBHOOK_PATH ||
+    isLegacyPublicApiRequest(method, normalizedPathname) ||
+    isPublicMarketplaceRead(method, normalizedPathname)
+  );
+}
 
 function getSanitizedRequestHeaders(request: NextRequest): Headers {
   const headers = new Headers(request.headers);
@@ -29,7 +66,7 @@ function getSanitizedRequestHeaders(request: NextRequest): Headers {
 }
 
 export async function proxy(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+  const pathname = normalizePathname(request.nextUrl.pathname);
   const origin = request.nextUrl.origin;
 
   // 1. Bypass asset streams, compiler frames, and auth endpoints early
@@ -47,7 +84,7 @@ export async function proxy(request: NextRequest) {
   }
 
   // 1.6 Fully public API routes
-  if (PUBLIC_API_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
+  if (isPublicApiRequest(request.method, pathname)) {
     return NextResponse.next({ request: { headers: getSanitizedRequestHeaders(request) } });
   }
 
@@ -95,7 +132,7 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith(CHECKOUT_PREFIX) ||
     (pathname.startsWith("/api") &&
       !pathname.startsWith("/api/public") &&
-      !PUBLIC_API_PREFIXES.some((prefix) => pathname.startsWith(prefix)) &&
+      !isPublicApiRequest(request.method, pathname) &&
       !BODY_AUTH_API_PREFIXES.some((prefix) => pathname.startsWith(prefix)));
 
   // 7. Enforce Authentication Guardrails
