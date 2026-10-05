@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { BadgeCheck, MapPin } from "lucide-react";
+import { MapPin } from "lucide-react";
 import { MediaImage } from "@/components/marketplace/media-image";
 import { SHOP_BANNER_FALLBACK, SHOP_LOGO_FALLBACK } from "@/lib/media";
 import type { PublicShopListing } from "@/lib/public-shop-dto";
+import { ShopVerificationBadge } from "@/components/marketplace/shop-verification-badge";
 
 export type MarketplaceVendor = PublicShopListing;
 
@@ -38,7 +39,7 @@ export function VendorCard({ vendor, priority = false }: { vendor: MarketplaceVe
           </div>
           <div className="flex items-start gap-2">
             <h2 className="min-w-0 flex-1 line-clamp-2 text-[17px] font-semibold leading-5 tracking-tight text-foreground transition-colors group-hover:text-primary">{vendor.storeName}</h2>
-            {vendor.isVerified ? <span title="Verified shop" className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-primary/10 px-1.5 py-0.5 text-primary"><BadgeCheck aria-hidden="true" className="size-3.5" /><span className="sr-only">Verified shop</span></span> : null}
+            {vendor.isVerified ? <ShopVerificationBadge compact className="mt-0.5 shrink-0 px-1.5" /> : null}
           </div>
           {location ? <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground"><MapPin aria-hidden="true" className="size-3.5 shrink-0" /><span className="line-clamp-1">{location}</span></p> : null}
           {vendor.description ? <p className="mt-3 line-clamp-2 text-sm leading-5 text-muted-foreground">{vendor.description}</p> : null}

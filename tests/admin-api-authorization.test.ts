@@ -8,7 +8,9 @@ const mocks = vi.hoisted(() => ({
   updateUserRole: vi.fn(),
   getAllApplications: vi.fn(),
   updateApplicationStatus: vi.fn(),
+  requireRequestRuntime: vi.fn(),
 }));
+vi.mock("@/lib/next/request-runtime", () => ({ requireRequestRuntime: mocks.requireRequestRuntime }));
 vi.mock("@/lib/auth/session", () => ({
   AuthenticationRequiredError: mocks.AuthenticationRequiredError,
 }));

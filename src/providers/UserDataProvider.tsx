@@ -74,6 +74,7 @@ export interface UserNotification {
   type: string;
   title: string;
   message: string;
+  actionPath?: string | null;
   readAt: string | null;
   createdAt: string;
 }

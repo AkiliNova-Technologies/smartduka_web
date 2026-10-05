@@ -49,6 +49,7 @@ export interface UpdateProductInput {
   colors?: string[];
   specs?: Record<string, string>[];
   tags?: string[];
+  images?: { url: string; isFeatured?: boolean; sortOrder?: number }[];
   variants?: VariantInput[];
 }
 
@@ -295,7 +296,7 @@ export function serializePublicProductDetail(product: Record<string, unknown>): 
     images: (Array.isArray(product.images) ? product.images : []).map((image) => { const value = image as Record<string, unknown>; return { id: String(value.id), url: String(value.url), isFeatured: value.isFeatured === true }; }),
     category: category ? { id: String(category.id), name: String(category.name), slug: String(category.slug) } : null,
     subCategory: subCategory ? { id: String(subCategory.id), name: String(subCategory.name), slug: String(subCategory.slug) } : null,
-    vendor: vendor ? { id: String(vendor.id), storeName: String(vendor.storeName), slug: String(vendor.slug), logoUrl: typeof vendor.logoUrl === "string" ? vendor.logoUrl : null, isVerified: vendor.isVerified === true, fulfillmentMethods: Array.isArray(vendor.fulfillmentMethods) ? vendor.fulfillmentMethods.filter((method): method is "DELIVERY" | "PICKUP" => method === "DELIVERY" || method === "PICKUP") : [], deliveryFee: vendor.deliveryFee == null ? null : Number(vendor.deliveryFee), deliveryEstimate: typeof vendor.deliveryEstimate === "string" ? vendor.deliveryEstimate : null, pickupLocation: typeof vendor.pickupLocation === "string" ? vendor.pickupLocation : null, returnWindowDays: typeof vendor.returnWindowDays === "number" ? vendor.returnWindowDays : null, returnPolicy: typeof vendor.returnPolicy === "string" ? vendor.returnPolicy : null, returnInstructions: typeof vendor.returnInstructions === "string" ? vendor.returnInstructions : null, acceptsExchanges: vendor.acceptsExchanges === true, exchangePolicy: typeof vendor.exchangePolicy === "string" ? vendor.exchangePolicy : null } : null,
+  vendor: vendor ? { id: String(vendor.id), storeName: String(vendor.storeName), slug: String(vendor.slug), logoUrl: typeof vendor.logoUrl === "string" ? vendor.logoUrl : null, isVerified: vendor.verificationStatus === "VERIFIED", fulfillmentMethods: Array.isArray(vendor.fulfillmentMethods) ? vendor.fulfillmentMethods.filter((method): method is "DELIVERY" | "PICKUP" => method === "DELIVERY" || method === "PICKUP") : [], deliveryFee: vendor.deliveryFee == null ? null : Number(vendor.deliveryFee), deliveryEstimate: typeof vendor.deliveryEstimate === "string" ? vendor.deliveryEstimate : null, pickupLocation: typeof vendor.pickupLocation === "string" ? vendor.pickupLocation : null, returnWindowDays: typeof vendor.returnWindowDays === "number" ? vendor.returnWindowDays : null, returnPolicy: typeof vendor.returnPolicy === "string" ? vendor.returnPolicy : null, returnInstructions: typeof vendor.returnInstructions === "string" ? vendor.returnInstructions : null, acceptsExchanges: vendor.acceptsExchanges === true, exchangePolicy: typeof vendor.exchangePolicy === "string" ? vendor.exchangePolicy : null } : null,
     rating: reviews.length ? Number((reviews.reduce((sum, review) => sum + Number(review.rating ?? 0), 0) / reviews.length).toFixed(1)) : 0,
     reviewCount: Number((product._count as { reviews?: number } | undefined)?.reviews ?? reviews.length),
     reviews: reviews.map((review) => { const user = relation(review.user); const variant = relation(review.variant); const replies = Array.isArray(review.vendorReplies) ? review.vendorReplies as Array<Record<string, unknown>> : []; const createdAt = review.createdAt; return { id: String(review.id), user: typeof user?.name === "string" ? user.name : "Anonymous", avatarUrl: typeof user?.avatarUrl === "string" ? user.avatarUrl : null, rating: Number(review.rating ?? 0), date: createdAt instanceof Date ? createdAt.toISOString().split("T")[0] : typeof createdAt === "string" ? createdAt.split("T")[0] : "", comment: typeof review.comment === "string" ? review.comment : "", verifiedPurchase: review.verifiedPurchase === true, title: typeof review.title === "string" ? review.title : null, imageUrls: Array.isArray(review.imageUrls) ? review.imageUrls.filter((url): url is string => typeof url === "string") : [], variantName: typeof variant?.name === "string" ? variant.name : null, vendorReply: typeof replies[0]?.body === "string" ? replies[0].body : null }; }),
@@ -349,7 +350,7 @@ export class ProductService {
             storeName: true,
             slug: true,
             logoUrl: true,
-            isVerified: true,
+            verificationStatus: true,
             fulfillmentMethods: true,
             deliveryFee: true,
             deliveryEstimate: true,
@@ -467,7 +468,7 @@ export class ProductService {
       where: { id, status: { in: ["ACTIVE", "PUBLISHED"] }, deletedAt: null },
       include: {
         images: { orderBy: { sortOrder: "asc" } }, category: true, subCategory: true,
-        vendor: { select: { id: true, storeName: true, slug: true, logoUrl: true, isVerified: true } },
+        vendor: { select: { id: true, storeName: true, slug: true, logoUrl: true, verificationStatus: true } },
         variants: true, reviews: { where: { status: "PUBLISHED" }, include: { user: { select: { id: true, name: true, avatarUrl: true } } }, orderBy: { createdAt: "desc" } },
         _count: { select: { reviews: { where: { status: "PUBLISHED" } }, variants: true, orderItems: true } },
       },
@@ -492,7 +493,7 @@ export class ProductService {
             slug: true,
             logoUrl: true,
             status: true,
-            isVerified: true,
+            verificationStatus: true,
           },
         },
         reviews: {
@@ -525,7 +526,7 @@ export class ProductService {
             storeName: true,
             slug: true,
             logoUrl: true,
-            isVerified: true,
+            verificationStatus: true,
           },
         },
         variants: true,
@@ -563,7 +564,7 @@ export class ProductService {
             storeName: true,
             slug: true,
             logoUrl: true,
-            isVerified: true,
+            verificationStatus: true,
             fulfillmentMethods: true,
             deliveryFee: true,
             deliveryEstimate: true,
@@ -902,6 +903,10 @@ export class ProductService {
       const sizes = variants ? [...new Set(active.map((variant) => variant.options.Size ?? variant.options.size).filter((value): value is string => Boolean(value)))] : input.sizes;
       const colors = variants ? [...new Set(active.map((variant) => variant.options.Colour ?? variant.options.Color ?? variant.options.colour ?? variant.options.color).filter((value): value is string => Boolean(value)))] : input.colors;
       const inventoryCount = variants ? active.reduce((sum, variant) => sum + variant.inventoryCount, 0) : input.inventoryCount;
+      if (input.images !== undefined) {
+        await tx.productImage.deleteMany({ where: { productId: input.id } });
+        await tx.productImage.createMany({ data: input.images.map((image, index) => ({ productId: input.id, url: image.url, isFeatured: image.isFeatured ?? index === 0, sortOrder: image.sortOrder ?? index })) });
+      }
       return tx.product.update({
       where: { id: input.id },
       data: {

@@ -6,8 +6,10 @@ export type AppPermissionKey =
   | "platform:manage_vendors"   // Onboarding, verification, and suspension loops
   | "platform:manage_billing"   // Monitoring mall vendor system subscriptions
   | "platform:customer_support" // Managing global order disputes and reviews
+  | "platform:manage_verifications" // Shop verification review lifecycle
   | "vendor:manage_shop"        // Adjust profile, storefront layout, parameters
   | "vendor:manage_team"        // Alter role capabilities of store employees
+  | "vendor:manage_legal"       // KYC/legal identity and sensitive shop records
   | "vendor:manage_products"    // Create, update, archive shop products
   | "vendor:view_orders"        // Track incoming items assigned to shop
   | "vendor:process_orders"     // Trigger fulfillment state changes
@@ -19,8 +21,8 @@ export type AppPermissionKey =
  */
 export const PLATFORM_ROLE_PERMISSIONS: Record<PlatformRole, AppPermissionKey[]> = {
   SUPER_ADMIN: ["platform:manage"],
-  ADMIN: ["platform:view_analytics", "platform:manage_vendors", "platform:manage_billing", "platform:customer_support"],
-  SUPPORT: ["platform:customer_support"],
+  ADMIN: ["platform:view_analytics", "platform:manage_vendors", "platform:manage_billing", "platform:customer_support", "platform:manage_verifications"],
+  SUPPORT: ["platform:customer_support", "platform:manage_verifications"],
   BILLING: ["platform:view_analytics", "platform:manage_billing"],
   VENDOR: [],   // Vendors use DEFAULT_ROLE_PERMISSIONS via VendorUserRole, not platform permissions
   CUSTOMER: [], // Customers have no special platform permissions
@@ -32,14 +34,14 @@ export const PLATFORM_ROLE_PERMISSIONS: Record<PlatformRole, AppPermissionKey[]>
 export const DEFAULT_ROLE_PERMISSIONS: Record<VendorUserRole, AppPermissionKey[]> = {
   OWNER: [
     "vendor:manage_shop", "vendor:manage_team", "vendor:manage_products",
-    "vendor:view_orders", "vendor:process_orders", "vendor:view_ledger", "vendor:request_payout"
+    "vendor:manage_legal", "vendor:view_orders", "vendor:process_orders", "vendor:view_ledger", "vendor:request_payout"
   ],
   ADMIN: [
     "vendor:manage_shop", "vendor:manage_team", "vendor:manage_products",
     "vendor:view_orders", "vendor:process_orders", "vendor:view_ledger"
   ],
   MANAGER: [
-    "vendor:manage_products", "vendor:view_orders", "vendor:process_orders"
+    "vendor:manage_shop", "vendor:manage_products", "vendor:view_orders", "vendor:process_orders"
   ],
   STAFF: [
     "vendor:view_orders", "vendor:process_orders"

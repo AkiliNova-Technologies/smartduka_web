@@ -1,6 +1,8 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
+import { type ColumnDef } from "@tanstack/react-table";
 import { AlertCircle, ArrowUpRight, CheckCircle2, Clock3, Landmark, Loader2, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,17 +11,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DashboardMetricCard } from "@/components/dashboard-metric-card";
-import { authHeaders, fetchApi } from "@/lib/providers/useProviderFetch";
-
-type FinanceSummary = {
-  currency: string;
-  balances: { pending: string; available: string; reserved: string; paidOut: string };
-  hasAvailableBalance: boolean;
-  destinations: Array<{ id: "MOBILE_MONEY" | "BANK_ACCOUNT"; label: string; maskedDestination: string }>;
-  disbursementsEnabled: boolean;
-};
-
-type Withdrawal = { id: string; amount: string | number; currency: string | null; status: string; maskedDestination: string | null; createdAt: string; updatedAt: string };
+import { DataTable } from "@/components/data-table";
+import { humanizeOperation, operationBadgeClass } from "@/lib/admin-operations";
+import { useVendorFinance } from "@/hooks/use-vendor-finance";
+import type { VendorFinanceSummary, VendorWithdrawal } from "@/lib/vendor-finance-client";
 
 function formatUgx(value: string) {
   const [whole, fraction] = value.split(".");
@@ -27,42 +22,20 @@ function formatUgx(value: string) {
   return `UGX ${grouped}${fraction && fraction !== "00" ? `.${fraction}` : ""}`;
 }
 
-function statusStyle(status: string) {
-  if (status === "COMPLETED") return "border-emerald-500/20 bg-emerald-500/5 text-emerald-700 dark:text-emerald-400";
-  if (["REQUESTED", "PENDING", "APPROVED", "READY_FOR_DISBURSEMENT"].includes(status)) return "border-amber-500/20 bg-amber-500/5 text-amber-700 dark:text-amber-400";
-  if (status === "PROCESSING") return "border-blue-500/20 bg-blue-500/5 text-blue-700 dark:text-blue-400";
-  if (["REJECTED", "FAILED"].includes(status)) return "border-rose-500/20 bg-rose-500/5 text-rose-700 dark:text-rose-400";
-  return "border-border bg-muted text-muted-foreground";
-}
-
-function statusLabel(status: string) {
-  if (status === "READY_FOR_DISBURSEMENT") return "Approved for processing";
-  return status.replaceAll("_", " ").toLowerCase().replace(/^./, (letter) => letter.toUpperCase());
-}
-
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString("en-UG", { day: "numeric", month: "short", year: "numeric" });
 }
 
 export default function VendorFinancePage() {
-  const [summary, setSummary] = React.useState<FinanceSummary | null>(null);
-  const [withdrawals, setWithdrawals] = React.useState<Withdrawal[]>([]);
-  const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState<string | null>(null);
+  const { summary, withdrawals, loading, error, refresh, requestWithdrawal } = useVendorFinance();
   const [sheetOpen, setSheetOpen] = React.useState(false);
-  const requestRef = React.useRef<Promise<void> | null>(null);
-
-  const refresh = React.useCallback(async () => {
-    if (requestRef.current) return requestRef.current;
-    const request = (async () => { setLoading(true); setError(null); try { const [nextSummary, history] = await Promise.all([
-        fetchApi<FinanceSummary>("/api/vendor/finance/summary", { headers: authHeaders() }),
-        fetchApi<{ withdrawals: Withdrawal[] }>("/api/vendor/withdrawals", { headers: authHeaders() }),
-      ]); setSummary(nextSummary); setWithdrawals(history.withdrawals); } catch { setError("We couldn’t load your finance information. Please try again."); } finally { setLoading(false); } })();
-    requestRef.current = request;
-    try { await request; } finally { requestRef.current = null; }
-  }, []);
-
-  React.useEffect(() => { queueMicrotask(() => { void refresh(); }); }, [refresh]);
+  const columns = React.useMemo<ColumnDef<VendorWithdrawal>[]>(() => [
+    { accessorKey: "createdAt", header: "Requested", cell: ({ row }) => <span className="whitespace-nowrap">{formatDate(row.original.createdAt)}</span> },
+    { accessorKey: "amount", header: "Amount", cell: ({ row }) => <span className="whitespace-nowrap font-semibold">{formatUgx(String(row.original.amount))}</span> },
+    { accessorKey: "maskedDestination", header: "Payout method", cell: ({ row }) => <span className="block max-w-48 truncate" title={row.original.maskedDestination || ""}>{row.original.maskedDestination || "Destination unavailable"}</span> },
+    { accessorKey: "status", header: "Status", cell: ({ row }) => <span className={`inline-flex rounded-full px-2 py-1 text-[10px] font-semibold ${operationBadgeClass(row.original.status)}`}>{humanizeOperation(row.original.status)}</span> },
+    { accessorKey: "updatedAt", header: "Updated", cell: ({ row }) => <span className="whitespace-nowrap text-muted-foreground">{formatDate(row.original.updatedAt)}</span> },
+  ], []);
 
   const canOpenWithdrawal = Boolean(summary?.hasAvailableBalance && summary.destinations.length > 0);
 
@@ -82,14 +55,14 @@ export default function VendorFinancePage() {
     </div>}</section>
 
     {summary && !summary.disbursementsEnabled && <p className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 text-sm text-amber-800 dark:text-amber-300">Withdrawal requests are reviewed and processed according to the current payout workflow. They are not sent automatically.</p>}
-    {summary && summary.destinations.length === 0 && <p className="rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground">A payout destination is required before you can request a withdrawal. Add your payout details in Store settings when that setup is available.</p>}
+    {summary && summary.destinations.length === 0 && <p className="rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground">A payout destination is required before you can request a withdrawal. <Link className="font-medium text-primary hover:underline" href="/vendor/settings?tab=payouts">Add payout details in Store settings.</Link></p>}
     {summary && !summary.hasAvailableBalance && <p className="rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground">You do not currently have earnings available to withdraw. Pending earnings will appear here when they become available.</p>}
 
-    <section aria-labelledby="withdrawal-history-heading" className="space-y-4"><div><h2 id="withdrawal-history-heading" className="text-lg font-semibold tracking-tight text-foreground">Withdrawal requests</h2><p className="mt-1 text-sm text-muted-foreground">Your most recent requests, newest first.</p></div><div className="overflow-hidden rounded-xl border border-border bg-card">{loading ? <p className="p-5 text-sm text-muted-foreground">Loading withdrawal requests…</p> : withdrawals.length === 0 ? <p className="p-5 text-sm text-muted-foreground">You have not made a withdrawal request yet.</p> : <ul className="divide-y divide-border/60">{withdrawals.map((withdrawal) => <li key={withdrawal.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><p className="text-sm font-semibold text-foreground">{formatUgx(String(withdrawal.amount))}</p><p className="truncate text-sm text-muted-foreground">{withdrawal.maskedDestination || "Destination unavailable"} · Requested {formatDate(withdrawal.createdAt)}</p></div><div className="flex items-center justify-between gap-3 sm:justify-end"><span className={`rounded-full border px-2.5 py-1 text-xs font-medium ${statusStyle(withdrawal.status)}`}>{statusLabel(withdrawal.status)}</span><span className="text-xs text-muted-foreground">Updated {formatDate(withdrawal.updatedAt)}</span></div></li>)}</ul>}</div></section>
+    <section aria-labelledby="withdrawal-history-heading" className="space-y-4"><div><h2 id="withdrawal-history-heading" className="text-lg font-semibold tracking-tight text-foreground">Withdrawal requests</h2><p className="mt-1 text-sm text-muted-foreground">Your most recent requests, newest first.</p></div><DataTable columns={columns} data={withdrawals} getRowId={(withdrawal) => withdrawal.id} isLoading={loading} defaultPageSize={10} features={{ pagination: true, search: false, sorting: false, filtering: false, columnVisibility: true, rowSelection: false, toolbar: true, footer: true }} emptyStateContent={<span>No withdrawals yet. Withdrawal requests will appear here once created.</span>} /></section>
 
     <section aria-labelledby="balance-help-heading" className="rounded-xl border border-border bg-card p-5"><h2 id="balance-help-heading" className="text-base font-semibold text-foreground">Understanding your balances</h2><dl className="mt-4 grid gap-4 text-sm sm:grid-cols-2"><div><dt className="font-medium text-foreground">Available</dt><dd className="mt-1 text-muted-foreground">Money currently eligible for a withdrawal request.</dd></div><div><dt className="font-medium text-foreground">Pending</dt><dd className="mt-1 text-muted-foreground">Earnings recorded but not yet released for withdrawal.</dd></div><div><dt className="font-medium text-foreground">Reserved</dt><dd className="mt-1 text-muted-foreground">Money held for active withdrawal requests.</dd></div><div><dt className="font-medium text-foreground">Paid out</dt><dd className="mt-1 text-muted-foreground">Amounts from completed withdrawals.</dd></div></dl></section>
 
-    {summary && <WithdrawalSheet open={sheetOpen} onOpenChange={setSheetOpen} summary={summary} onRequested={refresh} />}
+    {summary && <WithdrawalSheet open={sheetOpen} onOpenChange={setSheetOpen} summary={summary} onRequested={refresh} requestWithdrawal={requestWithdrawal} />}
   </div>;
 }
 
@@ -97,7 +70,7 @@ function FinanceCard({ label, value, description, icon: Icon, primary = false }:
 
 function BalanceSkeleton() { return <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-32 rounded-xl" />)}</div>; }
 
-function WithdrawalSheet({ open, onOpenChange, summary, onRequested }: { open: boolean; onOpenChange: (open: boolean) => void; summary: FinanceSummary; onRequested: () => Promise<void> }) {
+function WithdrawalSheet({ open, onOpenChange, summary, onRequested, requestWithdrawal }: { open: boolean; onOpenChange: (open: boolean) => void; summary: VendorFinanceSummary; onRequested: () => Promise<void>; requestWithdrawal: (input: { amount: string; currency: string; destinationId: string; withdrawalRequestId: string }) => Promise<unknown> }) {
   const [amount, setAmount] = React.useState("");
   const [destinationId, setDestinationId] = React.useState<string>(summary.destinations[0]?.id || "");
   const [submitting, setSubmitting] = React.useState(false);
@@ -114,7 +87,7 @@ function WithdrawalSheet({ open, onOpenChange, summary, onRequested }: { open: b
     if (!destination) { setError("Choose an available payout destination."); return; }
     setSubmitting(true); setError(null);
     try {
-      await fetchApi("/api/vendor/withdrawals", { method: "POST", headers: authHeaders(), body: JSON.stringify({ amount, currency: summary.currency, destinationId, withdrawalRequestId: crypto.randomUUID().replaceAll("-", "") }) });
+      await requestWithdrawal({ amount, currency: summary.currency, destinationId, withdrawalRequestId: crypto.randomUUID().replaceAll("-", "") });
       await onRequested();
       onOpenChange(false);
     } catch {

@@ -37,6 +37,7 @@ export function MobileCommerceNav() {
   const pathname = usePathname();
   const { isAuthenticated } = useAuth();
   const { cartCount } = useUserData();
+  if (pathname === "/checkout") return null;
   const accountHref = isAuthenticated ? "/settings" : "/login";
   const navigation = [
     ...items,

@@ -1,0 +1,4 @@
+import { NextRequest } from "next/server";
+import { errorResponse, getErrorMessage, successResponse } from "@/lib/api-utils";
+import { MarketplaceReportService } from "@/services/marketplace-reports";
+export async function GET(request: NextRequest) { try { const q = request.nextUrl.searchParams; if (q.get("admins") === "1") return successResponse({ admins: await MarketplaceReportService.eligibleAdmins() }); const result = await MarketplaceReportService.listForAdmin({ status: q.get("status") as never, severity: q.get("severity") as never, targetType: q.get("targetType") as never, reason: q.get("reason") as never, assignedAdminId: q.get("assignedAdminId") || undefined, unassigned: q.get("unassigned") === "true", quickView: q.get("view") || undefined, page: Number(q.get("page") || 1), limit: Number(q.get("limit") || 25) }); return successResponse(result); } catch (error) { return errorResponse(getErrorMessage(error), 403); } }

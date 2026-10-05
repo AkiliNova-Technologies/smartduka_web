@@ -2,6 +2,8 @@ import { headers, cookies } from "next/headers";
 import { PlatformRole, UserStatus, VendorUserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma/client";
 import { verifyToken } from "@/lib/auth/jwt";
+import { adminAuth } from "@/lib/firebase/admin";
+import { synchronizeFirebaseIdentity } from "@/services/auth-sync";
 
 export class AuthenticationRequiredError extends Error {}
 export class AccountInactiveError extends Error {}
@@ -19,10 +21,10 @@ export interface AuthenticatedUserSession {
  * cryptographically verified marketplace session cookie. Background cron workers
  * use their separate shared-secret authentication path.
  */
-export async function getAuthenticatedSession(): Promise<AuthenticatedUserSession | null> {
+export async function resolveAuthenticatedUser(request?: Request): Promise<AuthenticatedUserSession | null> {
   const requestHeaders = await headers();
 
-  const authHeader = requestHeaders.get("authorization");
+  const authHeader = request?.headers.get("authorization") ?? requestHeaders.get("authorization");
   const cronSecret = process.env.CRON_SECRET;
 
   if (cronSecret && authHeader === `Bearer ${cronSecret}`) {
@@ -33,6 +35,43 @@ export async function getAuthenticatedSession(): Promise<AuthenticatedUserSessio
       vendorRole: "OWNER" as VendorUserRole,
       platformRole: "SUPER_ADMIN" as PlatformRole,
     };
+  }
+
+  // Native clients authenticate with the same Firebase identity token used by
+  // the web sign-in flow. Resolve its current SmartDuka account here rather
+  // than trusting UID, vendor, or role claims supplied by a client.
+  const bearer = authHeader?.match(/^Bearer\s+(.+)$/i)?.[1];
+  if (bearer) {
+    const marketplaceSession = await verifyToken(bearer).catch(() => null);
+    if (marketplaceSession) {
+      return {
+        userId: marketplaceSession.userId,
+        email: marketplaceSession.email,
+        vendorId: marketplaceSession.vendorId,
+        vendorRole: marketplaceSession.vendorRole,
+        platformRole: marketplaceSession.platformRole,
+      };
+    }
+    try {
+      const identity = await adminAuth.verifyIdToken(bearer);
+      if (!identity.email) return null;
+      const user = await synchronizeFirebaseIdentity({
+        uid: identity.uid,
+        email: identity.email,
+        name: identity.name,
+        picture: identity.picture,
+        emailVerified: identity.email_verified,
+      });
+      return {
+        userId: user.id,
+        email: user.email,
+        vendorId: user.vendorId,
+        vendorRole: user.vendorRole,
+        platformRole: user.platformRole,
+      };
+    } catch {
+      return null;
+    }
   }
 
   try {
@@ -56,6 +95,11 @@ export async function getAuthenticatedSession(): Promise<AuthenticatedUserSessio
   }
 
   return null;
+}
+
+/** Backwards-compatible request-context entry point for server components/actions. */
+export async function getAuthenticatedSession(): Promise<AuthenticatedUserSession | null> {
+  return resolveAuthenticatedUser();
 }
 
 /**

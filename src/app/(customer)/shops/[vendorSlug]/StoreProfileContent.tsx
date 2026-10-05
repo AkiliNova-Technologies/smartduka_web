@@ -9,9 +9,10 @@ import { PageContainer } from "@/components/marketplace/page-container";
 import { PaginatedProductGrid } from "@/components/marketplace/product-grid";
 import { EmptyState } from "@/components/marketplace/empty-state";
 import { IllustratedEmptyState } from "@/components/marketplace/illustrated-empty-state";
-import { StatusBadge } from "@/components/marketplace/status-badge";
 import type { MarketplaceProduct } from "@/components/marketplace/product-card";
 import { ReviewEntryPoint } from "@/components/reviews/ReviewEntryPoint";
+import { ReportEntryPoint } from "@/components/marketplace/ReportEntryPoint";
+import { ShopVerificationBadge } from "@/components/marketplace/shop-verification-badge";
 
 interface StoreData {
   id: string;
@@ -72,9 +73,8 @@ export function StoreProfileContent({ store, products, categories }: Props) {
                 <h1 className="text-2xl font-semibold tracking-tight text-foreground">
                   {store.name}
                 </h1>
-                {store.verified ? (
-                  <StatusBadge tone="info">Verified shop</StatusBadge>
-                ) : null}
+                {store.verified ? <ShopVerificationBadge /> : null}
+                <ReportEntryPoint targetType="SHOP" targetId={store.id} label={store.name} />
               </div>
               {store.description ? (
                 <p className="max-w-3xl text-sm leading-6 text-muted-foreground">

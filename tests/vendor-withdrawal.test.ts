@@ -3,28 +3,28 @@ import { Decimal } from "@prisma/client/runtime/client";
 
 const mocks = vi.hoisted(() => ({
   payoutFindUnique: vi.fn(), payoutFindFirst: vi.fn(), payoutCreate: vi.fn(), payoutUpdate: vi.fn(),
-  vendorFindUnique: vi.fn(), ledgerAggregate: vi.fn(), ledgerFindMany: vi.fn(), ledgerCreate: vi.fn(), allocationCreateMany: vi.fn(), allocationUpdateMany: vi.fn(), auditCreate: vi.fn(), transaction: vi.fn(), adminContext: vi.fn(),
+  payoutAccountFindFirst: vi.fn(), ledgerAggregate: vi.fn(), ledgerFindMany: vi.fn(), ledgerCreate: vi.fn(), allocationCreateMany: vi.fn(), allocationUpdateMany: vi.fn(), auditCreate: vi.fn(), transaction: vi.fn(), adminContext: vi.fn(),
 }));
 vi.mock("@/lib/prisma/client", () => ({ prisma: {
   vendorPayout: { findUnique: mocks.payoutFindUnique, findFirst: mocks.payoutFindFirst, create: mocks.payoutCreate, update: mocks.payoutUpdate, findMany: vi.fn() },
-  vendorProfile: { findUnique: mocks.vendorFindUnique }, financialLedger: { aggregate: mocks.ledgerAggregate, findMany: mocks.ledgerFindMany, create: mocks.ledgerCreate }, vendorPayoutAllocation: { createMany: mocks.allocationCreateMany, updateMany: mocks.allocationUpdateMany }, auditLog: { create: mocks.auditCreate }, $transaction: mocks.transaction,
+  vendorPayoutAccount: { findFirst: mocks.payoutAccountFindFirst }, financialLedger: { aggregate: mocks.ledgerAggregate, findMany: mocks.ledgerFindMany, create: mocks.ledgerCreate }, vendorPayoutAllocation: { createMany: mocks.allocationCreateMany, updateMany: mocks.allocationUpdateMany }, auditLog: { create: mocks.auditCreate }, $transaction: mocks.transaction,
 } }));
 vi.mock("@/lib/auth/admin-context", () => ({ requireAdminContext: mocks.adminContext }));
 
 import { MIN_VENDOR_WITHDRAWAL_AMOUNT, VendorWithdrawalService } from "@/services/vendor-withdrawal";
 
-const input = { vendorId: "vendor-a", userId: "user-a", amount: "60000", currency: "UGX", destinationId: "BANK_ACCOUNT", withdrawalRequestId: "withdrawal-request-0001" };
+const input = { vendorId: "vendor-a", userId: "user-a", amount: "60000", currency: "UGX", destinationId: "payout-account-a", withdrawalRequestId: "withdrawal-request-0001" };
 const requested = { id: "payout-1", vendorId: "vendor-a", amount: new Decimal("60000"), currency: "UGX", status: "REQUESTED", requestHash: "hash", maskedDestination: "Bank •••• 1234" };
 const transactionClient = {
   vendorPayout: { findUnique: mocks.payoutFindUnique, findFirst: mocks.payoutFindFirst, create: mocks.payoutCreate, update: mocks.payoutUpdate },
-  vendorProfile: { findUnique: mocks.vendorFindUnique }, financialLedger: { aggregate: mocks.ledgerAggregate, findMany: mocks.ledgerFindMany, create: mocks.ledgerCreate }, vendorPayoutAllocation: { createMany: mocks.allocationCreateMany, updateMany: mocks.allocationUpdateMany }, auditLog: { create: mocks.auditCreate },
+  vendorPayoutAccount: { findFirst: mocks.payoutAccountFindFirst }, financialLedger: { aggregate: mocks.ledgerAggregate, findMany: mocks.ledgerFindMany, create: mocks.ledgerCreate }, vendorPayoutAllocation: { createMany: mocks.allocationCreateMany, updateMany: mocks.allocationUpdateMany }, auditLog: { create: mocks.auditCreate },
 };
 
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.payoutFindUnique.mockResolvedValue(null);
   mocks.adminContext.mockResolvedValue({ userId: "admin-a" });
-  mocks.vendorFindUnique.mockResolvedValue({ momoMerchantCode: "0777000000", bankName: "Bank", bankAccountName: "Vendor A", bankAccountNumber: "001234" });
+  mocks.payoutAccountFindFirst.mockResolvedValue({ id: "payout-account-a", type: "MOBILE_MONEY", maskedReference: "+25677••• ••42" });
   mocks.ledgerAggregate.mockResolvedValue({ _sum: { amount: new Decimal("100000") } });
   mocks.ledgerFindMany.mockResolvedValue([{ id: "lot-1", amount: new Decimal("100000"), payoutAllocations: [] }]);
   mocks.payoutCreate.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({ id: "payout-1", ...data }));
@@ -52,10 +52,10 @@ describe("Phase 3H withdrawal reservations", () => {
     await expect(VendorWithdrawalService.requestWithdrawal({ ...input, currency: "USD" })).rejects.toMatchObject({ code: "INVALID_REQUEST" });
   });
 
-  it("uses only the requesting vendor profile for the destination snapshot", async () => {
+  it("uses only the requesting vendor payout account for the destination snapshot", async () => {
     await VendorWithdrawalService.requestWithdrawal(input);
-    expect(mocks.vendorFindUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "vendor-a" } }));
-    expect(mocks.payoutCreate.mock.calls[0][0].data).toMatchObject({ destinationType: "BANK_ACCOUNT", maskedDestination: "Bank •••• 1234" });
+    expect(mocks.payoutAccountFindFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "payout-account-a", vendorId: "vendor-a", status: "ACTIVE" } }));
+    expect(mocks.payoutCreate.mock.calls[0][0].data).toMatchObject({ payoutAccountId: "payout-account-a", destinationType: "MOBILE_MONEY", maskedDestination: "+25677••• ••42" });
   });
 
   it("returns the same request without duplicate reservation for a matching idempotency key", async () => {

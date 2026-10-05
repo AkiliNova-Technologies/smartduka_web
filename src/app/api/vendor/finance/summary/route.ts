@@ -1,4 +1,3 @@
-import { PayoutDestinationType } from "@prisma/client";
 import { AuthenticationRequiredError } from "@/lib/auth/session";
 import { requireVendorContext, VendorAuthorizationError } from "@/lib/auth/vendor-context";
 import { successResponse, errorResponse, getErrorMessage } from "@/lib/api-utils";
@@ -15,13 +14,11 @@ async function getVendorFinanceSummary(vendorId: string) {
   "use cache";
   cacheLife(cacheProfiles.vendorOperational);
   cacheTag(cacheTags.vendorEarnings(vendorId));
-  const [balances, vendor] = await Promise.all([
+  const [balances, accounts] = await Promise.all([
     MarketplaceEconomicsService.vendorBalances(vendorId, PLATFORM_CURRENCY),
-    prisma.vendorProfile.findUnique({ where: { id: vendorId }, select: { momoMerchantCode: true, bankName: true, bankAccountNumber: true } }),
+    prisma.vendorPayoutAccount.findMany({ where: { vendorId, status: "ACTIVE" }, select: { id: true, provider: true, maskedReference: true }, orderBy: { isDefault: "desc" } }),
   ]);
-  const destinations = [] as Array<{ id: PayoutDestinationType; label: string; maskedDestination: string }>;
-  if (vendor?.momoMerchantCode) destinations.push({ id: PayoutDestinationType.MOBILE_MONEY, label: "Mobile money", maskedDestination: `Mobile money •••• ${vendor.momoMerchantCode.slice(-4)}` });
-  if (vendor?.bankName && vendor.bankAccountNumber) destinations.push({ id: PayoutDestinationType.BANK_ACCOUNT, label: "Bank account", maskedDestination: `${vendor.bankName} •••• ${vendor.bankAccountNumber.slice(-4)}` });
+  const destinations = accounts.map((account) => ({ id: account.id, label: account.provider === "MTN_MOBILE_MONEY" ? "MTN Mobile Money" : "Airtel Money", maskedDestination: account.maskedReference }));
   return { currency: balances.currency, balances: { pending: decimalString(balances.pendingBalance), available: decimalString(balances.availableBalance), reserved: decimalString(balances.reservedBalance), paidOut: decimalString(balances.paidOutTotal) }, hasAvailableBalance: balances.availableBalance.greaterThan(0), destinations, disbursementsEnabled: VENDOR_DISBURSEMENTS_ENABLED };
 }
 

@@ -4,7 +4,7 @@ import { type RefObject, useEffect, useRef, useState, useSyncExternalStore } fro
 import Link from "next/link";
 import { MediaImage } from "@/components/marketplace/media-image";
 import { PRODUCT_IMAGE_FALLBACK } from "@/lib/media";
-import { ArrowLeft, CreditCard, MapPin, ShoppingBag, Truck } from "lucide-react";
+import { ArrowLeft, MapPin, ShoppingBag, Truck } from "lucide-react";
 import { toast } from "sonner";
 import { useUserData } from "@/providers/UserDataProvider";
 import { useAuth } from "@/hooks/use-auth";
@@ -41,6 +41,7 @@ export default function CheckoutPage() {
   const [address, setAddress] = useState("");
   const [notes, setNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedPaymentGateway, setSelectedPaymentGateway] = useState<"PESAPAL">("PESAPAL");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [shops, setShops] = useState<ShopFulfillment[]>([]);
   const [fulfillment, setFulfillment] = useState<Record<string, "DELIVERY" | "PICKUP">>({});
@@ -166,8 +167,8 @@ export default function CheckoutPage() {
     );
 
   return (
-    <main className="mx-auto max-w-7xl px-4 py-6 pb-24 sm:px-6 lg:py-10">
-      <div className="mt-5 grid gap-8 lg:grid-cols-[minmax(0,7fr)_minmax(17rem,3fr)] lg:items-start">
+    <main className="mx-auto max-w-7xl px-4 py-6 pb-28 sm:px-6 lg:py-10">
+      <div className="mt-5 grid gap-6 lg:grid-cols-[minmax(0,13fr)_minmax(20rem,7fr)] lg:items-start lg:gap-8">
         <section className="min-w-0">
           <div className="flex items-center gap-3">
             <Link
@@ -176,7 +177,7 @@ export default function CheckoutPage() {
               <ArrowLeft className="size-4" />
             </Link>
             <div>
-              <h1 className="text-3xl font-semibold tracking-tight">
+              <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
                 Checkout
               </h1>
               <p className="mt-1 text-sm text-muted-foreground">
@@ -190,7 +191,7 @@ export default function CheckoutPage() {
             <h2 id="delivery-details" className="text-lg font-semibold">
               Delivery information
             </h2>
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 lg:grid-cols-2">
               <Field
                 label="Full name"
                 id="full-name"
@@ -215,8 +216,6 @@ export default function CheckoutPage() {
                 inputRef={phoneRef}
                 error={errors.phoneNumber}
               />
-            </div>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <Field
                 label="District / area"
                 id="delivery-district"
@@ -263,7 +262,7 @@ export default function CheckoutPage() {
           </section>
           <section className="mt-5 rounded-2xl border bg-card p-5 sm:p-6" aria-labelledby="fulfilment-options">
             <h2 id="fulfilment-options" className="text-lg font-semibold">How you’ll receive each order</h2>
-            <div className="mt-4 space-y-3">{shops.map((shop) => <div key={shop.id} className="rounded-xl border p-4"><div className="flex items-center justify-between gap-3"><p className="font-medium">{shop.storeName}</p><span className="text-xs text-muted-foreground">{fulfillment[shop.id] === "PICKUP" ? "No delivery fee" : `UGX ${shop.deliveryFee.toLocaleString()}`}</span></div><div className="mt-3 flex flex-wrap gap-2">{shop.fulfillmentMethods.map((method) => <Button key={method} type="button" size="sm" variant={fulfillment[shop.id] === method ? "default" : "outline"} className="rounded-full" onClick={() => setFulfillment((current) => ({ ...current, [shop.id]: method }))}>{method === "DELIVERY" ? <Truck className="mr-1.5 size-3.5" /> : <MapPin className="mr-1.5 size-3.5" />}{method === "DELIVERY" ? "Delivery" : "Pickup"}</Button>)}</div>{fulfillment[shop.id] === "PICKUP" && <p className="mt-3 text-xs text-muted-foreground"><span className="font-medium text-foreground">Collect from:</span> {shop.pickupLocation}{shop.pickupDirections ? ` · ${shop.pickupDirections}` : ""}{shop.pickupInstructions ? ` · ${shop.pickupInstructions}` : ""}</p>}{fulfillment[shop.id] === "DELIVERY" && shop.deliveryEstimate && <p className="mt-3 text-xs text-muted-foreground">Estimated delivery: {shop.deliveryEstimate}</p>}{shop.returnPolicy && <p className="mt-3 text-xs text-muted-foreground">Returns: {shop.returnWindowDays} days · {shop.acceptsExchanges ? "Exchanges available" : "Refund/return policy applies"}</p>}</div>)}</div>
+            <div className="mt-4 space-y-3">{shops.map((shop) => <div key={shop.id} className="min-w-0 rounded-xl border p-4"><div className="flex items-start justify-between gap-3"><p className="min-w-0 break-words font-medium">{shop.storeName}</p><span className="shrink-0 text-xs text-muted-foreground">{fulfillment[shop.id] === "PICKUP" ? "No delivery fee" : `UGX ${shop.deliveryFee.toLocaleString()}`}</span></div><div className="mt-3 flex flex-wrap gap-2">{shop.fulfillmentMethods.map((method) => <Button key={method} type="button" size="sm" variant={fulfillment[shop.id] === method ? "default" : "outline"} className="min-h-11 rounded-full" onClick={() => setFulfillment((current) => ({ ...current, [shop.id]: method }))}>{method === "DELIVERY" ? <Truck className="mr-1.5 size-3.5" /> : <MapPin className="mr-1.5 size-3.5" />}{method === "DELIVERY" ? "Delivery" : "Pickup"}</Button>)}</div>{fulfillment[shop.id] === "PICKUP" && <p className="mt-3 break-words text-xs text-muted-foreground"><span className="font-medium text-foreground">Collect from:</span> {shop.pickupLocation}{shop.pickupDirections ? ` · ${shop.pickupDirections}` : ""}{shop.pickupInstructions ? ` · ${shop.pickupInstructions}` : ""}</p>}{fulfillment[shop.id] === "DELIVERY" && shop.deliveryEstimate && <p className="mt-3 break-words text-xs text-muted-foreground">Estimated delivery: {shop.deliveryEstimate}</p>}{shop.returnPolicy && <p className="mt-3 break-words text-xs text-muted-foreground">Returns: {shop.returnWindowDays} days · {shop.acceptsExchanges ? "Exchanges available" : "Refund/return policy applies"}</p>}</div>)}</div>
             {errors.fulfillment && <FieldError id="fulfilment-error">{errors.fulfillment}</FieldError>}
           </section>
           <section
@@ -272,20 +271,34 @@ export default function CheckoutPage() {
             <h2 id="payment-method" className="text-lg font-semibold">
               Payment method
             </h2>
-            <div
-              role="radio"
-              aria-checked="true"
-              aria-label="Pesapal payment"
-              className="mt-4 flex items-start gap-3 rounded-xl border border-primary bg-primary/5 p-4">
-              <CreditCard className="mt-0.5 size-5 text-primary" />
-              <div>
-                <p className="font-semibold">Pesapal</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  You’ll be redirected to Pesapal to choose an available payment
-                  method and complete payment.
-                </p>
-              </div>
+            <div role="radiogroup" aria-labelledby="payment-method" className="mt-4">
+              <label
+                className={`flex min-w-0 items-start gap-3 rounded-xl border p-3 transition-colors focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 ${selectedPaymentGateway === "PESAPAL" ? "border-primary bg-primary/5" : "border-border bg-card hover:border-primary/50 hover:bg-muted/40"} ${isSubmitting ? "cursor-not-allowed opacity-70" : "cursor-pointer"}`}>
+                <input
+                  type="radio"
+                  name="payment-method"
+                  value="PESAPAL"
+                  checked={selectedPaymentGateway === "PESAPAL"}
+                  onChange={() => setSelectedPaymentGateway("PESAPAL")}
+                  disabled={isSubmitting}
+                  className="sr-only"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="text-base font-semibold">Pesapal</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Pay securely with card, Mobile Money, or other available methods.
+                  </p>
+                </div>
+                <span
+                  aria-hidden="true"
+                  className={`mt-1 flex size-5 shrink-0 items-center justify-center rounded-full border-2 ${selectedPaymentGateway === "PESAPAL" ? "border-primary" : "border-muted-foreground/50"}`}>
+                  {selectedPaymentGateway === "PESAPAL" && <span className="size-2.5 rounded-full bg-primary" />}
+                </span>
+              </label>
             </div>
+            <p className="mt-2 text-sm text-muted-foreground">
+              You’ll continue to Pesapal to complete payment securely.
+            </p>
           </section>
         </section>
         <aside className="h-fit rounded-2xl border bg-card p-5 lg:sticky lg:top-24">
@@ -310,8 +323,8 @@ export default function CheckoutPage() {
                   />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{item.name}</p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="line-clamp-2 break-words text-sm font-medium">{item.name}</p>
+                  <p className="break-words text-xs text-muted-foreground">
                     {item.variantName ? `${item.variantName} · ` : ""}Qty{" "}
                     {item.quantity}
                   </p>
@@ -319,26 +332,29 @@ export default function CheckoutPage() {
                 <PriceDisplay
                   price={item.price * item.quantity}
                   size="default"
+                  className="shrink-0 text-right"
                 />
               </div>
             ))}
           </div>
           <div className="space-y-2 py-4 text-sm border-b mb-4">
             <div className="flex justify-between gap-4">
-              <span className="text-muted-foreground">Items subtotal</span>
-              <PriceDisplay price={cartTotal} />
+              <span className="min-w-0 text-muted-foreground">Items subtotal</span>
+              <PriceDisplay price={cartTotal} className="shrink-0 text-right" />
             </div>
             <div className="flex justify-between gap-4">
-              <span className="text-muted-foreground">Fulfilment</span>
-              <span className="text-xs font-medium text-muted-foreground">Calculated securely</span>
+              <span className="min-w-0 text-muted-foreground">Fulfilment</span>
+              <span className="shrink-0 text-right text-xs font-medium text-muted-foreground">Calculated securely</span>
             </div>
           </div>
-          <Button
-            onClick={startPayment}
-            disabled={!hasHydrated || !checkoutIdsReady || isSubmitting || cartLoading || !cart.length}
-            className="mt-5 h-12 w-full rounded-full">
-            {isSubmitting ? "Preparing secure payment…" : "Continue to Pesapal"}
-          </Button>
+          <div className="sticky bottom-0 z-30 -mx-5 mt-5 border-t bg-card/95 p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] backdrop-blur lg:static lg:mx-0 lg:mt-5 lg:border-0 lg:bg-transparent lg:p-0 lg:backdrop-blur-none">
+            <Button
+              onClick={startPayment}
+              disabled={!hasHydrated || !checkoutIdsReady || isSubmitting || cartLoading || !cart.length}
+              className="h-12 w-full rounded-full">
+              {isSubmitting ? "Preparing secure payment…" : "Continue to Pesapal"}
+            </Button>
+          </div>
         </aside>
       </div>
     </main>

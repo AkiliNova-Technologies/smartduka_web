@@ -36,6 +36,8 @@ const navigationGroups: DashboardNavigationGroup[] = [
     { label: "Featured shops", href: "/admin/marketing/featured-shops", icon: Store },
   ] },
   { label: "Operations", items: [
+    { label: "Marketplace reports", href: "/admin/reports", icon: ShieldCheck },
+    { label: "Shop verification", href: "/admin/verifications", icon: ShieldCheck },
     { label: "Customer issues", href: "/admin/issues", icon: CircleAlert },
     { label: "Financial exceptions", href: "/admin/financial-exceptions", icon: Landmark },
   ] },

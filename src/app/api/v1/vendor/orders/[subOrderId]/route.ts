@@ -1,0 +1,4 @@
+import { requireVendorContext } from "@/lib/auth/vendor-context";
+import { OrderService } from "@/services/order";
+import { v1Data, v1Error, v1Exception } from "@/lib/api/v1/response";
+export async function PATCH(request: Request, { params }: { params: Promise<{ subOrderId: string }> }) { try { const context = await requireVendorContext("vendor:process_orders"); const { subOrderId } = await params; const body = await request.json(); if (typeof body.status !== "string") return v1Error("VALIDATION_ERROR", "status is required.", 400); const order = await OrderService.updateSubOrderStatus(subOrderId, body.status, context.vendorId); return order ? v1Data({ id: order.id, status: order.status }) : v1Error("ORDER_NOT_FOUND", "Order not found.", 404); } catch (error) { return v1Exception(error); } }

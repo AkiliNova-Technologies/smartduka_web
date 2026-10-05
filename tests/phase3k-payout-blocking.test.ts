@@ -36,13 +36,10 @@ const payout = (lots: any[]) => ({
   amount: new Decimal("30000"),
   currency: "UGX",
   status: "APPROVED",
-  destinationType: "BANK_ACCOUNT",
+  payoutAccount: { status: "ACTIVE", isDefault: true, provider: "MTN_MOBILE_MONEY" },
   vendor: {
     status: "ACTIVE",
-    bankName: "bank",
-    bankAccountName: "name",
-    bankAccountNumber: "123",
-    momoMerchantCode: null,
+    riskFlags: [],
   },
   allocations: lots.map((earningLedger, i) => ({
     status: "ACTIVE",

@@ -172,7 +172,7 @@ export async function uploadVerificationDocument(
   mimeType?: string,
   size?: number,
 ) {
-  const context = await requireVendorContext("vendor:manage_shop");
+  const context = await requireVendorContext("vendor:manage_legal");
   const document = await prisma.document.create({
     data: {
       vendorId: context.vendorId,
@@ -189,7 +189,7 @@ export async function uploadVerificationDocument(
 }
 
 export async function deleteVendorDocument(documentId: string) {
-  const context = await requireVendorContext("vendor:manage_shop");
+  const context = await requireVendorContext("vendor:manage_legal");
   const document = await prisma.document.findFirst({
     where: { id: documentId, vendorId: context.vendorId },
   });
@@ -201,7 +201,7 @@ export async function deleteVendorDocument(documentId: string) {
 }
 
 export async function getMyVendorDocuments() {
-  const context = await requireVendorContext("vendor:manage_shop");
+  const context = await requireVendorContext("vendor:manage_legal");
   const documents = await prisma.document.findMany({
     where: { vendorId: context.vendorId },
     orderBy: { createdAt: "desc" },
@@ -220,5 +220,5 @@ export async function getMyFullVendorProfile() {
   });
 
   if (!profile) return { success: false, error: "Vendor profile not found.", data: null };
-  return { success: true, data: toVendorProfileDto(profile) };
+  return { success: true, data: toVendorProfileDto({ ...profile, documents: context.vendor.ownerId === context.user.id ? profile.documents : [] }) };
 }

@@ -12,7 +12,7 @@ const extensionFor = (mime: string) => ({ "image/jpeg": "jpg", "image/png": "png
 async function authorize(purpose: StorageUploadPurpose) {
   if (purpose === "category-image" || purpose === "marketing-artwork") { await requireAdminContext("platform:manage"); return "platform"; }
   if (purpose === "review-image") return requireActiveUserId();
-  return (await requireVendorContext(purpose === "product-image" ? "vendor:manage_products" : "vendor:manage_shop")).vendorId;
+  return (await requireVendorContext(purpose === "product-image" ? "vendor:manage_products" : purpose === "kyc-document" ? "vendor:manage_legal" : "vendor:manage_shop")).vendorId;
 }
 
 export async function POST(request: NextRequest) {

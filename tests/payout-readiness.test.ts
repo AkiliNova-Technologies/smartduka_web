@@ -26,13 +26,10 @@ const payout = (overrides: Record<string, unknown> = {}) => ({
   amount: new Decimal("50"),
   currency: "UGX",
   status: "APPROVED",
-  destinationType: "BANK_ACCOUNT",
+  payoutAccount: { status: "ACTIVE", isDefault: true, provider: "MTN_MOBILE_MONEY" },
   vendor: {
     status: "ACTIVE",
-    momoMerchantCode: null,
-    bankName: "Bank",
-    bankAccountName: "A",
-    bankAccountNumber: "1234",
+    riskFlags: [],
   },
   allocations: [
     {
@@ -90,8 +87,13 @@ describe("Phase 3I payout readiness", () => {
       "VENDOR_SUSPENDED",
     ],
     [
-      "invalid destination",
-      payout({ vendor: { ...payout().vendor, bankAccountNumber: null } }),
+      "missing payout account",
+      payout({ payoutAccount: null }),
+      "DESTINATION_INVALID",
+    ],
+    [
+      "disabled payout account",
+      payout({ payoutAccount: { status: "DISABLED", isDefault: false, provider: "MTN_MOBILE_MONEY" } }),
       "DESTINATION_INVALID",
     ],
     ["reserve mismatch", payout(), "FINANCIAL_RESERVATION_MISMATCH"],

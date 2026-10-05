@@ -313,10 +313,10 @@ export function ProductCard({ product }: { product: MarketplaceProduct }) {
                       </p>
                     )}
                     {selectedVariant && selectedVariant.inventoryCount > 0 && (
-                      <p className="flex items-center justify-between text-sm text-muted-foreground">
+                      <div className="flex items-center justify-between text-sm text-muted-foreground">
                         <span>{selectedVariant.inventoryCount} in stock</span>
                         <PriceDisplay price={selectedVariant.price} />
-                      </p>
+                      </div>
                     )}
                     <button
                       type="button"

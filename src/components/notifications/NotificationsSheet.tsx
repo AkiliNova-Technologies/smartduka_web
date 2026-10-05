@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import {
   Bell,
   Check,
@@ -80,6 +81,7 @@ function groupNotificationsByDate(
     type: string;
     title: string;
     message: string;
+    actionPath?: string | null;
     readAt: string | null;
     createdAt: string;
   }[],
@@ -119,6 +121,7 @@ export function NotificationsSheet({
   const { notifications, unreadCount, markAsRead, markAllAsRead } =
     useUserData();
   const [now, setNow] = React.useState<number | null>(null);
+  const router = useRouter();
 
   React.useEffect(() => {
     const timer = window.setTimeout(() => setNow(Date.now()), 0);
@@ -185,6 +188,7 @@ export function NotificationsSheet({
                   notifications={grouped.today}
                   onMarkRead={markAsRead}
                   now={now}
+                  onNavigate={(path) => { onOpenChange(false); router.push(path); }}
                 />
               )}
 
@@ -195,6 +199,7 @@ export function NotificationsSheet({
                   notifications={grouped.yesterday}
                   onMarkRead={markAsRead}
                   now={now}
+                  onNavigate={(path) => { onOpenChange(false); router.push(path); }}
                 />
               )}
 
@@ -205,6 +210,7 @@ export function NotificationsSheet({
                   notifications={grouped.earlier}
                   onMarkRead={markAsRead}
                   now={now}
+                  onNavigate={(path) => { onOpenChange(false); router.push(path); }}
                 />
               )}
             </div>
@@ -231,6 +237,7 @@ function NotificationGroup({
   notifications,
   onMarkRead,
   now,
+  onNavigate,
 }: {
   label: string;
   notifications: {
@@ -240,9 +247,11 @@ function NotificationGroup({
     message: string;
     readAt: string | null;
     createdAt: string;
+    actionPath?: string | null;
   }[];
   onMarkRead: (id: string) => void;
   now: number | null;
+  onNavigate: (path: string) => void;
 }) {
   return (
     <div>
@@ -258,7 +267,7 @@ function NotificationGroup({
         return (
           <button
             key={notification.id}
-            onClick={() => onMarkRead(notification.id)}
+            onClick={() => { onMarkRead(notification.id); if (notification.actionPath?.startsWith("/")) onNavigate(notification.actionPath); }}
             className={cn(
               "w-full text-left px-5 py-3.5 flex items-start gap-3 hover:bg-muted/30 transition-colors",
               isUnread && "bg-primary/[0.02]",

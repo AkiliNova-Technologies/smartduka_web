@@ -91,4 +91,29 @@ describe("authoritative vendor context", () => {
       requireVendorContext("vendor:manage_products"),
     ).rejects.toBeInstanceOf(VendorAuthorizationError);
   });
+
+  it("allows managers to run day-to-day shop settings but keeps staff out", async () => {
+    mocks.findUnique.mockResolvedValue({
+      id: "manager-a", status: "ACTIVE", vendorId: "vendor-a", vendorRole: "MANAGER", vendorProfile: vendorA, ownedVendor: null,
+    });
+    await expect(requireVendorContext("vendor:manage_shop")).resolves.toMatchObject({ vendorId: "vendor-a", vendorRole: "MANAGER" });
+
+    mocks.findUnique.mockResolvedValue({
+      id: "staff-a", status: "ACTIVE", vendorId: "vendor-a", vendorRole: "STAFF", vendorProfile: vendorA, ownedVendor: null,
+    });
+    await expect(requireVendorContext("vendor:manage_shop")).rejects.toBeInstanceOf(VendorAuthorizationError);
+  });
+
+  it("allows payout-capable roles but rejects manager, staff, and unrelated memberships", async () => {
+    for (const role of ["OWNER", "ACCOUNTANT"] as const) {
+      mocks.findUnique.mockResolvedValue({ id: `${role}-a`, status: "ACTIVE", vendorId: "vendor-a", vendorRole: role, vendorProfile: vendorA, ownedVendor: null });
+      await expect(requireVendorContext("vendor:request_payout")).resolves.toMatchObject({ vendorId: "vendor-a", vendorRole: role });
+    }
+    for (const role of ["MANAGER", "STAFF"] as const) {
+      mocks.findUnique.mockResolvedValue({ id: `${role}-a`, status: "ACTIVE", vendorId: "vendor-a", vendorRole: role, vendorProfile: vendorA, ownedVendor: null });
+      await expect(requireVendorContext("vendor:request_payout")).rejects.toBeInstanceOf(VendorAuthorizationError);
+    }
+    mocks.findUnique.mockResolvedValue({ id: "other", status: "ACTIVE", vendorId: "vendor-b", vendorRole: "OWNER", vendorProfile: vendorA, ownedVendor: null });
+    await expect(requireVendorContext("vendor:request_payout")).rejects.toBeInstanceOf(VendorAuthorizationError);
+  });
 });

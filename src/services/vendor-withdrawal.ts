@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { LedgerTransactionType, PayoutDestinationType, PayoutStatus, Prisma, WalletBucket } from "@prisma/client";
+import { LedgerTransactionType, PayoutStatus, Prisma, WalletBucket } from "@prisma/client";
 import { Decimal } from "@prisma/client/runtime/client";
 import { prisma } from "@/lib/prisma/client";
 import { requireAdminContext } from "@/lib/auth/admin-context";
@@ -40,18 +40,6 @@ function validRequestId(value: string) {
   return /^[A-Za-z0-9_-]{16,128}$/.test(value);
 }
 
-function destinationSnapshot(vendor: { momoMerchantCode: string | null; bankName: string | null; bankAccountName: string | null; bankAccountNumber: string | null }, destinationId: string) {
-  if (destinationId === PayoutDestinationType.MOBILE_MONEY) {
-    if (!vendor.momoMerchantCode) throw new WithdrawalError("Mobile money destination is unavailable.", "DESTINATION_UNAVAILABLE");
-    return { destinationType: PayoutDestinationType.MOBILE_MONEY, maskedDestination: `Mobile money •••• ${vendor.momoMerchantCode.slice(-4)}` };
-  }
-  if (destinationId === PayoutDestinationType.BANK_ACCOUNT) {
-    if (!vendor.bankName || !vendor.bankAccountName || !vendor.bankAccountNumber) throw new WithdrawalError("Bank destination is unavailable.", "DESTINATION_UNAVAILABLE");
-    return { destinationType: PayoutDestinationType.BANK_ACCOUNT, maskedDestination: `${vendor.bankName} •••• ${vendor.bankAccountNumber.slice(-4)}` };
-  }
-  throw new WithdrawalError("Unsupported withdrawal destination.", "INVALID_REQUEST");
-}
-
 function sameIntent<T extends { requestHash: string | null }>(payout: T, hash: string): T {
   if (payout.requestHash !== hash) throw new WithdrawalError("Withdrawal request ID was already used for different details.", "IDEMPOTENCY_CONFLICT");
   return payout;
@@ -76,12 +64,9 @@ export class VendorWithdrawalService {
         return await prisma.$transaction(async (tx) => {
           const replay = await tx.vendorPayout.findUnique({ where: { vendorId_withdrawalRequestId: { vendorId: input.vendorId, withdrawalRequestId: input.withdrawalRequestId } } });
           if (replay) return sameIntent(replay, hash);
-          const vendor = await tx.vendorProfile.findUnique({
-            where: { id: input.vendorId },
-            select: { momoMerchantCode: true, bankName: true, bankAccountName: true, bankAccountNumber: true },
-          });
-          if (!vendor) throw new WithdrawalError("Vendor destination is unavailable.", "DESTINATION_UNAVAILABLE");
-          const destination = destinationSnapshot(vendor, input.destinationId);
+          const account = await tx.vendorPayoutAccount.findFirst({ where: { id: input.destinationId, vendorId: input.vendorId, status: "ACTIVE" }, select: { id: true, type: true, maskedReference: true } });
+          if (!account) throw new WithdrawalError("Payout destination is unavailable.", "DESTINATION_UNAVAILABLE");
+          const destination = { payoutAccountId: account.id, destinationType: account.type, maskedDestination: account.maskedReference };
           const lots = await tx.financialLedger.findMany({ where: { vendorId: input.vendorId, currency, type: LedgerTransactionType.SALE_AVAILABLE, amount: { gt: ZERO } }, include: { payoutAllocations: { where: { status: "ACTIVE" }, select: { allocatedAmount: true } } }, orderBy: [{ createdAt: "asc" }, { id: "asc" }] });
           let remaining = amount;
           const allocations: Array<{ earningLedgerId: string; allocatedAmount: Decimal }> = [];

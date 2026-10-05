@@ -20,6 +20,9 @@ const ONE_YEAR = 60 * 60 * 24 * 365;
 export type CookieConsent = {
   version: typeof COOKIE_CONSENT_VERSION;
   essential: true;
+  analytics: boolean;
+  marketing: boolean;
+  preferences: boolean;
   updatedAt: string;
 };
 
@@ -33,9 +36,9 @@ const CookieConsentContext = React.createContext<CookieConsentContextValue | nul
 export function parseCookieConsent(value: string | null | undefined): CookieConsent | null {
   if (!value) return null;
   try {
-    const parsed = JSON.parse(value) as Partial<CookieConsent>;
+    const parsed = JSON.parse(decodeURIComponent(value)) as Partial<CookieConsent>;
     return parsed.version === COOKIE_CONSENT_VERSION && parsed.essential === true && typeof parsed.updatedAt === "string"
-      ? { version: COOKIE_CONSENT_VERSION, essential: true, updatedAt: parsed.updatedAt }
+      ? { version: COOKIE_CONSENT_VERSION, essential: true, analytics: parsed.analytics === true, marketing: parsed.marketing === true, preferences: parsed.preferences === true, updatedAt: parsed.updatedAt }
       : null;
   } catch {
     return null;
@@ -57,17 +60,21 @@ export function CookieConsentProvider({
 }) {
   const [consent, setConsent] = React.useState(() => parseCookieConsent(initialConsentValue));
   const [preferencesOpen, setPreferencesOpen] = React.useState(false);
+  const [preferences, setPreferences] = React.useState({ analytics: false, marketing: false, preferences: false });
 
-  const saveConsent = React.useCallback(() => {
+  const saveConsent = React.useCallback((selection = preferences) => {
     const next: CookieConsent = {
       version: COOKIE_CONSENT_VERSION,
       essential: true,
+      analytics: selection.analytics,
+      marketing: selection.marketing,
+      preferences: selection.preferences,
       updatedAt: new Date().toISOString(),
     };
     document.cookie = `${COOKIE_CONSENT_COOKIE}=${encodeURIComponent(JSON.stringify(next))}; Path=/; Max-Age=${ONE_YEAR}; SameSite=Lax${location.protocol === "https:" ? "; Secure" : ""}`;
     setConsent(next);
     setPreferencesOpen(false);
-  }, []);
+  }, [preferences]);
 
   const value = React.useMemo(
     () => ({ openPreferences: () => setPreferencesOpen(true), consent }),
@@ -93,11 +100,11 @@ export function CookieConsentProvider({
             </div>
           </div>
           <div className="mt-4 grid gap-2 sm:grid-cols-3">
-            <Button type="button" variant="outline" className="h-10 rounded-full" onClick={saveConsent}>Reject Optional</Button>
+            <Button type="button" variant="outline" className="h-10 rounded-full" onClick={() => saveConsent({ analytics: false, marketing: false, preferences: false })}>Reject Optional</Button>
             <Button type="button" variant="outline" className="h-10 rounded-full" onClick={() => setPreferencesOpen(true)}>
               <Settings2 aria-hidden="true" /> Preferences
             </Button>
-            <Button type="button" className="h-10 rounded-full" onClick={saveConsent}>Accept All</Button>
+            <Button type="button" className="h-10 rounded-full" onClick={() => saveConsent({ analytics: true, marketing: true, preferences: true })}>Accept All</Button>
           </div>
         </aside>
       )}
@@ -117,12 +124,13 @@ export function CookieConsentProvider({
                 <span className="shrink-0 rounded-full border bg-background px-2.5 py-1 text-xs font-medium">Always on</span>
               </div>
             </section>
-            <p className="text-xs leading-5 text-muted-foreground">SmartDuka has no optional analytics or marketing tracking enabled. If that changes, this panel will request your choice before those categories are used.</p>
+            {([["analytics", "Analytics cookies", "Help us understand marketplace usage."], ["marketing", "Marketing cookies", "Support relevant SmartDuka promotions."], ["preferences", "Preference cookies", "Remember non-essential display choices."]] as const).map(([key, title, description]) => <label key={key} className="flex cursor-pointer items-start justify-between gap-4 rounded-xl border p-4"><span><span className="block font-semibold">{title}</span><span className="mt-1 block text-xs leading-5 text-muted-foreground">{description}</span></span><input type="checkbox" checked={preferences[key]} onChange={(event) => setPreferences(current => ({ ...current, [key]: event.target.checked }))} className="mt-1 size-4 accent-primary" /></label>)}
+            <p className="text-xs leading-5 text-muted-foreground">SmartDuka has no optional analytics or marketing tracking enabled today. Your choices are saved before any future optional category is used.</p>
             <Link href="/cookie-policy" className="inline-flex text-xs font-medium text-primary underline-offset-4 hover:underline">Read our Cookie Policy</Link>
           </div>
           <SheetFooter className="border-t sm:flex-row sm:justify-end">
             <Button type="button" variant="outline" className="rounded-full" onClick={() => setPreferencesOpen(false)}>Cancel</Button>
-            <Button type="button" className="rounded-full" onClick={saveConsent}>Save preferences</Button>
+            <Button type="button" className="rounded-full" onClick={() => saveConsent()}>Save preferences</Button>
           </SheetFooter>
         </SheetContent>
       </Sheet>

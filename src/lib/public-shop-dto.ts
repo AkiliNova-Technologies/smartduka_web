@@ -27,7 +27,9 @@ type PublicShopListingRecord = {
   description: string | null;
   city: string | null;
   country: string | null;
-  isVerified: boolean;
+  verificationStatus?: string;
+  /** Backward-compatible input only; public queries select verificationStatus. */
+  isVerified?: boolean;
   fulfillmentMethods: readonly unknown[];
   deliveryFee: { toString(): string } | number | null;
   deliveryEstimate: string | null;
@@ -47,7 +49,7 @@ export function serializePublicShopListing(
     description: vendor.description,
     city: vendor.city,
     country: vendor.country,
-    isVerified: vendor.isVerified,
+    isVerified: vendor.verificationStatus === "VERIFIED" || (vendor.verificationStatus == null && vendor.isVerified === true),
     fulfillmentMethods: vendor.fulfillmentMethods.filter(
       (method): method is "DELIVERY" | "PICKUP" =>
         method === "DELIVERY" || method === "PICKUP",

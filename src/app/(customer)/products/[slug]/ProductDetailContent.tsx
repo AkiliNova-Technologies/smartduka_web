@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { MediaImage } from "@/components/marketplace/media-image";
+import { ShopVerificationBadge } from "@/components/marketplace/shop-verification-badge";
 import { PRODUCT_IMAGE_FALLBACK, SHOP_LOGO_FALLBACK } from "@/lib/media";
 import Link from "next/link";
 import {
@@ -13,7 +14,6 @@ import {
   Plus,
   Star,
 } from "lucide-react";
-import { IconRosetteDiscountCheckFilled } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { PriceDisplay } from "@/components/marketplace/price-display";
 import {
@@ -22,6 +22,7 @@ import {
 } from "@/components/marketplace/product-card";
 import { useUserData } from "@/providers/UserDataProvider";
 import { ReviewEntryPoint } from "@/components/reviews/ReviewEntryPoint";
+import { ReportEntryPoint } from "@/components/marketplace/ReportEntryPoint";
 
 interface ProductData {
   id: string;
@@ -484,12 +485,7 @@ export function ProductDetailContent({
                     <p className="truncate font-medium">
                       {product.vendor.storeName}
                     </p>
-                    {product.vendor.isVerified && (
-                      <IconRosetteDiscountCheckFilled
-                        aria-label="Verified shop"
-                        className="size-4 shrink-0 text-blue-500"
-                      />
-                    )}
+                    {product.vendor.isVerified && <ShopVerificationBadge compact />}
                   </div>
                 </div>
                 <Link
@@ -541,6 +537,7 @@ export function ProductDetailContent({
                 image={featuredImage}
                 showEligibilityMessage={false}
               />
+              <ReportEntryPoint targetType="PRODUCT" targetId={product.id} label={product.name} />
             </div>
             {product.reviews.length ? (
               <div className="mt-4 space-y-4 rounded-xl border bg-card p-4 sm:p-5">
