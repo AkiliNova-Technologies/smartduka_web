@@ -24,6 +24,7 @@ describe("public V1 marketplace catalogue reads", () => {
     "/api/v1/products/product-id",
     "/api/v1/categories",
     "/api/v1/marketplace/home",
+    "/api/marketing/HOMEPAGE",
   ])("allows a guest GET to %s without creating a session context", async (pathname) => {
     const response = await proxy(guestRequest(pathname));
 
@@ -54,6 +55,17 @@ describe("public V1 marketplace catalogue reads", () => {
     const response = await proxy(guestRequest("/api/v1/products-private"));
 
     expect(response.status).toBe(401);
+  });
+
+  it("keeps admin marketing and non-canonical placement paths protected", async () => {
+    for (const pathname of [
+      "/api/admin/marketing/promotions",
+      "/api/marketing/homepage",
+      "/api/marketing/HOMEPAGE/private",
+    ]) {
+      const response = await proxy(guestRequest(pathname));
+      expect(response.status).toBe(401);
+    }
   });
 
   it("keeps the existing Pesapal webhook exemption intact", async () => {

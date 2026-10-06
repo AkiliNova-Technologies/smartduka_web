@@ -42,7 +42,8 @@ export function isPublicMarketplaceRead(method: string, pathname: string): boole
   return (
     hasPathPrefix(normalizedPathname, "/api/v1/products") ||
     normalizedPathname === "/api/v1/categories" ||
-    normalizedPathname === "/api/v1/marketplace/home"
+    normalizedPathname === "/api/v1/marketplace/home" ||
+    /^\/api\/marketing\/(HOMEPAGE|PRODUCTS|SHOPS)$/.test(normalizedPathname)
   );
 }
 
