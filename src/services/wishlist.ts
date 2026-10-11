@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma/client";
 import { serializeMarketplaceProduct } from "@/services/product";
+import { publicProductWhere } from "@/lib/marketplace-eligibility";
 
 // ==========================================
 // WISHLIST SERVICE
@@ -8,7 +9,7 @@ import { serializeMarketplaceProduct } from "@/services/product";
 export class WishlistService {
   static async getUserWishlist(userId: string) {
     const items = await prisma.wishlistItem.findMany({
-      where: { userId },
+      where: { userId, product: publicProductWhere },
       include: {
         product: {
           include: {
@@ -34,6 +35,8 @@ export class WishlistService {
   }
 
   static async addToWishlist(userId: string, productId: string) {
+    const product = await prisma.product.findFirst({ where: { id: productId, ...publicProductWhere }, select: { id: true } });
+    if (!product) throw new Error("Product not found.");
     return prisma.wishlistItem.upsert({
       where: { userId_productId: { userId, productId } },
       update: {},

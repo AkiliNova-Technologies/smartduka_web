@@ -16,6 +16,8 @@ import {
 } from "@/actions/admin";
 import { PlatformRole, UserStatus, VerificationStatus } from "@prisma/client";
 import type { OrderRow, VendorApplicationRow } from "@/types/marketplace";
+import { resolveShopModerationState } from "@/lib/shop-moderation-state";
+import type { VendorStatus } from "@prisma/client";
 
 interface AdminUser {
   id: string;
@@ -72,7 +74,7 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
   const [vendorsLoading, setVendorsLoading] = useState(true);
   const [metrics, setMetrics] = useState<PlatformMetrics | null>(null);
   const [metricsLoading, setMetricsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error] = useState<string | null>(null);
   const hasFetchedRef = useRef(false);
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
@@ -100,6 +102,7 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
           const vendorProfile = app.vendorProfile as
             | Record<string, unknown>
             | undefined;
+          const documents = (app.documents as unknown[]) || [];
           return {
             id: app.id as string,
             storeName: app.storeName as string,
@@ -111,7 +114,12 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
             city: app.city as string,
             district: (app.district as string) || null,
             hasPhysicalStore: app.hasPhysicalStore as boolean,
-            status: app.status as VerificationStatus,
+            status: resolveShopModerationState(
+              app.status as VerificationStatus,
+              vendorProfile?.status as VendorStatus | undefined,
+            ),
+            applicationStatus: app.status as VerificationStatus,
+            moderationReason: (vendorProfile?.moderationReason as string) || (app.reviewerNotes as string) || null,
             createdAt: (app.createdAt as Date).toISOString(),
             userName:
               ((app.user as Record<string, unknown>)?.name as string) ||
@@ -120,16 +128,15 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
               ((app.user as Record<string, unknown>)?.email as string) || "",
             userPhone:
               ((app.user as Record<string, unknown>)?.phone as string) || null,
-            documentCount: ((app.documents as unknown[]) || []).length,
+            documentCount: (app.documentCount as number) || 0,
             logoUrl: (vendorProfile?.logoUrl as string) || null,
             bannerUrl: (vendorProfile?.bannerUrl as string) || null,
-            documents: ((app.documents as unknown[]) || []).map((d) => {
+            documents: documents.map((d) => {
               const doc = d as Record<string, unknown>;
               return {
                 id: doc.id as string,
                 type: doc.type as string,
                 name: doc.name as string,
-                url: doc.url as string,
                 status: doc.status as string,
               };
             }),

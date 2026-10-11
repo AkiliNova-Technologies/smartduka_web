@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -28,12 +29,13 @@ export function TeamTab() {
   const [role, setRole] = useState("MANAGER");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [staff, setStaff] = useState<{ used: number; limit: number; canAdd: boolean; state: string } | null>(null);
   const load = () =>
     fetch("/api/vendor/team")
       .then((r) => r.json())
       .then((v) =>
         v.success
-          ? setMembers(v.data.members)
+          ? (setMembers(v.data.members), setStaff(v.data.staff))
           : setError(v.error || "Unable to load shop team."),
       )
       .catch(() => setError("Unable to load shop team."));
@@ -60,7 +62,7 @@ export function TeamTab() {
       <div>
         <h2 className="text-lg font-semibold">Shop team</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Owners can delegate day-to-day operations to existing SmartDuka users.
+          Owners can delegate day-to-day operations to existing Mwezora users.
           Ownership and payouts remain protected.
         </p>
       </div>
@@ -73,6 +75,9 @@ export function TeamTab() {
       )}
       <section className="rounded-2xl border bg-card p-5">
         <h3 className="font-medium">Add team member</h3>
+        {staff && <p className="mt-1 text-sm text-muted-foreground">{staff.used} of {staff.limit} staff seats used{staff.state === "TRIAL" ? " · Free trial" : ""}</p>}
+        {staff?.state === "LIMITED" && <p className="mt-3 text-sm text-muted-foreground">Subscription required. Existing team members remain active, but adding new members requires an active plan. <Link className="text-primary underline" href="/vendor/subscription">View plans</Link></p>}
+        {staff && !staff.canAdd && staff.state !== "LIMITED" && <p className="mt-3 text-sm text-muted-foreground">You&apos;ve reached your current staff limit. <Link className="text-primary underline" href="/vendor/subscription">View plans</Link></p>}
         <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_10rem_auto]">
           <Input
             type="email"
@@ -94,10 +99,10 @@ export function TeamTab() {
             </SelectContent>
           </Select>
           <Button
-            disabled={saving || !email}
+            disabled={saving || !email || staff?.canAdd === false}
             onClick={() => void mutate({ email, role })}
             className="rounded-full px-4 h-10">
-            Add member
+            {staff?.canAdd === false ? "Staff limit reached" : "Add member"}
           </Button>
         </div>
       </section>

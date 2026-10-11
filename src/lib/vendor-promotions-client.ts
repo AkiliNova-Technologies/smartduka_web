@@ -1,0 +1,18 @@
+export type VendorPromotionQuoteInput = { targetType: "PRODUCT" | "SHOP"; targetId?: string; durationDays: number; applyCredit: boolean; requestedStartAt?: string | null };
+export type VendorPromotionQuote = { quoteId: string; dailyRate: number; durationDays: number; subtotal: number; creditAvailable: number; creditApplied: number; amountDue: number; currency: string; startAt: string; endAt: string; expiresAt: string; availability: { placement: string; capacity: number; occupied: number; available: number; alternatives: string[] } };
+export type VendorPromotionList = { rows: Array<{ id: string; targetType: "PRODUCT" | "SHOP"; targetName: string; durationDays: number; dailyRate: string; subtotal: string; creditApplied: string; amountDue: string; requestedStartAt: string | null; startAt: string | null; endAt: string | null; status: string; fulfillmentStatus: string; viewPath: string; payment: { status: string; provider: string; reference: string | null; lastChecked: string | null } | null }>; pagination: { page: number; pageSize: number; total: number; totalPages: number } };
+export type VendorEntitlement = { status: "TRIAL" | "ACTIVE_SUBSCRIPTION" | "EXPIRED"; daysRemaining: number; trialEndsAt: string | null; promotionalCreditAvailable: number };
+export type VendorPromotionProduct = { id: string; name: string; slug: string; sku?: string | null; status: string; images?: Array<{ url: string; isFeatured?: boolean }> };
+export type PlatformPaymentReadiness = { provider: string; ready: boolean; readiness: string };
+export type CreatedPromotion = { id: string; revenueOrderId: string; amountDue: string | number; status: string; holdExpiresAt?: string | null };
+export class VendorPromotionsClientError extends Error { constructor(message: string, readonly status?: number) { super(message); } }
+async function request<T>(path: string, init?: RequestInit): Promise<T> { const response = await fetch(path, { ...init, headers: { "Content-Type": "application/json", ...init?.headers } }); const body = await response.json().catch(() => null) as { data?: T; error?: { message?: string } | string; message?: string } | null; if (!response.ok) throw new VendorPromotionsClientError(typeof body?.error === "string" ? body.error : body?.error?.message ?? body?.message ?? "Promotion request failed.", response.status); return body?.data as T; }
+export const vendorPromotionsClient = {
+  list: (query: URLSearchParams, signal?: AbortSignal) => request<VendorPromotionList>(`/api/v1/vendor/promotions?${query}`, { cache: "no-store", signal }),
+  entitlement: (signal?: AbortSignal) => request<VendorEntitlement>("/api/v1/vendor/entitlements", { cache: "no-store", signal }),
+  quote: (input: VendorPromotionQuoteInput, signal?: AbortSignal) => request<VendorPromotionQuote>("/api/v1/vendor/promotions/quote", { method: "POST", body: JSON.stringify(input), signal }),
+  create: (input: { quoteId: string; idempotencyKey: string }) => request<CreatedPromotion>("/api/v1/vendor/promotions", { method: "POST", body: JSON.stringify(input) }),
+  searchProducts: (query: string, signal?: AbortSignal) => request<VendorPromotionProduct[]>(`/api/v1/vendor/products?q=${encodeURIComponent(query)}&page=1&pageSize=20`, { cache: "no-store", signal }),
+  paymentReadiness: (signal?: AbortSignal) => request<PlatformPaymentReadiness>("/api/v1/vendor/platform-payments", { cache: "no-store", signal }),
+  initiatePayment: (input: { revenueOrderId: string; payerPhone: string; idempotencyKey: string }) => request<{ id: string; status: string }>("/api/v1/vendor/platform-payments", { method: "POST", body: JSON.stringify(input) }),
+};

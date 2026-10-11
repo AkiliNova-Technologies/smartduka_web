@@ -26,6 +26,16 @@ describe("DataTable feature configuration", () => {
     expect(table).toContain("emptyStateContent");
   });
 
+  it("supports debounced controlled search for server-backed tables", () => {
+    expect(table).toContain("export interface DataTableSearchConfig");
+    expect(table).toContain("onValueChange?: (value: string) => void");
+    expect(table).toContain("usesControlledSearch");
+    expect(table).toContain("search?.debounceMs ?? 300");
+    expect(table).toContain("getSearchText?: (row: TData) => string");
+    expect(table).toContain("sm:justify-between");
+    expect(table).toContain("max-w-sm");
+  });
+
   it("uses caller-provided row IDs and keeps variant editing in the shared table", () => {
     expect(table).toContain("getRowId,");
     expect(table).toContain("min-w-0");

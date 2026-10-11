@@ -7,25 +7,31 @@ const mocks = vi.hoisted(() => ({
   update: vi.fn(),
   audit: vi.fn(),
   transaction: vi.fn(),
+  count: vi.fn(),
+  entitlement: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/vendor-context", () => ({ requireVendorContext: mocks.context }));
 vi.mock("@/lib/prisma/client", () => ({ prisma: {
-  user: { findUnique: mocks.findUnique, findFirst: mocks.findFirst, update: mocks.update },
+  user: { findUnique: mocks.findUnique, findFirst: mocks.findFirst, update: mocks.update, count: mocks.count },
   auditLog: { create: mocks.audit },
   $transaction: mocks.transaction,
 } }));
+vi.mock("@/services/vendor-entitlement", () => ({ VendorEntitlementService: { summary: mocks.entitlement, staffSeatLimit: (summary: { status: string; activeSubscription?: { plan: { staffSeats: number } } | null }) => summary.status === "TRIAL" ? 10 : summary.status === "ACTIVE_SUBSCRIPTION" ? summary.activeSubscription?.plan.staffSeats ?? 0 : 0 } }));
 
 import { VendorTeamError, VendorTeamService } from "@/services/vendor-team";
 
 const ownerContext = { user: { id: "owner-a" }, vendorId: "vendor-a", vendorRole: "OWNER", vendor: { id: "vendor-a", ownerId: "owner-a", slug: "shop-a", status: "ACTIVE" } };
+type VendorTeamTransaction = { user: { count: typeof mocks.count; update: typeof mocks.update }; auditLog: { create: typeof mocks.audit } };
 
 describe("vendor team delegation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.context.mockResolvedValue(ownerContext);
-    mocks.transaction.mockImplementation((callback: (tx: any) => unknown) => callback({ user: { update: mocks.update }, auditLog: { create: mocks.audit } }));
-    mocks.update.mockImplementation(({ data }: any) => ({ id: "member-a", ...data }));
+    mocks.transaction.mockImplementation((callback: (tx: VendorTeamTransaction) => unknown) => callback({ user: { count: mocks.count, update: mocks.update }, auditLog: { create: mocks.audit } }));
+    mocks.count.mockResolvedValue(0);
+    mocks.entitlement.mockResolvedValue({ status: "TRIAL" });
+    mocks.update.mockImplementation(({ data }: { data: Record<string, unknown> }) => ({ id: "member-a", ...data }));
   });
 
   it("adds an active user to the owner’s server-derived vendor with an audit record", async () => {

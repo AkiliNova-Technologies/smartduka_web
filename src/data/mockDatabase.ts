@@ -66,7 +66,7 @@ export const mockDatabase = {
       id: "faq-1",
       category: "orders",
       question:
-        "How does SmartDuka Buyer Protection guarantee my cash is safe?",
+        "How does Mwezora Buyer Protection guarantee my cash is safe?",
       answer:
         "When you place an order, your Mobile Money payment is safely locked by the platform first. The shop owner is only paid after you receive your package, look through it, and tap 'Confirm Delivery' on your app.",
     },
@@ -92,7 +92,7 @@ export const mockDatabase = {
       question:
         "Can I pick up my package directly from a vendor's shop in town?",
       answer:
-        "Yes, many of our Kampala vendors allow shop walk-ins! If the seller enables store pick-up, you will see it as an option at checkout. Make sure to present your unique SmartDuka order token when you reach their counter.",
+        "Yes, many of our Kampala vendors allow shop walk-ins! If the seller enables store pick-up, you will see it as an option at checkout. Make sure to present your unique Mwezora order token when you reach their counter.",
     },
     {
       id: "faq-5",
@@ -639,7 +639,7 @@ export const mockDatabase = {
       name: "Minimalist Architecture Spring Drop",
       description:
         "Stripped-back utility lines, lightweight textile drops, and clean essential layouts curated carefully to elevate your daily rotations.",
-      curatorName: "SmartDuka Official",
+      curatorName: "Mwezora Official",
       isMerchantCurated: false,
       itemCount: 4,
       coverImage:

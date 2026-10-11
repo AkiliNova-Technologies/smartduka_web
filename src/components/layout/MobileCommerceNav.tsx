@@ -13,6 +13,7 @@ const items = [
   { label: "Search", href: "/products", icon: Search },
   { label: "Cart", href: "/cart", icon: ShoppingCart },
 ];
+const accountRoutes = ["/settings", "/orders", "/wishlist"];
 
 export function MobileCommerceNavFallback() {
   return (
@@ -50,7 +51,9 @@ export function MobileCommerceNav() {
     >
       <div className="mx-auto grid max-w-lg grid-cols-5">
         {navigation.map((item) => {
-          const active = isRouteActive(pathname, item.href);
+          const active = item.label === "Account"
+            ? accountRoutes.some((href) => isRouteActive(pathname, href))
+            : isRouteActive(pathname, item.href);
           const Icon = item.icon;
           return (
             <Link

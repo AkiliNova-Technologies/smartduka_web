@@ -16,7 +16,8 @@ describe("marketplace personalization contracts", () => {
   it("uses the canonical card serializer and excludes non-public shops from history", () => {
     const service = source("src/services/recently-viewed.ts");
     expect(service).toContain("serializeMarketplaceProduct");
-    expect(service).toContain('vendor: { status: "ACTIVE" as const, deletedAt: null }');
+    expect(service).toContain("publicProductWhere");
+    expect(source("src/lib/marketplace-eligibility.ts")).toContain("vendor: publicShopWhere");
     expect(service).toContain("RECENTLY_VIEWED_HISTORY_LIMIT = 24");
   });
 
@@ -35,9 +36,9 @@ describe("marketplace personalization contracts", () => {
     const home = source("src/app/(customer)/page.tsx");
     const grid = source("src/components/home/ProductGrid.tsx");
     expect(grid).toContain("Picked from what you’ve been exploring.");
-    expect(grid).toContain("Popular picks from across SmartDuka.");
+    expect(grid).toContain("Popular picks from across Mwezora.");
     expect(grid).toContain("Continue where you left off.");
-    expect(grid).toContain("slice(0, 8)");
+    expect(grid).toContain("slice(0, 4)");
     expect(grid).toContain("if (!recentlyViewed.length) return null");
     expect(home.indexOf("<ProductGrid")).toBeLessThan(home.indexOf("<FeaturedShopsSection"));
     expect(home.indexOf("<FeaturedShopsSection")).toBeLessThan(home.indexOf("<RecentlyViewedSection"));

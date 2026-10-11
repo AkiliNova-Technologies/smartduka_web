@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma/client";
 import { serializeMarketplaceProduct } from "@/services/product";
 import type { Prisma } from "@prisma/client";
+import { publicProductWhere } from "@/lib/marketplace-eligibility";
 
 export const RECENTLY_VIEWED_HISTORY_LIMIT = 24;
 export const RECENTLY_VIEWED_DISPLAY_LIMIT = 12;
@@ -13,12 +14,6 @@ const publicProductInclude = {
   variants: { select: { isActive: true, inventoryCount: true, price: true, options: true } },
   reviews: { where: { status: "PUBLISHED" as const }, select: { rating: true } },
 } satisfies Prisma.ProductInclude;
-
-const publicProductWhere: Prisma.ProductWhereInput = {
-  status: { in: ["ACTIVE", "PUBLISHED"] },
-  deletedAt: null,
-  vendor: { status: "ACTIVE" as const, deletedAt: null },
-};
 
 // ==========================================
 // RECENTLY VIEWED SERVICE

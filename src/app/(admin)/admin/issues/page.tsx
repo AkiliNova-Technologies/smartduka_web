@@ -2,19 +2,22 @@
 
 import * as React from "react";
 import { type ColumnDef } from "@tanstack/react-table";
+import { Eye } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/data-table";
+import { DataTableRowActions } from "@/components/data-table-row-actions";
+import { StatusBadge } from "@/components/marketplace/status-badge";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { DeleteDialog } from "@/components/alert-dialog";
-import { humanizeOperation, operationBadgeClass, shortReference } from "@/lib/admin-operations";
+import { shortReference } from "@/lib/admin-operations";
 
 type Issue = { id:string; status:string; subOrderId:string; createdAt:string; reason:string; amount?:string|number; currency?:string; customerId?:string; vendorId?:string; orderId?:string; openedAt?:string; items?:Array<{quantity:number}> };
 type Tab = "returns" | "refunds" | "disputes";
 const date = (v?: string) => v ? new Intl.DateTimeFormat("en-UG", { day:"numeric", month:"short", year:"numeric" }).format(new Date(v)) : "—";
 const money = (v: string|number|undefined, c?: string) => v == null ? "—" : new Intl.NumberFormat("en-UG", { style:"currency", currency:c || "UGX", maximumFractionDigits:2 }).format(Number(v));
-const Badge = ({value}:{value:string}) => <span className={`inline-flex rounded-full px-2 py-1 text-[10px] font-semibold ${operationBadgeClass(value)}`}>{humanizeOperation(value)}</span>;
+const Badge = ({value}:{value:string}) => <StatusBadge status={value} />;
 
 export default function AdminIssuesPage() {
   const [tab, setTab] = React.useState<Tab>("returns");
@@ -32,7 +35,7 @@ export default function AdminIssuesPage() {
     {accessorKey:"amount",header:"Amount",cell:({row})=>tab==="refunds"?money(row.original.amount,row.original.currency): row.original.items?.reduce((n,x)=>n+x.quantity,0) ?? "—"},
     {accessorKey:"status",header:"Status",cell:({row})=><Badge value={row.original.status}/>},
     {accessorKey:"createdAt",header:"Opened",cell:({row})=>date(row.original.createdAt || row.original.openedAt)},
-    {id:"action",header:"",cell:({row})=> <Button variant="outline" size="sm" className="h-8 rounded-lg text-xs" onClick={()=>setSelected(row.original)}>Review</Button>},
+    {id:"action",header:"",cell:({row})=> <DataTableRowActions actions={[{id:"review",label:"Review issue",icon:Eye,onSelect:()=>setSelected(row.original)}]}/>},
   ],[tab]);
   const list=records[tab];
   const action = selected && (tab === "returns" && selected.status === "REQUESTED" ? {label:"Approve return",value:"approve"} : tab === "refunds" && selected.status === "REQUESTED" ? {label:"Approve refund",value:"approve"} : tab === "disputes" && selected.status === "OPEN" ? {label:"Start review",value:"UNDER_REVIEW"} : tab === "disputes" && selected.status === "UNDER_REVIEW" ? {label:"Resolve for vendor",value:"RESOLVED_VENDOR"} : null);

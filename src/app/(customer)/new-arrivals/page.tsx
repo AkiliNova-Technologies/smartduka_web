@@ -5,15 +5,22 @@ import { PageHeader } from "@/components/marketplace/page-header";
 import { PaginatedProductGrid } from "@/components/marketplace/product-grid";
 import { IllustratedEmptyState } from "@/components/marketplace/illustrated-empty-state";
 import { ErrorState } from "@/components/marketplace/error-state";
+import { Suspense } from "react";
+import { connection } from "next/server";
 
-export default async function NewArrivalsPage() {
+export default function NewArrivalsPage() {
+  return <Suspense fallback={<PageContainer className="py-6 sm:py-8"><PageHeader title="New arrivals" description="The latest products added by Mwezora shops." /></PageContainer>}><NewArrivalsRuntime /></Suspense>;
+}
+
+async function NewArrivalsRuntime() {
+  await connection();
   const result = await getNewArrivalsAction();
   return (
     <PageContainer className="py-6 sm:py-8">
       <div className="space-y-7">
         <PageHeader
           title="New arrivals"
-          description="The latest products added by SmartDuka shops."
+          description="The latest products added by Mwezora shops."
         />
         {!result.success ? (
           <ErrorState

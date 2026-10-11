@@ -6,12 +6,15 @@ import {
   PaymentGateway,
   PaymentStatus,
   Prisma,
-  ProductStatus,
   SubOrderStatus,
 } from "@prisma/client";
 import { Decimal } from "@prisma/client/runtime/client";
-import { MarketplaceEconomicsService } from "@/services/marketplace-economics";
 import { isFulfillmentMethod, type FulfillmentMethod } from "@/lib/fulfillment";
+import { PaymentProviderRegistry } from "@/lib/payments/payment-provider";
+import { MarketplaceEconomicsService } from "@/services/marketplace-economics";
+import { deriveParentPaymentProgress } from "@/services/payment-progress";
+import { canFulfillSubOrder } from "@/services/payment-fulfillment";
+import { publicProductWhere } from "@/lib/marketplace-eligibility";
 
 export interface CheckoutIntent {
   items: Array<{
@@ -59,6 +62,7 @@ export interface ResolvedCheckoutLine {
   vendorId: string;
   quantity: number;
   unitPrice: Decimal;
+  /** Deprecated compatibility field; direct sales always use zero commission. */
   commissionRate: Decimal;
   productNameSnapshot?: string;
   variantNameSnapshot?: string | null;
@@ -86,8 +90,8 @@ export interface CheckoutCalculation {
     tax: Decimal;
     discount: Decimal;
     total: Decimal;
-    platformCommission: Decimal;
     commissionRate: Decimal;
+    platformCommission: Decimal;
     vendorNetEntitlement: Decimal;
     items: Array<ResolvedCheckoutLine & { lineSubtotal: Decimal }>;
   }>;
@@ -98,17 +102,9 @@ export interface CheckoutCalculation {
   total: Decimal;
 }
 const ZERO = new Decimal(0);
-export const DEFAULT_MARKETPLACE_COMMISSION_RATE = new Decimal("10");
-export function resolveCommissionRate(value: unknown): Decimal {
-  let rate: Decimal;
-  try {
-    rate = value == null ? DEFAULT_MARKETPLACE_COMMISSION_RATE : new Decimal(String(value));
-  } catch {
-    throw new CheckoutError("Vendor commission configuration is invalid.", "INVALID_CHECKOUT");
-  }
-  if (!rate.isFinite() || rate.lessThan(0) || rate.greaterThan(100)) throw new CheckoutError("Vendor commission configuration is invalid.", "INVALID_CHECKOUT");
-  return rate;
-}
+/** Retained export for older callers; marketplace purchase commission is always zero. */
+export const DEFAULT_MARKETPLACE_COMMISSION_RATE = ZERO;
+export function resolveCommissionRate(value: unknown): Decimal { void value; return ZERO; }
 const SHIPPING_PER_VENDOR = new Decimal(3500); // Backward-compatible default for shops created before fulfilment settings.
 const paymentGateways = new Set(Object.values(PaymentGateway));
 
@@ -235,9 +231,9 @@ export function calculateCheckoutTotals(
       tax,
       discount,
       total: subtotal.plus(shipping).plus(tax).minus(discount),
-      commissionRate: groupItems[0].commissionRate,
-      platformCommission: subtotal.times(groupItems[0].commissionRate).dividedBy(100).toDecimalPlaces(2, Decimal.ROUND_HALF_UP),
-      vendorNetEntitlement: subtotal.minus(subtotal.times(groupItems[0].commissionRate).dividedBy(100).toDecimalPlaces(2, Decimal.ROUND_HALF_UP)),
+      commissionRate: ZERO,
+      platformCommission: ZERO,
+      vendorNetEntitlement: subtotal.plus(shipping).plus(tax).minus(discount),
       items: groupItems,
     };
   });
@@ -296,18 +292,14 @@ export class OrderService {
       return await prisma.$transaction(async (tx) => {
         const products = await tx.product.findMany({
           where: {
-            status: { in: [ProductStatus.ACTIVE, ProductStatus.PUBLISHED] },
-            deletedAt: null,
+            ...publicProductWhere,
+            id: { in: input.items.map((item) => item.productId) },
           },
           include: {
             variants: true,
         vendor: {
               include: {
-                subscriptions: {
-                  where: { status: "ACTIVE" },
-                  include: { plan: true },
-                  take: 1,
-                },
+                paymentAccounts: { where: { status: "VERIFIED", suspendedAt: null }, select: { id: true, provider: true, isDefault: true }, orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }] },
               },
             },
           },
@@ -347,7 +339,7 @@ export class OrderService {
             unitPrice: new Decimal(
               (variant?.price ?? product.basePrice).toString(),
             ),
-            commissionRate: resolveCommissionRate(product.vendor.subscriptions[0]?.plan.commissionRate),
+            commissionRate: ZERO,
             productNameSnapshot: product.name,
             variantNameSnapshot: variant?.name ?? null,
             variantOptionsSnapshot: variant?.options ?? null,
@@ -410,6 +402,15 @@ export class OrderService {
           selections.set(selection.vendorId, selection.method);
         }
         const calculation = calculateCheckoutTotals(lines, selections);
+        // A paid marketplace order is only created for shops with a verified,
+        // enabled direct merchant destination. Cash-on-delivery stays outside
+        // the electronic payment path.
+        if (input.paymentGateway !== PaymentGateway.CASH_ON_DELIVERY) {
+          for (const group of calculation.vendorGroups) {
+            const vendor = products.find((product) => product.vendorId === group.vendorId)?.vendor;
+            if (!vendor?.paymentAccounts.some((account) => PaymentProviderRegistry.isEnabled(account.provider))) throw new CheckoutError("A shop in this cart cannot accept payments until its merchant account is verified.", "INVALID_CHECKOUT");
+          }
+        }
         if (calculation.vendorGroups.some((group) => group.fulfillmentMethod === "DELIVERY") && !input.shippingAddress?.trim())
           throw new CheckoutError("A delivery address is required for delivery orders.", "INVALID_CHECKOUT");
         const orderNumber = createOrderNumber();
@@ -442,9 +443,11 @@ export class OrderService {
               vendorSubTotal: group.subtotal,
               vendorShipping: group.shipping,
               vendorTotal: group.total,
-              platformCommission: group.platformCommission,
-              commissionRate: group.commissionRate,
-              vendorNetEntitlement: group.vendorNetEntitlement,
+              // Direct-to-vendor payments never produce a SmartDuka commission
+              // or a payout entitlement. Legacy fields remain as zero snapshots.
+              platformCommission: ZERO,
+              commissionRate: ZERO,
+              vendorNetEntitlement: group.total,
               paymentProcessingFee: ZERO,
               status: SubOrderStatus.PENDING,
               fulfillmentMethod: group.fulfillmentMethod,
@@ -490,7 +493,7 @@ export class OrderService {
           });
         }
         return order;
-      });
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
     } catch (error) {
       if (isCheckoutIdempotencyP2002(error)) {
         const winningOrder = await prisma.order.findFirst({
@@ -539,8 +542,10 @@ export class OrderService {
             id: true,
             status: true,
             subOrderNumber: true,
-            vendor: { select: { storeName: true } },
+            vendorTotal: true,
+            vendor: { select: { storeName: true, paymentAccounts: { where: { status: "VERIFIED", suspendedAt: null }, select: { provider: true } } } },
             shopReview: { select: { id: true, rating: true, comment: true } },
+            paymentIntents: { select: { id: true, provider: true, status: true, amount: true, currency: true, providerReference: true, updatedAt: true }, orderBy: { createdAt: "desc" } },
           },
         },
       },
@@ -551,7 +556,7 @@ export class OrderService {
       id: order.id,
       orderNumber: order.orderNumber,
       status: order.status,
-      paymentStatus: order.paymentStatus,
+      paymentStatus: deriveParentPaymentProgress(order.subOrders, order.paymentStatus),
       paymentGateway: order.paymentGateway,
       totalAmount: Number(order.totalAmount),
       subTotal: Number(order.subTotal),
@@ -575,6 +580,9 @@ export class OrderService {
         status: so.status,
         subOrderNumber: so.subOrderNumber,
         vendorName: so.vendor.storeName,
+        total: Number(so.vendorTotal),
+        paymentOptions: [...new Set(so.vendor.paymentAccounts.map((account) => account.provider).filter((provider) => PaymentProviderRegistry.isEnabled(provider)))],
+        paymentIntents: so.paymentIntents.map((intent) => ({ id: intent.id, provider: intent.provider, status: intent.status, amount: Number(intent.amount), currency: intent.currency, providerReference: intent.providerReference, updatedAt: intent.updatedAt.toISOString() })),
         canReview: order.paymentStatus === "COMPLETED" && order.status !== "REFUNDED" && so.status === "DELIVERED",
         review: so.shopReview,
       })),
@@ -588,12 +596,31 @@ export class OrderService {
   ) {
     const existing = await prisma.subOrder.findFirst({
       where: { id: subOrderId, vendorId },
-      select: { id: true, status: true },
+      select: {
+        id: true,
+        status: true,
+        order: { select: { paymentGateway: true } },
+        paymentIntents: { select: { status: true } },
+      },
     });
 
     if (!existing) return null;
     if (!SUB_ORDER_ALLOWED_TRANSITIONS[existing.status]?.includes(status))
       throw new CheckoutError("Invalid SubOrder fulfillment status transition.", "INVALID_CHECKOUT");
+    // This protects both vendor status APIs; UI affordances are only a
+    // convenience.  Cancellation remains possible so an unpaid order can be
+    // safely stopped.  A later reversal also prevents further fulfilment.
+    if (
+      status !== SubOrderStatus.CANCELLED &&
+      !canFulfillSubOrder({
+        paymentGateway: existing.order.paymentGateway,
+        paymentIntentStatuses: existing.paymentIntents.map((intent) => intent.status),
+      })
+    )
+      throw new CheckoutError(
+        "Customer payment must be confirmed before fulfilment can continue.",
+        "INVALID_CHECKOUT",
+      );
 
     const updated = await prisma.subOrder.update({
       where: { id: subOrderId },

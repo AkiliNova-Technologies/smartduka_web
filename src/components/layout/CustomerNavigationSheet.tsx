@@ -26,6 +26,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useWorkspaceAccess } from "@/hooks/use-workspace-access";
 import { isRouteActive } from "@/components/layout/nav-utils";
 import { NotificationsSheet } from "@/components/notifications/NotificationsSheet";
+import { MwezoraLogo } from "@/components/brand/MwezoraLogo";
 import { useUserData } from "@/providers/UserDataProvider";
 import {
   Sheet,
@@ -81,11 +82,8 @@ export function CustomerNavigationSheet({
         className="w-[88vw] max-w-[380px] gap-0 p-0"
         aria-describedby="customer-navigation-description">
         <SheetHeader className="border-b px-5 py-4 pr-14">
-          <SheetTitle className="flex items-center gap-2 text-base font-bold">
-            <span className="grid size-8 place-items-center rounded-lg bg-primary text-primary-foreground">
-              <ShoppingBag className="size-4" />
-            </span>
-            Smart<span className="text-primary">Duka</span>
+          <SheetTitle className="flex items-center text-foreground">
+            <MwezoraLogo variant="horizontal" size="sm" label="Mwezora" />
           </SheetTitle>
           <SheetDescription
             id="customer-navigation-description"
@@ -117,7 +115,7 @@ export function CustomerNavigationSheet({
               </Link>
             ) : (
               <div className="mb-5 rounded-lg border bg-muted/30 p-3">
-                <p className="text-sm font-medium">Welcome to SmartDuka</p>
+                <p className="text-sm font-medium">Welcome to Mwezora</p>
                 <div className="mt-3 flex gap-2">
                   <Link
                     href="/login"

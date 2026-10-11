@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { CheckCircle2, Eye, Package, Search, Truck } from "lucide-react";
+import { Eye, Package, Search } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +13,8 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DataTableStatusFilter } from "@/components/data-table-status-filter";
+import { StatusBadge } from "@/components/marketplace/status-badge";
 import { useVendor } from "@/hooks/use-vendor";
 import { toast } from "sonner";
 import { IllustratedEmptyState } from "@/components/marketplace/illustrated-empty-state";
@@ -105,22 +106,15 @@ export default function VendorOrdersPage({ initialData }: { initialData: VendorO
         </p>
       </div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <Tabs
+        <DataTableStatusFilter
           value={tab}
-          onValueChange={(value) => updateQuery({ status: value, page: "1" })}>
-          <div className="overflow-x-auto pb-1">
-            <TabsList className="min-w-max" aria-label="Order status">
-              {statuses.map((status) => (
-                <TabsTrigger key={status} value={status} className="text-xs">
-                  {status === "ALL" ? "All" : label(status)}{" "}
-                  <span className="text-muted-foreground">
-                    {counts[status]}
-                  </span>
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </div>
-        </Tabs>
+          onValueChange={(value) => updateQuery({ status: value, page: "1" })}
+          options={statuses.map((status) => ({
+            value: status,
+            label: status === "ALL" ? "All statuses" : label(status),
+            count: counts[status],
+          }))}
+        />
         <div className="relative w-full sm:w-56">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -347,19 +341,7 @@ export default function VendorOrdersPage({ initialData }: { initialData: VendorO
   );
 }
 function Status({ value }: { value: string }) {
-  const delivered = value === "DELIVERED";
-  const shipped = value === "SHIPPED" || value === "READY_FOR_PICKUP";
-  return (
-    <span
-      className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[10px] font-bold ${delivered ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-600" : shipped ? "border-blue-500/20 bg-blue-500/5 text-blue-600" : "border-amber-500/20 bg-amber-500/5 text-amber-600"}`}>
-      {delivered ? (
-        <CheckCircle2 className="size-3" />
-      ) : shipped ? (
-        <Truck className="size-3" />
-      ) : null}
-      {label(value)}
-    </span>
-  );
+  return <StatusBadge status={value} />;
 }
 function Detail({ label, value }: { label: string; value: string }) {
   return (

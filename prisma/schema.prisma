@@ -23,6 +23,7 @@ enum VendorStatus {
   PENDING
   ACTIVE
   SUSPENDED
+  BANNED
   CANCELLED
 }
 
@@ -83,6 +84,39 @@ enum PaymentStatus {
   COMPLETED
   FAILED
   REVERSED
+}
+
+// Provider-neutral payment state for customer-to-vendor transactions.  This is
+// deliberately separate from the legacy PaymentAttempt model, which records
+// historical marketplace gateway attempts.
+enum PaymentProvider {
+  MTN_MOMO
+  AIRTEL_MONEY
+  PESAPAL
+}
+
+enum VendorPaymentAccountStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+  SUSPENDED
+}
+
+enum PaymentIntentStatus {
+  CREATED
+  PENDING
+  SUCCESSFUL
+  FAILED
+  CANCELLED
+  EXPIRED
+  REVERSED
+}
+
+enum PaymentPurpose {
+  MARKETPLACE_PURCHASE
+  PLATFORM_SUBSCRIPTION
+  PROMOTION_PURCHASE
+  PREMIUM_FEATURE_PURCHASE
 }
 
 enum PayoutStatus {
@@ -337,17 +371,103 @@ enum PromotionStatus {
   ACTIVE
   DISABLED
 }
+
 enum PromotionPlacement {
   HOMEPAGE
   PRODUCTS
   SHOPS
 }
+
 enum PromotionCtaType {
   PRODUCT
   SHOP
   CATEGORY
   INTERNAL_PATH
   EXTERNAL_URL
+}
+
+// Platform-revenue records are intentionally separate from marketplace
+// PaymentIntent: these are vendor-to-SmartDuka purchases, never customer sales.
+enum PlatformRevenueOrderType {
+  SUBSCRIPTION
+  PRODUCT_PROMOTION
+  SHOP_PROMOTION
+  FUTURE_SERVICE
+}
+
+enum PlatformRevenueOrderStatus {
+  DRAFT
+  AWAITING_PAYMENT
+  PAID
+  FAILED
+  CANCELLED
+  REFUNDED
+  REVIEW_REQUIRED
+}
+
+// Qualification payments prove a provider integration without becoming
+// commercial platform revenue or activating a vendor entitlement.
+enum PlatformRevenueQualificationKind {
+  NONE
+  SANDBOX_QUALIFICATION
+  LIVE_QUALIFICATION
+}
+
+enum PlatformPaymentIntentStatus {
+  CREATED
+  PENDING
+  SUCCESSFUL
+  FAILED
+  EXPIRED
+  CANCELLED
+  REVERSED
+}
+
+enum PromotionCampaignTargetType {
+  PRODUCT
+  SHOP
+}
+
+enum PromotionCampaignStatus {
+  DRAFT
+  AWAITING_PAYMENT
+  SCHEDULED
+  ACTIVE
+  COMPLETED
+  PAYMENT_FAILED
+  CANCELLED
+  REVIEW_REQUIRED
+}
+
+enum AdvertisingPlacement {
+  HOMEPAGE_FEATURED_PRODUCTS
+  HOMEPAGE_FEATURED_SHOPS
+}
+
+enum PromotionReservationStatus {
+  HOLD
+  CONFIRMED
+  EXPIRED
+  CANCELLED
+  RECOVERY_REQUIRED
+}
+
+enum PromotionFulfillmentStatus {
+  PENDING_PAYMENT
+  CONFIRMED
+  DELIVERING
+  COMPLETED
+  INELIGIBLE
+  RECOVERY_REQUIRED
+  CANCELLED
+}
+
+enum PromotionCreditLedgerType {
+  GRANT
+  REDEMPTION
+  RELEASE
+  EXPIRY
+  ADJUSTMENT
 }
 
 enum ReviewStatus {
@@ -365,24 +485,26 @@ enum ReviewReportStatus {
 
 // Marketplace trust-and-safety cases are deliberately separate from review
 // reports, payment disputes, and automated risk signals.
-enum MarketplaceReportTargetType { 
-  PRODUCT 
-  SHOP 
+enum MarketplaceReportTargetType {
+  PRODUCT
+  SHOP
 }
-enum MarketplaceReportReason { 
-  COUNTERFEIT 
-  MISLEADING_INFORMATION 
-  PROHIBITED_ITEM 
-  INAPPROPRIATE_CONTENT 
-  WRONG_CATEGORY 
-  PRICE_MANIPULATION 
-  INTELLECTUAL_PROPERTY 
-  SCAM_OR_FRAUD 
-  IMPERSONATION 
-  ABUSIVE_BEHAVIOR 
-  SPAM 
-  OTHER 
+
+enum MarketplaceReportReason {
+  COUNTERFEIT
+  MISLEADING_INFORMATION
+  PROHIBITED_ITEM
+  INAPPROPRIATE_CONTENT
+  WRONG_CATEGORY
+  PRICE_MANIPULATION
+  INTELLECTUAL_PROPERTY
+  SCAM_OR_FRAUD
+  IMPERSONATION
+  ABUSIVE_BEHAVIOR
+  SPAM
+  OTHER
 }
+
 enum MarketplaceReportSeverity {
   UNASSESSED
   LOW
@@ -390,6 +512,7 @@ enum MarketplaceReportSeverity {
   HIGH
   CRITICAL
 }
+
 enum MarketplaceReportStatus {
   SUBMITTED
   UNDER_REVIEW
@@ -398,6 +521,7 @@ enum MarketplaceReportStatus {
   RESOLVED
   DISMISSED
 }
+
 enum MarketplaceReportResolution {
   NO_VIOLATION
   PRODUCT_UPDATED
@@ -409,6 +533,7 @@ enum MarketplaceReportResolution {
   REFERRED_FOR_FURTHER_REVIEW
   OTHER
 }
+
 enum MarketplaceReportActivityType {
   REPORT_CREATED
   STATUS_CHANGED
@@ -419,6 +544,51 @@ enum MarketplaceReportActivityType {
   RESOLUTION_SET
   REPORT_RESOLVED
   REPORT_DISMISSED
+}
+
+// Test-data cleanup is registry-driven. Human-readable fields are never used
+// to infer that an application record is safe to delete.
+enum TestDataBatchStatus {
+  DRAFT
+  VERIFIED
+  REVOKED
+  CLEANED
+}
+
+enum TestDataEnvironment {
+  DEVELOPMENT
+  TEST
+  STAGING
+  PRODUCTION
+}
+
+enum TestDataFinancialDisposition {
+  NOT_FINANCIAL
+  SIMULATED
+  PROTECTED
+}
+
+enum TestDataCleanupStatus {
+  PLANNED
+  RUNNING
+  COMPLETED
+  FAILED
+  STALE
+}
+
+enum TestDataCleanupScope {
+  ACCOUNT
+  SHOP
+  BATCH
+  ALL
+}
+
+enum StorageCleanupStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  SKIPPED_SHARED
 }
 
 // ==========================================
@@ -496,37 +666,37 @@ model User {
 
   vendorApplications VendorApplication[]
 
-  wishlistItems     WishlistItem[]
-  recentlyViewed    RecentlyViewed[]
-  customerOrders    Order[]          @relation("CustomerOrders")
-  reviewsWritten    ProductReview[]
-  shopReviewsWritten ShopReview[]
-  reviewReplies      ReviewReply[]
-  reviewReports      ReviewReport[] @relation("ReviewReporter")
-  reviewReportsResolved ReviewReport[] @relation("ReviewReportResolver")
-  auditLogs         AuditLog[]
-  notifications     Notification[]
-  devices           UserDevice[]
-  returnRequests    ReturnRequest[]  @relation("ReturnRequester")
-  refundsRequested  Refund[]         @relation("RefundRequester")
-  refundsApproved   Refund[]         @relation("RefundApprover")
-  disputesOpened    Dispute[]        @relation("DisputeCustomer")
-  disputesResolved  Dispute[]        @relation("DisputeResolver")
-  riskFlagsCreated  RiskFlag[]       @relation("RiskFlagCreator")
-  riskFlagsResolved RiskFlag[]       @relation("RiskFlagResolver")
-  customerRiskFlags RiskFlag[]       @relation("RiskFlagCustomer")
-  marketplaceReportsFiled MarketplaceReport[] @relation("MarketplaceReportReporter")
-  marketplaceReportsAssigned MarketplaceReport[] @relation("MarketplaceReportAssignee")
-  marketplaceReportsAssignedBy MarketplaceReport[] @relation("MarketplaceReportAssignedBy")
-  marketplaceReportsResolved MarketplaceReport[] @relation("MarketplaceReportResolver")
-  marketplaceReportActivities MarketplaceReportActivity[] @relation("MarketplaceReportActivityActor")
-  marketplaceReportNotes MarketplaceReportNote[] @relation("MarketplaceReportNoteAuthor")
-  verificationApplicationsSubmitted ShopVerificationApplication[] @relation("ShopVerificationSubmittedBy")
-  verificationApplicationsAssigned ShopVerificationApplication[] @relation("ShopVerificationAssignedAdmin")
+  wishlistItems                      WishlistItem[]
+  recentlyViewed                     RecentlyViewed[]
+  customerOrders                     Order[]                       @relation("CustomerOrders")
+  reviewsWritten                     ProductReview[]
+  shopReviewsWritten                 ShopReview[]
+  reviewReplies                      ReviewReply[]
+  reviewReports                      ReviewReport[]                @relation("ReviewReporter")
+  reviewReportsResolved              ReviewReport[]                @relation("ReviewReportResolver")
+  auditLogs                          AuditLog[]
+  notifications                      Notification[]
+  devices                            UserDevice[]
+  returnRequests                     ReturnRequest[]               @relation("ReturnRequester")
+  refundsRequested                   Refund[]                      @relation("RefundRequester")
+  refundsApproved                    Refund[]                      @relation("RefundApprover")
+  disputesOpened                     Dispute[]                     @relation("DisputeCustomer")
+  disputesResolved                   Dispute[]                     @relation("DisputeResolver")
+  riskFlagsCreated                   RiskFlag[]                    @relation("RiskFlagCreator")
+  riskFlagsResolved                  RiskFlag[]                    @relation("RiskFlagResolver")
+  customerRiskFlags                  RiskFlag[]                    @relation("RiskFlagCustomer")
+  marketplaceReportsFiled            MarketplaceReport[]           @relation("MarketplaceReportReporter")
+  marketplaceReportsAssigned         MarketplaceReport[]           @relation("MarketplaceReportAssignee")
+  marketplaceReportsAssignedBy       MarketplaceReport[]           @relation("MarketplaceReportAssignedBy")
+  marketplaceReportsResolved         MarketplaceReport[]           @relation("MarketplaceReportResolver")
+  marketplaceReportActivities        MarketplaceReportActivity[]   @relation("MarketplaceReportActivityActor")
+  marketplaceReportNotes             MarketplaceReportNote[]       @relation("MarketplaceReportNoteAuthor")
+  verificationApplicationsSubmitted  ShopVerificationApplication[] @relation("ShopVerificationSubmittedBy")
+  verificationApplicationsAssigned   ShopVerificationApplication[] @relation("ShopVerificationAssignedAdmin")
   verificationApplicationsAssignedBy ShopVerificationApplication[] @relation("ShopVerificationAssignedBy")
-  verificationApplicationsDecided ShopVerificationApplication[] @relation("ShopVerificationDecisionBy")
-  verificationActivities ShopVerificationActivity[] @relation("ShopVerificationActivityActor")
-  verificationNotes ShopVerificationNote[] @relation("ShopVerificationNoteAuthor")
+  verificationApplicationsDecided    ShopVerificationApplication[] @relation("ShopVerificationDecisionBy")
+  verificationActivities             ShopVerificationActivity[]    @relation("ShopVerificationActivityActor")
+  verificationNotes                  ShopVerificationNote[]        @relation("ShopVerificationNoteAuthor")
 
   @@index([status])
   @@index([vendorId])
@@ -534,72 +704,75 @@ model User {
 }
 
 model UserDevice {
-  id          String         @id @default(uuid())
-  userId      String
-  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  deviceId    String
-  platform    DevicePlatform
-  pushToken   String          @unique
-  appVersion  String?
-  deviceName  String?
-  enabled     Boolean         @default(true)
-  lastSeenAt  DateTime        @default(now())
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  id         String         @id @default(uuid())
+  userId     String
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceId   String
+  platform   DevicePlatform
+  pushToken  String         @unique
+  appVersion String?
+  deviceName String?
+  enabled    Boolean        @default(true)
+  lastSeenAt DateTime       @default(now())
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
 
   @@unique([userId, deviceId])
   @@index([userId, enabled])
 }
 
 model Promotion {
-  id String @id @default(uuid())
-  title String
-  subtitle String?
-  desktopImageUrl String
-  mobileImageUrl String?
-  status PromotionStatus @default(DRAFT)
-  priority Int @default(100)
-  startsAt DateTime?
-  endsAt DateTime?
-  primaryCtaLabel String?
-  primaryCtaType PromotionCtaType?
-  primaryCtaValue String?
+  id                String               @id @default(uuid())
+  title             String
+  subtitle          String?
+  desktopImageUrl   String
+  mobileImageUrl    String?
+  status            PromotionStatus      @default(DRAFT)
+  priority          Int                  @default(100)
+  startsAt          DateTime?
+  endsAt            DateTime?
+  primaryCtaLabel   String?
+  primaryCtaType    PromotionCtaType?
+  primaryCtaValue   String?
   secondaryCtaLabel String?
-  secondaryCtaType PromotionCtaType?
+  secondaryCtaType  PromotionCtaType?
   secondaryCtaValue String?
-  placements PromotionPlacement[]
-  createdByUserId String
-  updatedByUserId String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  placements        PromotionPlacement[]
+  createdByUserId   String
+  updatedByUserId   String?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
   @@index([status, priority])
 }
 
 model FeaturedProduct {
-  id String @id @default(uuid())
-  productId String @unique
-  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
-  priority Int @default(100)
-  isActive Boolean @default(true)
-  startsAt DateTime?
-  endsAt DateTime?
+  id              String    @id @default(uuid())
+  productId       String    @unique
+  product         Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  priority        Int       @default(100)
+  isActive        Boolean   @default(true)
+  startsAt        DateTime?
+  endsAt          DateTime?
   createdByUserId String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
   @@index([isActive, priority])
 }
 
 model FeaturedShop {
-  id String @id @default(uuid())
-  vendorId String @unique
-  vendor VendorProfile @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  priority Int @default(100)
-  isActive Boolean @default(true)
-  startsAt DateTime?
-  endsAt DateTime?
+  id              String        @id @default(uuid())
+  vendorId        String        @unique
+  vendor          VendorProfile @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  priority        Int           @default(100)
+  isActive        Boolean       @default(true)
+  startsAt        DateTime?
+  endsAt          DateTime?
   createdByUserId String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
   @@index([isActive, priority])
 }
 
@@ -630,6 +803,9 @@ model UserSettings {
 
   twoFactorEnabled       Boolean @default(false)
   buyerProtectionEnabled Boolean @default(true)
+
+  themeMode   String @default("system")
+  accentColor String @default("classic")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -713,6 +889,8 @@ model VendorDocument {
   status VerificationStatus @default(PENDING)
   notes  String?
 
+  verificationSubmissions ShopVerificationDocument[]
+
   createdAt DateTime @default(now())
 
   @@index([applicationId])
@@ -728,7 +906,7 @@ model VendorProfile {
   owner   User   @relation("VendorOwner", fields: [ownerId], references: [id], onDelete: Cascade)
 
   storeName          String
-  slug               String       @unique
+  slug               String                 @unique
   registrationNumber String?
   email              String?
   phone              String?
@@ -737,60 +915,69 @@ model VendorProfile {
   bannerUrl          String?
   description        String?
   address            String?
-  city               String?      @default("Kampala")
-  country            String?      @default("Uganda")
-  currency           String       @default("UGX")
-  timezone           String       @default("Africa/Kampala")
-  status             VendorStatus @default(PENDING)
+  city               String?                @default("Kampala")
+  country            String?                @default("Uganda")
+  currency           String                 @default("UGX")
+  timezone           String                 @default("Africa/Kampala")
+  status             VendorStatus           @default(PENDING)
   verificationStatus ShopVerificationStatus @default(NOT_APPLIED)
   verifiedAt         DateTime?
   // Deprecated cache retained for compatibility with older consumers. The
   // verification service is the only writer and keeps it in sync.
-  isVerified         Boolean      @default(false)
+  isVerified         Boolean                @default(false)
 
   momoMerchantCode  String?
   bankAccountName   String?
   bankAccountNumber String?
   bankName          String?
 
-  fulfillmentMethods  FulfillmentMethod[] @default([DELIVERY])
-  deliveryFee         Decimal              @default(3500.00) @db.Decimal(18, 2)
-  deliveryEstimate    String?
-  pickupLocation      String?
-  pickupDirections    String?              @db.Text
-  pickupInstructions  String?              @db.Text
-  returnWindowDays    Int                  @default(7)
-  returnPolicy        String?              @db.Text
-  returnInstructions  String?              @db.Text
-  returnAddress       String?              @db.Text
-  acceptsExchanges    Boolean              @default(false)
-  exchangePolicy      String?              @db.Text
+  fulfillmentMethods FulfillmentMethod[] @default([DELIVERY])
+  deliveryFee        Decimal             @default(3500.00) @db.Decimal(18, 2)
+  deliveryEstimate   String?
+  pickupLocation     String?
+  pickupDirections   String?             @db.Text
+  pickupInstructions String?             @db.Text
+  returnWindowDays   Int                 @default(7)
+  returnPolicy       String?             @db.Text
+  returnInstructions String?             @db.Text
+  returnAddress      String?             @db.Text
+  acceptsExchanges   Boolean             @default(false)
+  exchangePolicy     String?             @db.Text
 
-  trialEndsAt DateTime?
-  activatedAt DateTime?
-  suspendedAt DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  deletedAt   DateTime?
+  trialStartedAt   DateTime?
+  trialEndsAt      DateTime?
+  activatedAt      DateTime?
+  suspendedAt      DateTime?
+  bannedAt         DateTime?
+  moderationReason String?   @db.Text
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  deletedAt        DateTime?
 
   // Relations
-  employees         User[]               @relation("VendorEmployees")
-  products          Product[]
-  subOrders         SubOrder[]
-  ledgerEntries     FinancialLedger[]
-  payouts           VendorPayout[]
-  payoutAccounts    VendorPayoutAccount[]
-  subscriptions     VendorSubscription[]
-  notifications     Notification[]
-  auditLogs         AuditLog[]
-  documents         Document[]
-  vendorApplication VendorApplication?
-  featuredEntry FeaturedShop?
-  disputes          Dispute[]
-  riskFlags         RiskFlag[]
-  shopReviews       ShopReview[]
-  reviewReplies     ReviewReply[] @relation("VendorReviewReplies")
-  marketplaceReports MarketplaceReport[]
+  employees                User[]                        @relation("VendorEmployees")
+  products                 Product[]
+  subOrders                SubOrder[]
+  ledgerEntries            FinancialLedger[]
+  payouts                  VendorPayout[]
+  payoutAccounts           VendorPayoutAccount[]
+  paymentAccounts          VendorPaymentAccount[]
+  paymentIntents           PaymentIntent[]
+  subscriptions            VendorSubscription[]
+  promotionCampaigns       PromotionCampaign[]
+  promotionCredits         PromotionCreditLedger[]
+  platformRevenueOrders    PlatformRevenueOrder[]
+  platformPaymentIntents   PlatformPaymentIntent[]
+  notifications            Notification[]
+  auditLogs                AuditLog[]
+  documents                Document[]
+  vendorApplication        VendorApplication?
+  featuredEntry            FeaturedShop?
+  disputes                 Dispute[]
+  riskFlags                RiskFlag[]
+  shopReviews              ShopReview[]
+  reviewReplies            ReviewReply[]                 @relation("VendorReviewReplies")
+  marketplaceReports       MarketplaceReport[]
   verificationApplications ShopVerificationApplication[]
 
   @@index([status])
@@ -798,38 +985,57 @@ model VendorProfile {
 }
 
 model ShopVerificationApplication {
-  id              String                 @id @default(uuid())
-  publicId        String                 @unique
-  vendorId        String
-  vendor          VendorProfile          @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  submittedById   String
-  submittedBy     User                   @relation("ShopVerificationSubmittedBy", fields: [submittedById], references: [id], onDelete: Restrict)
-  status          ShopVerificationStatus @default(PENDING)
-  snapshot        Json
-  vendorResponse  String?                @db.Text
-  informationRequest String?             @db.Text
-  submittedAt     DateTime               @default(now())
-  reviewStartedAt DateTime?
-  assignedAdminId String?
-  assignedAdmin   User?                  @relation("ShopVerificationAssignedAdmin", fields: [assignedAdminId], references: [id], onDelete: SetNull)
-  assignedById    String?
-  assignedBy      User?                  @relation("ShopVerificationAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
-  assignedAt      DateTime?
-  decisionById    String?
-  decisionBy      User?                  @relation("ShopVerificationDecisionBy", fields: [decisionById], references: [id], onDelete: SetNull)
-  decidedAt       DateTime?
-  verifiedAt      DateTime?
-  rejectionReason String?                @db.Text
-  suspensionReason String?               @db.Text
-  revocationReason String?               @db.Text
-  createdAt       DateTime               @default(now())
-  updatedAt       DateTime               @updatedAt
-  activities      ShopVerificationActivity[]
-  notes           ShopVerificationNote[]
+  id                 String                     @id @default(uuid())
+  publicId           String                     @unique
+  vendorId           String
+  vendor             VendorProfile              @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  submittedById      String
+  submittedBy        User                       @relation("ShopVerificationSubmittedBy", fields: [submittedById], references: [id], onDelete: Restrict)
+  status             ShopVerificationStatus     @default(PENDING)
+  snapshot           Json
+  vendorResponse     String?                    @db.Text
+  informationRequest String?                    @db.Text
+  submittedAt        DateTime                   @default(now())
+  reviewStartedAt    DateTime?
+  assignedAdminId    String?
+  assignedAdmin      User?                      @relation("ShopVerificationAssignedAdmin", fields: [assignedAdminId], references: [id], onDelete: SetNull)
+  assignedById       String?
+  assignedBy         User?                      @relation("ShopVerificationAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
+  assignedAt         DateTime?
+  decisionById       String?
+  decisionBy         User?                      @relation("ShopVerificationDecisionBy", fields: [decisionById], references: [id], onDelete: SetNull)
+  decidedAt          DateTime?
+  verifiedAt         DateTime?
+  rejectionReason    String?                    @db.Text
+  suspensionReason   String?                    @db.Text
+  revocationReason   String?                    @db.Text
+  createdAt          DateTime                   @default(now())
+  updatedAt          DateTime                   @updatedAt
+  activities         ShopVerificationActivity[]
+  notes              ShopVerificationNote[]
+  documents          ShopVerificationDocument[]
 
   @@index([vendorId, status])
   @@index([status, submittedAt])
   @@index([assignedAdminId, status])
+}
+
+// References the exact existing documents reviewed for an application. The
+// underlying files and document records remain authoritative and are not copied.
+model ShopVerificationDocument {
+  id               String                      @id @default(uuid())
+  applicationId    String
+  application      ShopVerificationApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  documentId       String?
+  document         Document?                   @relation(fields: [documentId], references: [id], onDelete: Restrict)
+  vendorDocumentId String?
+  vendorDocument   VendorDocument?             @relation(fields: [vendorDocumentId], references: [id], onDelete: Restrict)
+  submittedAt      DateTime                    @default(now())
+
+  @@unique([applicationId, documentId])
+  @@unique([applicationId, vendorDocumentId])
+  @@index([documentId])
+  @@index([vendorDocumentId])
 }
 
 model ShopVerificationActivity {
@@ -867,6 +1073,7 @@ model ProductCategory {
   id          String  @id @default(uuid())
   name        String
   slug        String  @unique
+  taxonomyKey String? @unique
   description String?
   image       String?
   isActive    Boolean @default(true)
@@ -917,14 +1124,15 @@ model Product {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  images         ProductImage[]
-  variants       ProductVariant[]
-  orderItems     OrderItem[]
-  reviews        ProductReview[]
-  wishlistItems  WishlistItem[]
-  recentlyViewed RecentlyViewed[]
-  featuredEntry FeaturedProduct?
+  images             ProductImage[]
+  variants           ProductVariant[]
+  orderItems         OrderItem[]
+  reviews            ProductReview[]
+  wishlistItems      WishlistItem[]
+  recentlyViewed     RecentlyViewed[]
+  featuredEntry      FeaturedProduct?
   marketplaceReports MarketplaceReport[]
+  promotionCampaigns PromotionCampaign[]
 
   @@unique([vendorId, slug])
   @@index([vendorId])
@@ -933,6 +1141,153 @@ model Product {
   @@index([status])
   @@index([categoryId, status, createdAt])
   @@index([subCategoryId, status, createdAt])
+}
+
+model PromotionCreditLedger {
+  id         String                    @id @default(uuid())
+  vendorId   String
+  vendor     VendorProfile             @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  type       PromotionCreditLedgerType
+  amount     Decimal                   @db.Decimal(18, 2)
+  grantKey   String?                   @unique
+  releaseKey String?                   @unique
+  reason     String
+  expiresAt  DateTime?
+  campaignId String?
+  campaign   PromotionCampaign?        @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  createdAt  DateTime                  @default(now())
+
+  @@index([vendorId, createdAt])
+  @@index([vendorId, expiresAt])
+}
+
+model PromotionCampaign {
+  id                String                      @id @default(uuid())
+  vendorId          String
+  vendor            VendorProfile               @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  targetType        PromotionCampaignTargetType
+  productId         String?
+  product           Product?                    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  dailyRate         Decimal                     @db.Decimal(18, 2)
+  durationDays      Int
+  subtotal          Decimal                     @db.Decimal(18, 2)
+  creditApplied     Decimal                     @default(0) @db.Decimal(18, 2)
+  amountDue         Decimal                     @db.Decimal(18, 2)
+  currency          String                      @default("UGX") @db.VarChar(3)
+  requestedStartAt  DateTime?
+  startAt           DateTime?
+  endAt             DateTime?
+  status            PromotionCampaignStatus     @default(DRAFT)
+  placement         AdvertisingPlacement
+  fulfillmentStatus PromotionFulfillmentStatus  @default(PENDING_PAYMENT)
+  fundingSource     String?
+  idempotencyKey    String?
+  revenueOrder      PlatformRevenueOrder?
+  reservation       PromotionReservation?
+  creditEntries     PromotionCreditLedger[]
+  createdAt         DateTime                    @default(now())
+  updatedAt         DateTime                    @updatedAt
+
+  @@unique([vendorId, idempotencyKey])
+  @@index([vendorId, status])
+  @@index([targetType, productId, status])
+  @@index([startAt, endAt])
+}
+
+model AdvertisingPlacementInventory {
+  id        String               @id @default(uuid())
+  placement AdvertisingPlacement @unique
+  capacity  Int
+  isActive  Boolean              @default(true)
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+}
+
+model PromotionReservation {
+  id            String                     @id @default(uuid())
+  campaignId    String                     @unique
+  campaign      PromotionCampaign          @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  placement     AdvertisingPlacement
+  startAt       DateTime
+  endAt         DateTime
+  holdExpiresAt DateTime?
+  status        PromotionReservationStatus
+  confirmedAt   DateTime?
+  createdAt     DateTime                   @default(now())
+  updatedAt     DateTime                   @updatedAt
+
+  @@index([placement, status, startAt, endAt])
+  @@index([status, holdExpiresAt])
+}
+
+model PromotionQuote {
+  id               String                      @id @default(uuid())
+  vendorId         String
+  targetType       PromotionCampaignTargetType
+  productId        String?
+  placement        AdvertisingPlacement
+  durationDays     Int
+  requestedStartAt DateTime?
+  startAt          DateTime
+  endAt            DateTime
+  dailyRate        Decimal                     @db.Decimal(18, 2)
+  subtotal         Decimal                     @db.Decimal(18, 2)
+  creditApplied    Decimal                     @db.Decimal(18, 2)
+  amountDue        Decimal                     @db.Decimal(18, 2)
+  expiresAt        DateTime
+  createdAt        DateTime                    @default(now())
+
+  @@index([vendorId, expiresAt])
+}
+
+model PlatformRevenueOrder {
+  id                String                           @id @default(uuid())
+  vendorId          String
+  vendor            VendorProfile                    @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  type              PlatformRevenueOrderType
+  status            PlatformRevenueOrderStatus       @default(DRAFT)
+  campaignId        String?                          @unique
+  campaign          PromotionCampaign?               @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  subscriptionId    String?                          @unique
+  subscription      VendorSubscription?              @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  subtotal          Decimal                          @db.Decimal(18, 2)
+  creditApplied     Decimal                          @default(0) @db.Decimal(18, 2)
+  amountDue         Decimal                          @db.Decimal(18, 2)
+  currency          String                           @default("UGX") @db.VarChar(3)
+  idempotencyKey    String?
+  qualificationKind PlatformRevenueQualificationKind @default(NONE)
+  qualificationId   String?
+  paymentIntents    PlatformPaymentIntent[]
+  createdAt         DateTime                         @default(now())
+  updatedAt         DateTime                         @updatedAt
+
+  @@unique([vendorId, idempotencyKey])
+  @@unique([vendorId, qualificationId])
+  @@index([vendorId, status])
+}
+
+model PlatformPaymentIntent {
+  id                        String                      @id @default(uuid())
+  platformRevenueOrderId    String
+  platformRevenueOrder      PlatformRevenueOrder        @relation(fields: [platformRevenueOrderId], references: [id], onDelete: Restrict)
+  vendorId                  String
+  vendor                    VendorProfile               @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  provider                  PaymentProvider
+  amount                    Decimal                     @db.Decimal(18, 2)
+  currency                  String                      @default("UGX") @db.VarChar(3)
+  status                    PlatformPaymentIntentStatus @default(PENDING)
+  providerReference         String?                     @unique
+  idempotencyKey            String?
+  merchantDestinationMasked String?
+  reconcileAttempts         Int                         @default(0)
+  lastReconciledAt          DateTime?
+  nextReconcileAt           DateTime?
+  lastReconcileError        String?
+  createdAt                 DateTime                    @default(now())
+  updatedAt                 DateTime                    @updatedAt
+
+  @@unique([platformRevenueOrderId, idempotencyKey])
+  @@index([vendorId, status])
 }
 
 model ProductImage {
@@ -966,32 +1321,32 @@ model ProductVariant {
   orderItems OrderItem[]
   reviews    ProductReview[]
 
-  @@index([productId])
   @@unique([productId, optionKey])
+  @@index([productId])
 }
 
 model ProductReview {
-  id               String    @id @default(uuid())
+  id               String          @id @default(uuid())
   productId        String
-  product          Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product          Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
   userId           String
-  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   // Legacy reviews predate purchase proof and remain hidden. New writes are
   // required by ReviewService to provide an order item.
-  orderItemId      String?   @unique
-  orderItem        OrderItem? @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
+  orderItemId      String?         @unique
+  orderItem        OrderItem?      @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
   variantId        String?
   variant          ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
-  rating           Int       @default(5)
-  title            String?   @db.VarChar(120)
-  comment          String?   @db.Text
-  imageUrls        String[]  @default([])
-  status           ReviewStatus @default(PUBLISHED)
-  verifiedPurchase Boolean   @default(false)
+  rating           Int             @default(5)
+  title            String?         @db.VarChar(120)
+  comment          String?         @db.Text
+  imageUrls        String[]        @default([])
+  status           ReviewStatus    @default(PUBLISHED)
+  verifiedPurchase Boolean         @default(false)
   vendorReplies    ReviewReply[]
   reports          ReviewReport[]
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
 
   @@index([productId])
   @@index([productId, status, createdAt])
@@ -999,20 +1354,20 @@ model ProductReview {
 }
 
 model ShopReview {
-  id          String        @id @default(uuid())
-  vendorId    String
-  vendor      VendorProfile @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  userId      String
-  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  subOrderId  String        @unique
-  subOrder    SubOrder      @relation(fields: [subOrderId], references: [id], onDelete: Restrict)
-  rating      Int
-  comment     String?       @db.Text
-  status      ReviewStatus  @default(PUBLISHED)
+  id            String         @id @default(uuid())
+  vendorId      String
+  vendor        VendorProfile  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subOrderId    String         @unique
+  subOrder      SubOrder       @relation(fields: [subOrderId], references: [id], onDelete: Restrict)
+  rating        Int
+  comment       String?        @db.Text
+  status        ReviewStatus   @default(PUBLISHED)
   vendorReplies ReviewReply[]
-  reports     ReviewReport[]
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  reports       ReviewReport[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 
   @@index([vendorId, status, createdAt])
   @@index([userId])
@@ -1059,38 +1414,39 @@ model ReviewReport {
 }
 
 model MarketplaceReport {
-  id String @id @default(uuid())
-  publicId String @unique
-  targetType MarketplaceReportTargetType
-  productId String?
-  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
-  vendorId String?
-  vendor VendorProfile? @relation(fields: [vendorId], references: [id], onDelete: SetNull)
-  reporterId String
-  reporter User @relation("MarketplaceReportReporter", fields: [reporterId], references: [id], onDelete: Restrict)
-  reason MarketplaceReportReason
-  description String? @db.Text
-  severity MarketplaceReportSeverity @default(UNASSESSED)
-  status MarketplaceReportStatus @default(SUBMITTED)
-  assignedAdminId String?
-  assignedAdmin User? @relation("MarketplaceReportAssignee", fields: [assignedAdminId], references: [id], onDelete: SetNull)
-  assignedAt DateTime?
-  assignedById String?
-  assignedBy User? @relation("MarketplaceReportAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
-  resolution MarketplaceReportResolution?
-  resolutionNote String? @db.Text
-  resolvedById String?
-  resolvedBy User? @relation("MarketplaceReportResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
-  resolvedAt DateTime?
+  id                  String                       @id @default(uuid())
+  publicId            String                       @unique
+  targetType          MarketplaceReportTargetType
+  productId           String?
+  product             Product?                     @relation(fields: [productId], references: [id], onDelete: SetNull)
+  vendorId            String?
+  vendor              VendorProfile?               @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+  reporterId          String
+  reporter            User                         @relation("MarketplaceReportReporter", fields: [reporterId], references: [id], onDelete: Restrict)
+  reason              MarketplaceReportReason
+  description         String?                      @db.Text
+  severity            MarketplaceReportSeverity    @default(UNASSESSED)
+  status              MarketplaceReportStatus      @default(SUBMITTED)
+  assignedAdminId     String?
+  assignedAdmin       User?                        @relation("MarketplaceReportAssignee", fields: [assignedAdminId], references: [id], onDelete: SetNull)
+  assignedAt          DateTime?
+  assignedById        String?
+  assignedBy          User?                        @relation("MarketplaceReportAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
+  resolution          MarketplaceReportResolution?
+  resolutionNote      String?                      @db.Text
+  resolvedById        String?
+  resolvedBy          User?                        @relation("MarketplaceReportResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+  resolvedAt          DateTime?
   targetTitleSnapshot String
-  targetSlugSnapshot String?
+  targetSlugSnapshot  String?
   targetImageSnapshot String?
-  vendorIdSnapshot String?
-  vendorNameSnapshot String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  activities MarketplaceReportActivity[]
-  notes MarketplaceReportNote[]
+  vendorIdSnapshot    String?
+  vendorNameSnapshot  String?
+  createdAt           DateTime                     @default(now())
+  updatedAt           DateTime                     @updatedAt
+  activities          MarketplaceReportActivity[]
+  notes               MarketplaceReportNote[]
+
   @@index([status, severity, createdAt])
   @@index([assignedAdminId, status, createdAt])
   @@index([targetType, productId])
@@ -1100,28 +1456,30 @@ model MarketplaceReport {
 }
 
 model MarketplaceReportActivity {
-  id String @id @default(uuid())
-  reportId String
-  report MarketplaceReport @relation(fields: [reportId], references: [id], onDelete: Restrict)
-  actorId String?
-  actor User? @relation("MarketplaceReportActivityActor", fields: [actorId], references: [id], onDelete: SetNull)
-  type MarketplaceReportActivityType
+  id        String                        @id @default(uuid())
+  reportId  String
+  report    MarketplaceReport             @relation(fields: [reportId], references: [id], onDelete: Restrict)
+  actorId   String?
+  actor     User?                         @relation("MarketplaceReportActivityActor", fields: [actorId], references: [id], onDelete: SetNull)
+  type      MarketplaceReportActivityType
   fromValue String?
-  toValue String?
-  metadata Json?
-  createdAt DateTime @default(now())
+  toValue   String?
+  metadata  Json?
+  createdAt DateTime                      @default(now())
+
   @@index([reportId, createdAt])
 }
 
 model MarketplaceReportNote {
-  id String @id @default(uuid())
-  reportId String
-  report MarketplaceReport @relation(fields: [reportId], references: [id], onDelete: Restrict)
-  adminId String
-  admin User @relation("MarketplaceReportNoteAuthor", fields: [adminId], references: [id], onDelete: Restrict)
-  body String @db.Text
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id        String            @id @default(uuid())
+  reportId  String
+  report    MarketplaceReport @relation(fields: [reportId], references: [id], onDelete: Restrict)
+  adminId   String
+  admin     User              @relation("MarketplaceReportNoteAuthor", fields: [adminId], references: [id], onDelete: Restrict)
+  body      String            @db.Text
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
   @@index([reportId, createdAt])
 }
 
@@ -1174,6 +1532,7 @@ model Order {
   checkoutRequestId   String?
   checkoutRequestHash String?
   paymentAttempts     PaymentAttempt[]
+  paymentIntents      PaymentIntent[]
   ledgerEntries       FinancialLedger[]
   shippingAddress     String
   shippingPhone       String
@@ -1210,13 +1569,14 @@ model SubOrder {
   vendorNetEntitlement Decimal?          @db.Decimal(18, 2)
   paymentProcessingFee Decimal           @default(0.00) @db.Decimal(18, 2)
   ledgerEntries        FinancialLedger[]
+  paymentIntents       PaymentIntent[]
 
   status                     SubOrderStatus              @default(PENDING)
   deliveryConfirmedAt        DateTime?
   deliveryConfirmedByUserId  String?
   deliveryConfirmationSource DeliveryConfirmationSource?
   notes                      String?
-  fulfillmentMethod          FulfillmentMethod            @default(DELIVERY)
+  fulfillmentMethod          FulfillmentMethod           @default(DELIVERY)
   fulfillmentSnapshot        Json?
   refundPolicySnapshot       Json?
 
@@ -1233,6 +1593,93 @@ model SubOrder {
   @@index([orderId])
   @@index([vendorId])
   @@index([status])
+}
+
+// Destination for a direct customer payment.  The encrypted reference is never
+// selected into client DTOs.  Legacy VendorPayoutAccount remains intact for
+// historical payout/withdrawal data and is not used by checkout.
+model VendorPaymentAccount {
+  id                     String                     @id @default(uuid())
+  vendorId               String
+  vendor                 VendorProfile              @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  provider               PaymentProvider
+  merchantCode           String?
+  merchantAccountId      String?
+  merchantName           String?
+  merchantPhoneEncrypted String?
+  merchantPhoneHash      String?
+  maskedMerchantPhone    String?
+  status                 VendorPaymentAccountStatus @default(PENDING)
+  isDefault              Boolean                    @default(false)
+  verifiedAt             DateTime?
+  rejectedAt             DateTime?
+  suspendedAt            DateTime?
+  verificationNote       String?
+  createdById            String
+  updatedById            String?
+  createdAt              DateTime                   @default(now())
+  updatedAt              DateTime                   @updatedAt
+  paymentIntents         PaymentIntent[]
+
+  @@unique([vendorId, provider, merchantPhoneHash])
+  @@index([vendorId, status])
+  @@index([vendorId, isDefault])
+}
+
+model PaymentIntent {
+  id                     String                 @id @default(uuid())
+  orderId                String
+  order                  Order                  @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  subOrderId             String
+  subOrder               SubOrder               @relation(fields: [subOrderId], references: [id], onDelete: Restrict)
+  vendorId               String
+  vendor                 VendorProfile          @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  vendorPaymentAccountId String
+  vendorPaymentAccount   VendorPaymentAccount   @relation(fields: [vendorPaymentAccountId], references: [id], onDelete: Restrict)
+  provider               PaymentProvider
+  purpose                PaymentPurpose         @default(MARKETPLACE_PURCHASE)
+  amount                 Decimal                @db.Decimal(18, 2)
+  currency               String                 @default("UGX") @db.VarChar(3)
+  status                 PaymentIntentStatus    @default(CREATED)
+  providerReference      String?                @unique @db.VarChar(191)
+  checkoutRequestId      String?
+  idempotencyKey         String?
+  failureCode            String?
+  failureMessage         String?
+  initiatedAt            DateTime?
+  confirmedAt            DateTime?
+  failedAt               DateTime?
+  lastReconciledAt       DateTime?
+  nextReconcileAt        DateTime?
+  reconcileAttempts      Int                    @default(0)
+  lastReconcileError     String?
+  createdAt              DateTime               @default(now())
+  updatedAt              DateTime               @updatedAt
+  providerEvents         PaymentProviderEvent[]
+
+  @@unique([subOrderId, idempotencyKey])
+  @@index([orderId, status])
+  @@index([vendorId, status])
+}
+
+model PaymentProviderEvent {
+  id                String               @id @default(uuid())
+  paymentIntentId   String
+  paymentIntent     PaymentIntent        @relation(fields: [paymentIntentId], references: [id], onDelete: Cascade)
+  provider          PaymentProvider
+  providerReference String?
+  providerEventId   String?
+  eventType         String
+  normalizedStatus  PaymentIntentStatus?
+  payloadHash       String
+  processingResult  String
+  processedAt       DateTime?
+  failureReason     String?
+  receivedAt        DateTime             @default(now())
+
+  @@unique([provider, payloadHash])
+  @@unique([provider, providerEventId])
+  @@index([paymentIntentId, receivedAt])
 }
 
 model PaymentAttempt {
@@ -1277,17 +1724,17 @@ model OrderItem {
   variantId  String?
   variant    ProductVariant? @relation(fields: [variantId], references: [id])
 
-  quantity        Int     @default(1)
-  priceAtPurchase Decimal @db.Decimal(18, 2)
-  totalPrice      Decimal @db.Decimal(18, 2)
-  productNameSnapshot String?
-  variantNameSnapshot String?
+  quantity               Int     @default(1)
+  priceAtPurchase        Decimal @db.Decimal(18, 2)
+  totalPrice             Decimal @db.Decimal(18, 2)
+  productNameSnapshot    String?
+  variantNameSnapshot    String?
   variantOptionsSnapshot Json?
 
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  returnItems ReturnItem[]
-  refundItems RefundItem[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  returnItems   ReturnItem[]
+  refundItems   RefundItem[]
   productReview ProductReview?
 
   @@index([orderId])
@@ -1472,9 +1919,9 @@ model RefundItem {
 }
 
 model VendorPayout {
-  id       String        @id @default(uuid())
-  vendorId String
-  vendor   VendorProfile @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  id              String               @id @default(uuid())
+  vendorId        String
+  vendor          VendorProfile        @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   payoutAccountId String?
   payoutAccount   VendorPayoutAccount? @relation(fields: [payoutAccountId], references: [id], onDelete: SetNull)
 
@@ -1513,23 +1960,23 @@ model VendorPayout {
 // A payout destination is separate from a withdrawal. The encrypted reference
 // is never selected into vendor-facing DTOs.
 model VendorPayoutAccount {
-  id                        String                    @id @default(uuid())
+  id                        String                      @id @default(uuid())
   vendorId                  String
-  vendor                    VendorProfile             @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  vendor                    VendorProfile               @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   type                      PayoutDestinationType
   provider                  VendorPayoutAccountProvider
   accountHolderName         String
   accountReferenceEncrypted String
   accountReferenceHash      String
   maskedReference           String
-  status                    VendorPayoutAccountStatus @default(PENDING)
-  isDefault                 Boolean                   @default(false)
+  status                    VendorPayoutAccountStatus   @default(PENDING)
+  isDefault                 Boolean                     @default(false)
   verifiedAt                DateTime?
   verifiedById              String?
   createdById               String
   updatedById               String?
-  createdAt                 DateTime                  @default(now())
-  updatedAt                 DateTime                  @updatedAt
+  createdAt                 DateTime                    @default(now())
+  updatedAt                 DateTime                    @updatedAt
   payouts                   VendorPayout[]
 
   @@unique([vendorId, accountReferenceHash])
@@ -1563,6 +2010,7 @@ model SubscriptionPlan {
   id           String       @id @default(uuid())
   name         String       @unique
   slug         String       @unique
+  code         String       @unique
   description  String?
   price        Decimal      @db.Decimal(18, 2)
   currency     String       @default("UGX")
@@ -1572,6 +2020,9 @@ model SubscriptionPlan {
   commissionRate    Decimal @db.Decimal(5, 2)
   hasPremiumThemes  Boolean @default(false)
   hasAdvancedCharts Boolean @default(false)
+  staffSeats        Int     @default(2)
+  features          Json?
+  sortOrder         Int     @default(0)
   isActive          Boolean @default(true)
 
   createdAt DateTime @default(now())
@@ -1587,12 +2038,13 @@ model VendorSubscription {
   planId   String
   plan     SubscriptionPlan @relation(fields: [planId], references: [id])
 
-  status             SubscriptionStatus @default(TRIAL)
-  startedAt          DateTime           @default(now())
+  status             SubscriptionStatus    @default(TRIAL)
+  startedAt          DateTime              @default(now())
   currentPeriodStart DateTime?
   currentPeriodEnd   DateTime?
   cancelledAt        DateTime?
   gracePeriodEndsAt  DateTime?
+  revenueOrder       PlatformRevenueOrder?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1606,18 +2058,19 @@ model VendorSubscription {
 // ==========================================
 
 model Notification {
-  id       String         @id @default(uuid())
-  vendorId String?
-  vendor   VendorProfile? @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  userId   String?
-  user     User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id             String         @id @default(uuid())
+  idempotencyKey String?        @unique @db.VarChar(191)
+  vendorId       String?
+  vendor         VendorProfile? @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  userId         String?
+  user           User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  type      NotificationType @default(INFO)
-  title     String
-  message   String
+  type       NotificationType @default(INFO)
+  title      String
+  message    String
   actionPath String?
-  readAt    DateTime?
-  createdAt DateTime         @default(now())
+  readAt     DateTime?
+  createdAt  DateTime         @default(now())
 
   @@index([vendorId])
   @@index([userId])
@@ -1635,6 +2088,8 @@ model Document {
   mimeType  String?
   size      Int?
   createdAt DateTime     @default(now())
+
+  verificationSubmissions ShopVerificationDocument[]
 
   @@index([vendorId])
 }
@@ -1714,4 +2169,123 @@ model ReconciliationFinding {
   @@index([status, severity])
   @@index([domain, status])
   @@index([vendorId, status])
+}
+
+// A batch is the administrative review boundary for test ownership. DRAFT
+// batches cannot be previewed or cleaned until a different super administrator
+// (or a controlled seed process outside production) verifies them.
+model TestDataBatch {
+  id          String               @id @default(uuid())
+  name        String
+  description String?              @db.Text
+  environment TestDataEnvironment
+  status      TestDataBatchStatus  @default(DRAFT)
+  createdBy   String
+  reviewedBy  String?
+  reviewNote  String?              @db.Text
+  verifiedAt  DateTime?
+  revokedAt   DateTime?
+  cleanedAt   DateTime?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  records     TestDataRegistry[]
+  cleanupJobs TestDataCleanupJob[]
+
+  @@index([status, environment])
+  @@index([createdAt])
+}
+
+model TestDataRegistry {
+  id                   String                       @id @default(uuid())
+  batchId              String
+  batch                TestDataBatch                @relation(fields: [batchId], references: [id], onDelete: Restrict)
+  entityType           String
+  entityId             String
+  environment          TestDataEnvironment
+  financialDisposition TestDataFinancialDisposition @default(NOT_FINANCIAL)
+  externalProvider     String?
+  externalId           String?
+  externalAccountId    String?
+  externalUserId       String?
+  ownershipMetadata    Json?
+  createdBy            String
+  createdAt            DateTime                     @default(now())
+
+  @@unique([environment, entityType, entityId])
+  @@index([batchId, entityType])
+  @@index([entityType, entityId])
+}
+
+// The complete server-generated plan is retained for stale-plan detection,
+// idempotent retries, auditability, and explicit multi-step recovery semantics.
+model TestDataCleanupJob {
+  id            String                        @id @default(uuid())
+  batchId       String?
+  batch         TestDataBatch?                @relation(fields: [batchId], references: [id], onDelete: Restrict)
+  scope         TestDataCleanupScope
+  scopeId       String?
+  environment   TestDataEnvironment
+  status        TestDataCleanupStatus         @default(PLANNED)
+  plan          Json
+  planHash      String
+  confirmation  String?
+  requestedBy   String
+  startedAt     DateTime?
+  completedAt   DateTime?
+  failedAt      DateTime?
+  expiresAt     DateTime
+  error         String?                       @db.Text
+  result        Json?
+  createdAt     DateTime                      @default(now())
+  updatedAt     DateTime                      @updatedAt
+  storageTasks  StorageCleanupTask[]
+  identityTasks ExternalIdentityCleanupTask[]
+
+  @@index([status, expiresAt])
+  @@index([scope, scopeId, status])
+  @@index([requestedBy, createdAt])
+}
+
+model StorageCleanupTask {
+  id             String               @id @default(uuid())
+  cleanupJobId   String
+  cleanupJob     TestDataCleanupJob   @relation(fields: [cleanupJobId], references: [id], onDelete: Restrict)
+  bucket         String
+  objectPath     String
+  status         StorageCleanupStatus @default(PENDING)
+  attempts       Int                  @default(0)
+  claimedAt      DateTime?
+  leaseExpiresAt DateTime?
+  nextAttemptAt  DateTime             @default(now())
+  lastError      String?              @db.Text
+  completedAt    DateTime?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  @@unique([cleanupJobId, bucket, objectPath])
+  @@index([status, nextAttemptAt])
+  @@index([status, leaseExpiresAt])
+}
+
+model ExternalIdentityCleanupTask {
+  id                String               @id @default(uuid())
+  cleanupJobId      String
+  cleanupJob        TestDataCleanupJob   @relation(fields: [cleanupJobId], references: [id], onDelete: Restrict)
+  provider          String
+  externalId        String
+  expectedUserId    String?
+  expectedAccountId String?
+  status            StorageCleanupStatus @default(PENDING)
+  attempts          Int                  @default(0)
+  claimedAt         DateTime?
+  leaseExpiresAt    DateTime?
+  nextAttemptAt     DateTime             @default(now())
+  lastError         String?              @db.Text
+  completedAt       DateTime?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  @@unique([cleanupJobId, provider, externalId])
+  @@index([status, nextAttemptAt])
+  @@index([status, leaseExpiresAt])
 }

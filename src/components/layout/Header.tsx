@@ -23,6 +23,7 @@ import { useUserData } from "@/providers/UserDataProvider";
 import { NotificationsSheet } from "@/components/notifications/NotificationsSheet";
 import { MarketplaceSearch } from "@/components/marketplace/marketplace-search";
 import { CustomerNavigationSheet } from "@/components/layout/CustomerNavigationSheet";
+import { MwezoraLogoLink } from "@/components/brand/MwezoraLogo";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -218,17 +219,20 @@ export function Header() {
         >
           <Menu className="size-5" />
         </button>
-        <Link
-          href="/"
-          className="flex min-w-0 flex-1 items-center gap-2 text-base font-bold tracking-tight text-foreground md:flex-none"
-        >
-          <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <ShoppingBag className="size-4" />
-          </span>
-          <span>
-            Smart<span className="text-primary">Duka</span>
-          </span>
-        </Link>
+        <div className="flex min-w-0 flex-1 items-center md:flex-none">
+          {/* Mobile: symbol only saves horizontal space */}
+          <MwezoraLogoLink
+            variant="symbol"
+            size="sm"
+            className="md:hidden"
+          />
+          {/* Desktop: full horizontal logo */}
+          <MwezoraLogoLink
+            variant="horizontal"
+            size="sm"
+            className="hidden md:inline-flex"
+          />
+        </div>
         <Suspense
           fallback={
             <div className="hidden h-10 max-w-2xl flex-1 animate-pulse rounded-lg bg-muted md:block" />

@@ -1,25 +1,48 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Inter } from "next/font/google";
 import "./globals.css";
-import { cn } from "@/lib/utils";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/providers/AuthProvider";
 import { PublicCatalogProvider } from "@/providers/PublicCatalogProvider";
 import { UserDataProvider } from "@/providers/UserDataProvider";
 import { WorkspaceAccessProvider } from "@/providers/WorkspaceAccessProvider";
+import { AppearanceProvider } from "@/providers/AppearanceProvider";
+import { brand } from "@/config/brand";
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
-const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+const configuredProductionUrl = process.env.NEXT_PUBLIC_APP_URL ?? process.env.VERCEL_PROJECT_PRODUCTION_URL;
+const canonicalProductionUrl = configuredProductionUrl
+  ? new URL(configuredProductionUrl.startsWith("http") ? configuredProductionUrl : `https://${configuredProductionUrl}`)
+  : undefined;
 
 export const metadata: Metadata = {
-  title: "SmartDuka - Multi-Vendor Marketplace",
-  description:
-    "Discover stores, buy products, and manage vendor spaces seamlessly.",
+  metadataBase: canonicalProductionUrl,
+  title: {
+    default: `${brand.name} | ${brand.tagline}`,
+    template: `%s | ${brand.name}`,
+  },
+  description: brand.description,
+  applicationName: brand.name,
+  manifest: "/manifest.webmanifest",
+  icons: {
+    icon: [
+      { url: brand.logo.symbol, type: "image/svg+xml" },
+      { url: brand.appIcons.classic, type: "image/png", sizes: "1024x1024" },
+    ],
+    apple: [{ url: brand.appIcons.light, type: "image/png", sizes: "1024x1024" }],
+  },
+  openGraph: {
+    type: "website",
+    siteName: brand.name,
+    title: `${brand.name} | ${brand.tagline}`,
+    description: brand.description,
+    images: canonicalProductionUrl ? [{ url: brand.appIcons.classic, width: 1024, height: 1024, alt: `${brand.name} symbol` }] : undefined,
+  },
+  twitter: {
+    card: "summary",
+    title: `${brand.name} | ${brand.tagline}`,
+    description: brand.description,
+    images: canonicalProductionUrl ? [brand.appIcons.classic] : undefined,
+  },
 };
 
 export default function RootLayout({
@@ -30,15 +53,10 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={cn(
-        "h-full antialiased selection:bg-primary/10",
-        geistSans.variable,
-        geistMono.variable,
-        inter.variable,
-        "font-sans",
-      )}>
+      className="h-full font-sans antialiased selection:bg-primary/10">
       <body className="min-h-full bg-background text-foreground flex flex-col">
         <AuthProvider>
+          <AppearanceProvider>
           <WorkspaceAccessProvider>
           <UserDataProvider>
             <PublicCatalogProvider>
@@ -47,6 +65,7 @@ export default function RootLayout({
             </PublicCatalogProvider>
           </UserDataProvider>
           </WorkspaceAccessProvider>
+          </AppearanceProvider>
         </AuthProvider>
       </body>
     </html>

@@ -46,7 +46,7 @@ export const prisma = basePrisma.$extends({
           "VendorSubscription",
           "Notification",
           "Document",
-          "AuditLog"
+          "AuditLog", "PromotionCampaign", "PromotionCreditLedger", "PromotionQuote", "PlatformRevenueOrder", "PlatformPaymentIntent"
         ];
 
         const queryArgs = (args as Record<string, unknown>) || {};

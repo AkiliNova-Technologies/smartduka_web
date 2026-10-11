@@ -60,7 +60,7 @@ export function LoginForm({
     if (!password) { setFormError("Enter your password."); return; }
     try {
       await loginWithEmail(email.trim(), password);
-      toast.success("Welcome back to SmartDuka!");
+      toast.success("Welcome back to Mwezora!");
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "";
       setFormError(getFriendlyErrorMessage(message));
@@ -85,7 +85,7 @@ export function LoginForm({
           Welcome back
         </h1>
         <p className="text-xs text-muted-foreground px-2 leading-relaxed">
-          Sign in to continue shopping or manage your SmartDuka workspace.
+          Sign in to continue shopping or manage your Mwezora workspace.
         </p>
       </div>
 

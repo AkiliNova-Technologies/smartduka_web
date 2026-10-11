@@ -5,15 +5,22 @@ import { PageHeader } from "@/components/marketplace/page-header";
 import { PaginatedProductGrid } from "@/components/marketplace/product-grid";
 import { IllustratedEmptyState } from "@/components/marketplace/illustrated-empty-state";
 import { ErrorState } from "@/components/marketplace/error-state";
+import { Suspense } from "react";
+import { connection } from "next/server";
 
-export default async function DealsPage() {
+export default function DealsPage() {
+  return <Suspense fallback={<PageContainer className="py-6 sm:py-8"><PageHeader title="Current offers" description="Reduced prices from Mwezora shops." /></PageContainer>}><DealsRuntime /></Suspense>;
+}
+
+async function DealsRuntime() {
+  await connection();
   const result = await getDealsAction();
   return (
     <PageContainer className="py-6 sm:py-8">
       <div className="space-y-7">
         <PageHeader
           title="Current offers"
-          description="Reduced prices from SmartDuka shops."
+          description="Reduced prices from Mwezora shops."
         />
         {!result.success ? (
           <ErrorState
@@ -33,7 +40,7 @@ export default async function DealsPage() {
           <IllustratedEmptyState
             illustration="/illustrations/empty-deals.svg"
             title="No deals right now"
-            description="Check back later for current offers from SmartDuka shops."
+            description="Check back later for current offers from Mwezora shops."
             action={{ label: "Browse products", href: "/products" }}
             size="standard"
           />

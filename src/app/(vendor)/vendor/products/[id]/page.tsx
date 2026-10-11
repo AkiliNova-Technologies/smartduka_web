@@ -24,6 +24,7 @@ import { MediaImage } from "@/components/marketplace/media-image";
 import { PRODUCT_IMAGE_FALLBACK } from "@/lib/media";
 import { DataTable } from "@/components/data-table";
 import type { ColumnDef } from "@tanstack/react-table";
+import { DashboardPageHeader } from "@/components/dashboard-page-header";
 
 function ProductDetailSkeleton() {
   return (
@@ -265,41 +266,15 @@ export default function VendorProductPreviewPage() {
 
   return (
     <div className="space-y-6 max-w-8xl mx-auto animate-in fade-in duration-300">
-      <div className="flex items-center justify-between border-b border-border/40 pb-4 select-none">
-        <div className="flex items-center gap-3">
-          <Link
-            href="/vendor/products"
-            className="p-2 border border-border/60 hover:bg-muted text-muted-foreground hover:text-foreground rounded-xl transition-all">
-            <ArrowLeft className="w-4 h-4" />
-          </Link>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-medium tracking-tight text-foreground">
-                {productName}
-              </h1>
-              <span
-                className={cn(
-                  "text-[10px] font-medium px-2 py-0.5 rounded-full border",
-                  isOutOfStock
-                    ? "bg-rose-500/5 border-rose-500/10 text-rose-600"
-                    : isLowStock
-                      ? "bg-amber-500/5 border-amber-500/10 text-amber-600"
-                      : "bg-emerald-500/5 border-emerald-500/10 text-emerald-600",
-                )}>
-                {isOutOfStock
-                  ? "Out of Stock"
-                  : isLowStock
-                    ? "Low Stock"
-                    : "In Stock"}
-              </span>
-            </div>
-            <p className="text-xs text-muted-foreground font-medium mt-0.5">
-              Product ID:{" "}
-              <code className="font-mono text-[11px]">{product.id}</code>
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
+      <DashboardPageHeader
+        title={productName}
+        description={<>Product ID: <code className="font-mono text-[11px]">{product.id}</code></>}
+        backHref="/vendor/products"
+        trailing={<>
+          <span className={cn(
+            "rounded-full border px-2 py-0.5 text-[10px] font-medium",
+            isOutOfStock ? "border-rose-500/10 bg-rose-500/5 text-rose-600" : isLowStock ? "border-amber-500/10 bg-amber-500/5 text-amber-600" : "border-emerald-500/10 bg-emerald-500/5 text-emerald-600",
+          )}>{isOutOfStock ? "Out of Stock" : isLowStock ? "Low Stock" : "In Stock"}</span>
           <Link
             href={`/products/${product.id}`}
             className="h-10 px-4 border border-border/60 hover:bg-muted text-xs font-medium rounded-full transition-all flex items-center gap-1.5">
@@ -312,8 +287,8 @@ export default function VendorProductPreviewPage() {
             <Edit2 className="w-3.5 h-3.5" />
             <span>Edit Product</span>
           </Link>
-        </div>
-      </div>
+        </>}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div className="lg:col-span-4 space-y-4">

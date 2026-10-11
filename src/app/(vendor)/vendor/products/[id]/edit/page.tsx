@@ -2,9 +2,7 @@
 
 import * as React from "react";
 import { useRouter, useParams } from "next/navigation";
-import Link from "next/link";
 import {
-  ArrowLeft,
   ChevronRight,
   Check,
   Info,
@@ -21,6 +19,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
+import { DashboardPageHeader } from "@/components/dashboard-page-header";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -516,30 +515,16 @@ export default function VendorProductEditPage() {
 
   return (
     <div className="space-y-8 max-w-6xl mx-auto animate-in fade-in duration-300">
-      <div className="flex items-center justify-between border-b border-border/40 pb-4 select-none">
-        <div className="flex items-center gap-3">
-          <Link
-            href="/vendor/products"
-            className="p-2 border border-border/60 hover:bg-muted text-muted-foreground hover:text-foreground rounded-xl transition-all">
-            <ArrowLeft className="w-4 h-4" />
-          </Link>
-          <div>
-            <h1 className="text-xl font-medium tracking-tight text-foreground">
-              {isEditMode ? "Edit Product" : "New Product Listing"}
-            </h1>
-            <p className="text-xs text-muted-foreground font-medium mt-0.5">
-              {isEditMode
-                ? `Editing: ${formData.title}`
-                : "Fill in all details to create a complete product page"}
-            </p>
-          </div>
-        </div>
-        {isEditMode && productId && (
+      <DashboardPageHeader
+        title={isEditMode ? "Edit Product" : "Add Product"}
+        description={isEditMode ? `Editing: ${formData.title}` : "Create a new product for your shop"}
+        backHref="/vendor/products"
+        trailing={isEditMode && productId ? (
           <span className="text-[10px] font-mono text-muted-foreground bg-muted/50 px-2.5 py-1 rounded-full border border-border/40">
             {productId.slice(0, 8)}
           </span>
-        )}
-      </div>
+        ) : undefined}
+      />
 
       <div className="bg-muted/10 border border-border/40 rounded-full p-4 flex items-center justify-center select-none">
         <div className="flex items-center gap-4 max-w-3xl w-full justify-between">

@@ -4,10 +4,11 @@ import { MediaImage } from "@/components/marketplace/media-image";
 import { SHOP_BANNER_FALLBACK, SHOP_LOGO_FALLBACK } from "@/lib/media";
 import { Star, MapPin } from "lucide-react";
 import { IconRosetteDiscountCheckFilled } from "@tabler/icons-react";
-import type { VendorProfile, Document } from "@prisma/client";
+import type { VendorProfile } from "@prisma/client";
+import type { VendorSettingsDocument } from "./documents-tab";
 
 type FullVendorProfile = VendorProfile & {
-  documents: Document[];
+  documents: VendorSettingsDocument[];
   _count: { products: number; subOrders: number };
 };
 

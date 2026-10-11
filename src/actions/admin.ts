@@ -5,6 +5,9 @@ import { PlatformRole, UserStatus, VerificationStatus } from "@prisma/client";
 import { withErrorHandling } from "@/lib/api-utils";
 import { revalidatePath } from "next/cache";
 import { requireAdminContext } from "@/lib/auth/admin-context";
+import { ShopModerationService, type ShopModerationAction } from "@/services/shop-moderation";
+import { cacheTags } from "@/lib/cache-policy";
+import { revalidateTag } from "next/cache";
 
 export async function getPlatformMetricsAction() {
   return withErrorHandling(async () => {
@@ -59,6 +62,16 @@ export async function getVendorApplicationByIdAction(applicationId: string) {
   }, "getVendorApplicationByIdAction");
 }
 
+export async function getAdminVendorVerificationDetailsAction(applicationId: string) {
+  return withErrorHandling(
+    async () => {
+      const { VerificationDocumentService } = await import("@/services/verification-documents");
+      return VerificationDocumentService.getAdminVendorDetails(applicationId);
+    },
+    "getAdminVendorVerificationDetailsAction",
+  );
+}
+
 export async function verifyVendorAction(applicationId: string, status: VerificationStatus, reviewerNotes?: string) {
   return withErrorHandling(async () => {
     const admin = await requireAdminContext("platform:manage_vendors");
@@ -66,6 +79,21 @@ export async function verifyVendorAction(applicationId: string, status: Verifica
     revalidatePath("/admin/vendors");
     return result;
   }, "verifyVendorAction");
+}
+
+export async function moderateShopAction(applicationId: string, action: ShopModerationAction, reason?: string) {
+  return withErrorHandling(async () => {
+    const admin = await requireAdminContext("platform:manage_vendors");
+    const result = await ShopModerationService.transition({ applicationId, action, reason, actorId: admin.userId });
+    revalidatePath("/admin/vendors");
+    revalidateTag(cacheTags.marketplace.shops, "max");
+    revalidateTag(cacheTags.marketplace.products, "max");
+    revalidateTag(cacheTags.marketplace.discovery, "max");
+    revalidateTag(cacheTags.marketplace.promotions, "max");
+    if (result.vendorId) revalidateTag(cacheTags.shop(result.vendorId), "max");
+    if (result.vendorSlug) revalidateTag(cacheTags.shopSlug(result.vendorSlug), "max");
+    return result;
+  }, "moderateShopAction");
 }
 
 export async function getAllOrdersAction() {

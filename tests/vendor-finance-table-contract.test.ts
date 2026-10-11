@@ -15,8 +15,8 @@ describe("vendor finance withdrawals table", () => {
   });
 
   it("uses platform status badges and only local pagination", () => {
-    expect(page).toContain("operationBadgeClass");
-    expect(page).toContain("humanizeOperation");
+    expect(page).toContain('import { StatusBadge } from "@/components/marketplace/status-badge"');
+    expect(page).toContain("<StatusBadge status={row.original.status} />");
     expect(page).toContain("pagination: true");
     expect(page).toContain("sorting: false");
     expect(page).toContain("filtering: false");

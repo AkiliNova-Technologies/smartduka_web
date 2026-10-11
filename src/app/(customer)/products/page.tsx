@@ -12,6 +12,7 @@ import { CatalogFilters } from "@/components/marketplace/catalog-filters";
 import { CategoryService } from "@/services/category";
 import { ProductService } from "@/services/product";
 import { parseMarketplaceFilters, type MarketplaceProductSearchParams } from "@/lib/marketplace-page";
+import { connection } from "next/server";
 
 function MarketplaceSearchFallback() {
   return <div aria-hidden="true" className="h-11 w-full rounded-full border border-input bg-background" />;
@@ -31,8 +32,7 @@ export default function ProductsPage({ searchParams }: ProductsPageProps) {
   return (
     <PageContainer className="py-6 sm:py-8 lg:py-10">
       <div className="space-y-6">
-        <PromotionSection placement="PRODUCTS" />
-        <PageHeader title="Browse products" description="Browse products from local shops on SmartDuka." />
+        <PageHeader title="Browse products" description="Browse products from local shops on Mwezora." />
         <div className="md:hidden"><Suspense fallback={<MarketplaceSearchFallback />}><MarketplaceSearch /></Suspense></div>
         <Suspense fallback={<ProductsResultsFallback />}><ProductsRuntime searchParams={searchParams} /></Suspense>
       </div>
@@ -42,6 +42,7 @@ export default function ProductsPage({ searchParams }: ProductsPageProps) {
 
 async function ProductsRuntime({ searchParams }: ProductsPageProps) {
   const { search, sort: catalogSort, page: currentPage, filters: filterInput } = parseMarketplaceFilters(await searchParams);
+  await connection();
   const [products, categories, brands, facets] = await Promise.all([
     ProductService.getPublicCatalogProducts({ search, sort: catalogSort, ...filterInput }),
     CategoryService.getCategoryTree({ activeOnly: true }),
@@ -50,6 +51,7 @@ async function ProductsRuntime({ searchParams }: ProductsPageProps) {
   ]);
   return (
     <div className="space-y-6">
+        <PromotionSection placement="PRODUCTS" compact />
         {search ? <div className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-muted-foreground">Search results for “{search}”</p><Link href="/products" className="inline-flex h-10 items-center gap-2 rounded-full border border-border px-3 text-sm font-medium text-foreground hover:bg-muted"><RotateCcw className="size-4" />Clear search</Link></div> : null}
             <Suspense fallback={<FilterToolbarFallback />}><FilterToolbar count={products.length} sort={catalogSort}>
               <CatalogFilters categories={categories} brands={brands} sizes={facets.sizes} colors={facets.colors} />
@@ -69,7 +71,7 @@ async function ProductsRuntime({ searchParams }: ProductsPageProps) {
                 description={
                   search
                     ? `We couldn’t find anything matching “${search}”. Try another search or browse a category.`
-                    : "Products from SmartDuka shops will appear here."
+                    : "Products from Mwezora shops will appear here."
                 }
                 action={{
                   label: search ? "Clear search" : "Browse shops",

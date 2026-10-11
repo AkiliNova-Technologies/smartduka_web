@@ -1,9 +1,9 @@
 "use client";
 
-import { ShoppingBag } from "lucide-react";
 import Link from "next/link";
 import { RegisterForm } from "@/components/register-form";
 import Image from "next/image";
+import { BrandLink } from "@/components/brand/brand";
 
 export default function RegisterPage() {
   return (
@@ -11,16 +11,7 @@ export default function RegisterPage() {
       {/* AUTH INTERFACE ENTRY CONTAINER */}
       <div className="flex flex-col gap-4 p-6 md:p-10 justify-between">
         <div className="flex justify-center gap-2 md:justify-start">
-          <Link
-            href="/"
-            className="flex items-center gap-2.5 font-bold tracking-tight text-foreground select-none group">
-            <div className="flex size-8 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-xs transition-transform group-hover:rotate-6">
-              <ShoppingBag className="size-4 stroke-[2.2]" />
-            </div>
-            <span>
-              Smart<span className="text-primary">Duka</span>
-            </span>
-          </Link>
+          <BrandLink logoClassName="h-9 w-[149px]" />
         </div>
 
         <div className="flex flex-1 items-center justify-center py-8">
@@ -35,7 +26,7 @@ export default function RegisterPage() {
       <div className="relative hidden bg-zinc-950 lg:block border-l border-border/40 overflow-hidden">
         <Image
           src="https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&w=1200&q=85"
-          alt="Premium SmartDuka Onboarding Lifestyle Canvas"
+          alt="Premium Mwezora onboarding lifestyle canvas"
           fill
           className="absolute inset-0 h-full w-full object-cover opacity-75 object-center transition-transform duration-10000 ease-out brightness-[0.80] dark:brightness-[0.25]"
           priority
@@ -53,7 +44,7 @@ export default function RegisterPage() {
             Thousands of shops, one secure checkout.
           </h2>
           <p className="text-xs text-zinc-400 font-medium leading-relaxed">
-            Join the SmartDuka community to track your orders in real-time,
+            Join the Mwezora community to track your orders in real-time,
             curate your personal wishlist, and shop with total peace of mind,
             knowing every transaction is fully protected.
           </p>

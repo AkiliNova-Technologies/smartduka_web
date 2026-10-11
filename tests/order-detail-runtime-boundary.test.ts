@@ -25,7 +25,8 @@ describe("order detail runtime boundary", () => {
     const users = source("src/app/api/admin/users/route.ts");
     expect(categories).toContain("await connection();");
     expect(categories).toContain("request.nextUrl");
-    expect(users).toContain("await connection();");
+    expect(users).toContain("await requireRequestRuntime();");
+    expect(source("src/lib/next/request-runtime.ts")).toContain("await connection()");
     expect(users).toContain("requireAdminContext");
   });
 });

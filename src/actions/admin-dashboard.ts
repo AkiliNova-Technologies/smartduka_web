@@ -1,9 +1,12 @@
 "use server";
 
 import { prisma } from "@/lib/prisma/client";
-import { VendorStatus, BillingCycle, Prisma } from "@prisma/client";
+import { VendorStatus, BillingCycle } from "@prisma/client";
 import { Decimal } from "@prisma/client/runtime/client";
 import { requireAdminContext } from "@/lib/auth/admin-context";
+import { ShopModerationService, resolveShopModerationState, type ShopModerationAction } from "@/services/shop-moderation";
+import { revalidatePath, revalidateTag } from "next/cache";
+import { cacheTags } from "@/lib/cache-policy";
 
 interface ManagePlanInput {
   planId?: string;
@@ -24,6 +27,7 @@ interface VendorReviewInput {
   vendorId: string;
   targetStatus: VendorStatus;
   trialDaysExtension?: number;
+  reason?: string;
 }
 
 export async function getPlatformOverviewMetrics() {
@@ -45,43 +49,33 @@ export async function getPlatformOverviewMetrics() {
 
 export async function reviewAndVerifyVendorStatus(input: VendorReviewInput) {
   const admin = await requireAdminContext("platform:manage_vendors");
-  const { vendorId, targetStatus, trialDaysExtension = 14 } = input;
-  const existingVendor = await prisma.vendorProfile.findUnique({ where: { id: vendorId }, include: { documents: true } });
+  const { vendorId, targetStatus } = input;
+  const existingVendor = await prisma.vendorProfile.findUnique({ where: { id: vendorId }, include: { vendorApplication: true } });
   if (!existingVendor) throw new Error("Target Vendor Profile reference was not found.");
-
-  const updatePayload: Prisma.VendorProfileUpdateInput = { status: targetStatus };
-  if (targetStatus === VendorStatus.ACTIVE && existingVendor.status === VendorStatus.PENDING) {
-    const trialEnds = new Date();
-    trialEnds.setDate(trialEnds.getDate() + trialDaysExtension);
-    updatePayload.activatedAt = new Date();
-    updatePayload.trialEndsAt = trialEnds;
-  } else if (targetStatus === VendorStatus.SUSPENDED) {
-    updatePayload.suspendedAt = new Date();
-  }
-
-  return prisma.$transaction(async (tx) => {
-    const updatedVendor = await tx.vendorProfile.update({ where: { id: vendorId }, data: updatePayload });
-    await tx.auditLog.create({
-      data: { userId: admin.userId, action: `VENDOR_STATUS_MUTATION_${targetStatus}`, entity: "VendorProfile", entityId: vendorId, oldValues: { status: existingVendor.status }, newValues: { status: targetStatus } },
-    });
-    await tx.notification.create({
-      data: {
-        vendorId, type: targetStatus === VendorStatus.ACTIVE ? "SUCCESS" : "ERROR",
-        title: `Store Governance Status Updated: ${targetStatus}`,
-        message: targetStatus === VendorStatus.ACTIVE
-          ? `Congratulations! Your store verification documents have been approved. Your ${trialDaysExtension}-day trial phase is now active.`
-          : "Your marketplace selling privileges have been suspended. Please review your administrative compliance dashboard.",
-      },
-    });
-    return { success: true, updatedStatus: updatedVendor.status };
-  });
+  if (!existingVendor.vendorApplication) throw new Error("The shop has no linked application history.");
+  const current = resolveShopModerationState(existingVendor.vendorApplication.status, existingVendor.status);
+  const action: ShopModerationAction | null =
+    targetStatus === VendorStatus.ACTIVE ? (current === "SUSPENDED" ? "RESTORE" : current === "PENDING" ? "APPROVE" : null)
+      : targetStatus === VendorStatus.SUSPENDED ? "SUSPEND"
+        : targetStatus === VendorStatus.BANNED ? "BAN"
+          : null;
+  if (!action) throw new Error("Unsupported or invalid shop moderation transition.");
+  const result = await ShopModerationService.transition({ applicationId: existingVendor.vendorApplication.id, action, reason: input.reason, actorId: admin.userId });
+  revalidatePath("/admin/vendors");
+  revalidateTag(cacheTags.marketplace.shops, "max");
+  revalidateTag(cacheTags.marketplace.products, "max");
+  revalidateTag(cacheTags.marketplace.discovery, "max");
+  revalidateTag(cacheTags.marketplace.promotions, "max");
+  revalidateTag(cacheTags.shop(existingVendor.id), "max");
+  revalidateTag(cacheTags.shopSlug(existingVendor.slug), "max");
+  return { success: true, updatedStatus: result.state };
 }
 
 export async function manageSubscriptionPlan(input: ManagePlanInput) {
   const admin = await requireAdminContext("platform:manage_billing");
   const { planId, ...planData } = input;
   const formattedData = {
-    name: planData.name, slug: planData.slug, description: planData.description || null,
+    name: planData.name, slug: planData.slug, code: planData.slug.toUpperCase(), description: planData.description || null,
     price: new Decimal(planData.price), currency: planData.currency || "UGX", billingCycle: planData.billingCycle,
     maxProducts: planData.maxProducts !== undefined ? planData.maxProducts : null,
     commissionRate: new Decimal(planData.commissionRate), hasPremiumThemes: !!planData.hasPremiumThemes,

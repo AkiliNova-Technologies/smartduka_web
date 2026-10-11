@@ -3,6 +3,7 @@
 import * as React from "react";
 import {
   CircleAlert,
+  DatabaseZap,
   LayoutDashboard,
   Landmark,
   LayoutGrid,
@@ -14,12 +15,14 @@ import {
   Star,
   Store,
   Users,
-  WalletCards,
+  ReceiptText,
 } from "lucide-react";
 import {
   DashboardSidebar,
   type DashboardNavigationGroup,
 } from "@/components/layout/DashboardSidebar";
+import { useAuth } from "@/providers/AuthProvider";
+import { brand } from "@/config/brand";
 
 const navigationGroups: DashboardNavigationGroup[] = [
   { label: "Overview", items: [{ label: "Dashboard", href: "/admin", icon: LayoutDashboard }] },
@@ -41,14 +44,21 @@ const navigationGroups: DashboardNavigationGroup[] = [
     { label: "Customer issues", href: "/admin/issues", icon: CircleAlert },
     { label: "Financial exceptions", href: "/admin/financial-exceptions", icon: Landmark },
   ] },
-  { label: "Finance", items: [
-    { label: "Withdrawals", href: "/admin/finance/withdrawals", icon: WalletCards },
-    { label: "Payment investigation", href: "/admin/finance/payments", icon: ScanSearch },
+  { label: "Payments", items: [
+    { label: "Payment operations", href: "/admin/payments", icon: ScanSearch },
   ] },
 ];
 
 export function AdminSidebar(
   props: Omit<React.ComponentProps<typeof DashboardSidebar>, "workspace" | "navigationGroups">,
 ) {
-  return <DashboardSidebar {...props} workspace={{ name: "SmartDuka Admin", description: "Administration workspace", icon: ShieldCheck }} navigationGroups={navigationGroups} />;
+  const { userRole } = useAuth();
+  const canManageBilling = ["SUPER_ADMIN", "ADMIN", "BILLING"].includes(userRole ?? "");
+  const groups = navigationGroups.map((group) => {
+    if (group.label === "Payments") return { ...group, items: canManageBilling ? [...group.items, { label: "Platform Revenue", href: "/admin/revenue", icon: ReceiptText }] : [] };
+    if (group.label === "Marketing" && canManageBilling) return { ...group, items: [...group.items, { label: "Promotion capacity", href: "/admin/marketing/capacity", icon: LayoutGrid }] };
+    if (group.label === "Operations" && userRole === "SUPER_ADMIN") return { ...group, items: [...group.items, { label: "Test data cleanup", href: "/admin/test-data-cleanup", icon: DatabaseZap }] };
+    return group;
+  }).filter((group) => group.items.length);
+  return <DashboardSidebar {...props} workspace={{ name: `${brand.name} Admin`, description: "Administration workspace", icon: ShieldCheck }} navigationGroups={groups} />;
 }

@@ -87,7 +87,7 @@ export default function CartPage() {
                         fill
                         sizes="80px"
                         className="object-cover"
-                        fallbackClassName="object-contain p-3"
+                        fallbackClassName="object-cover"
                       />
                     </div>
                     <div className="min-w-0 flex-1">

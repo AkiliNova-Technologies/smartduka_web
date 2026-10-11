@@ -9,7 +9,7 @@ const placementFallbacks: Partial<Record<PromotionPlacement, HeroSlide>> = {
 };
 
 export async function PromotionSection({ placement, compact = false }: { placement: PromotionPlacement; compact?: boolean }) {
-  const data = await MarketingService.publicPromotions(placement);
+  const data = await MarketingService.publicPromotions(placement).catch(() => []);
   const fallback = placementFallbacks[placement];
   if (data.length) return <PromotionCarousel promotions={data} size={compact ? "compact" : "hero"} />;
   if (fallback) return <HeroCarousel slides={[fallback]} size={compact ? "compact" : "hero"} />;

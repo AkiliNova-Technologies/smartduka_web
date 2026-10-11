@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => {
     context: vi.fn(), upload: vi.fn(), dashboard: vi.fn(), analytics: vi.fn(), shopGet: vi.fn(), shopUpdate: vi.fn(),
     catalogueList: vi.fn(), catalogueDetail: vi.fn(), catalogueExists: vi.fn(), mutationDto: vi.fn((product) => product), productCreate: vi.fn(), productUpdate: vi.fn(),
     inventoryList: vi.fn(), inventoryAdjust: vi.fn(), deviceList: vi.fn(), deviceRegister: vi.fn(), deviceRemove: vi.fn(),
-    orders: vi.fn(), activeUser: vi.fn(), asset: vi.fn(),
+    orders: vi.fn(), paymentStatus: vi.fn(), activeUser: vi.fn(), asset: vi.fn(),
   };
 });
 
@@ -22,6 +22,7 @@ vi.mock("@/services/product", () => ({ ProductService: { createProduct: mocks.pr
 vi.mock("@/services/vendor-inventory", () => ({ VendorInventoryService: { list: mocks.inventoryList, adjust: mocks.inventoryAdjust } }));
 vi.mock("@/services/user-devices", () => ({ UserDeviceService: { list: mocks.deviceList, register: mocks.deviceRegister, remove: mocks.deviceRemove } }));
 vi.mock("@/services/order", () => ({ OrderService: { getUserOrders: mocks.orders } }));
+vi.mock("@/services/payment-status", () => ({ PaymentStatusService: { getCustomerOrderPaymentStatus: mocks.paymentStatus } }));
 vi.mock("@/lib/api/v1/vendor-assets", () => ({ resolveVendorAssetRef: mocks.asset }));
 
 import * as uploads from "@/app/api/v1/uploads/route";
@@ -96,8 +97,9 @@ describe("V1 mobile route adapters", () => {
   });
 
   it("normalizes payment status and isolates devices through their canonical services", async () => {
-    mocks.orders.mockResolvedValue([{ id: "order-a", paymentStatus: "COMPLETED", status: "PAID", createdAt: "now" }]);
+    mocks.paymentStatus.mockResolvedValue({ status: "SUCCEEDED", orderStatus: "PAID", updatedAt: "now", canRetry: false });
     expect(await (await paymentStatus.GET(new Request("http://localhost"), params("order-a"))).json()).toEqual({ data: { status: "SUCCEEDED", orderStatus: "PAID", updatedAt: "now", canRetry: false } });
+    mocks.paymentStatus.mockResolvedValueOnce(null);
     expect((await paymentStatus.GET(new Request("http://localhost"), params("other-order"))).status).toBe(404);
     mocks.deviceRegister.mockResolvedValue({ id: "device-a", platform: "ANDROID" }); mocks.deviceList.mockResolvedValue([{ id: "device-a", platform: "ANDROID" }]);
     const registered = await devices.POST(request("http://localhost/api/v1/devices", json({ deviceId: "abcdefgh", platform: "ANDROID", pushToken: "x".repeat(20) }))); expect(registered.status).toBe(201); expect(await (await devices.GET()).json()).toEqual({ data: [{ id: "device-a", platform: "ANDROID" }] });

@@ -14,6 +14,8 @@ const mocks = vi.hoisted(() => ({
   getMyApplication: vi.fn(),
   getProfileByOwner: vi.fn(),
   updateApplicationStatus: vi.fn(),
+  submitApplication: vi.fn(),
+  storageInfo: vi.fn(),
 }));
 vi.mock("@/lib/auth/session", () => ({
   AuthenticationRequiredError: mocks.AuthenticationRequiredError,
@@ -44,8 +46,10 @@ vi.mock("@/services/vendor", () => ({
     getMyApplication: mocks.getMyApplication,
     getVendorProfileByOwner: mocks.getProfileByOwner,
     updateApplicationStatus: mocks.updateApplicationStatus,
+    submitApplication: mocks.submitApplication,
   },
 }));
+vi.mock("@/lib/supabase/server", () => ({ getSupabaseServerClient: () => ({ storage: { from: () => ({ info: mocks.storageInfo }) } }) }));
 
 import * as applyRoute from "@/app/api/vendors/apply/route";
 import * as verifyRoute from "@/app/api/vendors/[vendorId]/verify/route";
@@ -64,6 +68,7 @@ describe("vendor application and KYC authorization", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.requireApplicantContext.mockResolvedValue(applicantA);
+    mocks.storageInfo.mockResolvedValue({ data: { contentType: "application/pdf", size: 42 }, error: null });
   });
 
   it("returns 401 when an anonymous caller reads or submits an application", async () => {
@@ -94,9 +99,7 @@ describe("vendor application and KYC authorization", () => {
   });
 
   it("creates an application for the derived applicant and ignores self-approval fields", async () => {
-    mocks.findApplication.mockResolvedValue(null);
-    mocks.findProfile.mockResolvedValue(null);
-    mocks.createApplication.mockResolvedValue({
+    mocks.submitApplication.mockResolvedValue({
       id: "application-a",
       storeName: "Store A",
       status: "PENDING",
@@ -115,15 +118,8 @@ describe("vendor application and KYC authorization", () => {
       }) as never,
     );
     expect(response.status).toBe(201);
-    expect(mocks.createApplication).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          userId: "applicant-a",
-          storeName: "Store A",
-        }),
-      }),
-    );
-    const data = mocks.createApplication.mock.calls[0][0].data;
+    expect(mocks.submitApplication).toHaveBeenCalledWith("applicant-a", expect.objectContaining({ storeName: "Store A" }));
+    const data = mocks.submitApplication.mock.calls[0][1];
     expect(data).not.toHaveProperty("status");
     expect(data).not.toHaveProperty("reviewedBy");
     expect(data).not.toHaveProperty("reviewerNotes");
@@ -165,7 +161,7 @@ describe("vendor application and KYC authorization", () => {
         documents: {
           NATIONAL_ID: {
             name: "id",
-            url: "url-a",
+            url: "storage://kyc-documents/kyc/vendor-a/550e8400-e29b-41d4-a716-446655440000.pdf",
             size: 42,
             status: "APPROVED",
           },

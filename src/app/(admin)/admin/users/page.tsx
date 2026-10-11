@@ -19,8 +19,9 @@ import Image from "next/image";
 import { type ColumnDef } from "@tanstack/react-table";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { DataTable } from "@/components/data-table";
-import { Input } from "@/components/ui/input";
+import { StatusBadge } from "@/components/marketplace/status-badge";
 import {
   Select,
   SelectContent,
@@ -75,11 +76,12 @@ const ROLE_CONFIG: Record<string, { label: string; color: string; icon: React.El
 };
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.ElementType }> = {
-  ACTIVE: { label: "Active", color: "text-white bg-emerald-600 border-transparent", icon: CheckCircle2 },
-  PENDING: { label: "Pending", color: "text-white bg-amber-500 border-transparent", icon: Clock },
-  SUSPENDED: { label: "Suspended", color: "text-white bg-rose-600 border-transparent", icon: XCircle },
-  DEACTIVATED: { label: "Deactivated", color: "text-zinc-700 bg-zinc-100 border-zinc-200 dark:text-zinc-300 dark:bg-zinc-800 dark:border-zinc-700", icon: XCircle },
+  ACTIVE: { label: "Active", color: "text-emerald-600", icon: CheckCircle2 },
+  PENDING: { label: "Pending", color: "text-amber-600", icon: Clock },
+  SUSPENDED: { label: "Suspended", color: "text-rose-600", icon: XCircle },
+  DEACTIVATED: { label: "Deactivated", color: "text-muted-foreground", icon: XCircle },
 };
+
 
 function formatDate(date: Date | string | null): string {
   if (!date) return "—";
@@ -112,7 +114,6 @@ export default function AdminUsersPage() {
   const { users, usersLoading, refreshUsers, metrics, metricsLoading } = useAdmin();
   const { userRole } = useAuth();
 
-  const [searchQuery, setSearchQuery] = React.useState("");
   const [roleFilter, setRoleFilter] = React.useState<PlatformRole | "ALL">("ALL");
   const [selectedUser, setSelectedUser] = React.useState<AdminUser | null>(null);
   const [actionLoading, setActionLoading] = React.useState<string | null>(null);
@@ -121,20 +122,11 @@ export default function AdminUsersPage() {
 
   const filteredUsers = React.useMemo(() => {
     let result = users;
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      result = result.filter(
-        (u) =>
-          u.name?.toLowerCase().includes(q) ||
-          u.email?.toLowerCase().includes(q) ||
-          u.phone?.includes(q)
-      );
-    }
     if (roleFilter !== "ALL") {
       result = result.filter((u) => u.platformRole === roleFilter);
     }
     return result;
-  }, [users, searchQuery, roleFilter]);
+  }, [users, roleFilter]);
 
   const handleRoleChange = React.useCallback(async (userId: string, newRole: PlatformRole) => {
     setActionLoading(userId);
@@ -209,15 +201,7 @@ export default function AdminUsersPage() {
       {
         accessorKey: "status",
         header: "Status",
-        cell: ({ row }) => {
-          const config = STATUS_CONFIG[row.original.status] || STATUS_CONFIG.ACTIVE;
-          const Icon = config.icon;
-          return (
-            <span className={cn("inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium leading-none", config.color)}>
-              <Icon className="w-3 h-3" />{config.label}
-            </span>
-          );
-        },
+        cell: ({ row }) => <StatusBadge status={row.original.status} />,
       },
       {
         accessorKey: "createdAt",
@@ -230,20 +214,15 @@ export default function AdminUsersPage() {
         cell: ({ row }) => {
           const isLoading = actionLoading === row.original.id;
           return (
-            <div className="flex items-center justify-end gap-1.5">
-              <button
-                onClick={() => setSelectedUser(row.original)}
-                className="p-1.5 text-muted-foreground hover:text-foreground rounded-lg border border-border/40 hover:bg-muted transition-colors cursor-pointer"
-                title="View details">
-                <Search className="w-3.5 h-3.5" />
-              </button>
+            <TooltipProvider><div className="flex items-center justify-end gap-1.5">
+              <Tooltip><TooltipTrigger asChild><button aria-label="View details" onClick={() => setSelectedUser(row.original)} className="grid size-8 shrink-0 place-items-center rounded-full border border-border/40 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><Search aria-hidden="true" className="size-3.5" /></button></TooltipTrigger><TooltipContent side="top" sideOffset={6}>View details</TooltipContent></Tooltip>
               {isSuperAdmin && (
                 <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" disabled={isLoading} className="size-7 border border-border/40 rounded-lg text-muted-foreground cursor-pointer">
+                  <Tooltip><TooltipTrigger asChild><DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="icon" disabled={isLoading} aria-label="More options" className="size-8 shrink-0 rounded-full border-border/40 bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground">
                       <MoreVertical className="size-3.5" />
                     </Button>
-                  </DropdownMenuTrigger>
+                  </DropdownMenuTrigger></TooltipTrigger><TooltipContent side="top" sideOffset={6}>More options</TooltipContent></Tooltip>
                   <DropdownMenuContent align="end" className="w-48 rounded-xl border border-border/60 p-1 text-xs font-medium">
                     <DropdownMenuItem disabled className="rounded-lg py-2 px-2.5 text-xs text-muted-foreground font-semibold uppercase tracking-wider">Change Role</DropdownMenuItem>
                     {(Object.keys(ROLE_CONFIG) as PlatformRole[]).map((role) => (
@@ -261,7 +240,7 @@ export default function AdminUsersPage() {
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}
-            </div>
+            </div></TooltipProvider>
           );
         },
       },
@@ -295,17 +274,11 @@ export default function AdminUsersPage() {
         data={filteredUsers}
         getRowId={(row) => row.id}
         isLoading={usersLoading}
-        renderTabs={
+        features={{ search: true }}
+        searchPlaceholder="Search users..."
+        getSearchText={(user) => [user.name, user.email, user.phone].filter(Boolean).join(" ")}
+        toolbarActions={
           <div className="flex items-center gap-3">
-            <div className="relative w-full max-w-xs group">
-              <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" />
-              <Input
-                placeholder="Search users..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 h-9 border-border/60 rounded-full bg-muted/20 placeholder:text-muted-foreground/40 text-xs focus-visible:ring-primary/20"
-              />
-            </div>
             <Select value={roleFilter} onValueChange={(val) => setRoleFilter(val as PlatformRole | "ALL")}>
               <SelectTrigger className="h-9 w-36 rounded-full text-xs border-border/60">
                 <SelectValue placeholder="All Roles" />

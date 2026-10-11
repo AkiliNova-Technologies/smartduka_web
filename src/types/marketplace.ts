@@ -315,7 +315,9 @@ export interface VendorApplicationRow {
   city: string;
   district: string | null;
   hasPhysicalStore: boolean;
-  status: import("@prisma/client").VerificationStatus;
+  status: import("@/lib/shop-moderation-state").ShopModerationState;
+  applicationStatus: import("@prisma/client").VerificationStatus;
+  moderationReason: string | null;
   createdAt: string;
   userName: string;
   userEmail: string;
@@ -330,7 +332,6 @@ export interface VendorDocument {
   id: string;
   type: string;
   name: string;
-  url: string;
   status: string;
 }
 

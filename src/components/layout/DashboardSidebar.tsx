@@ -30,6 +30,13 @@ export function isActiveDashboardRoute(pathname: string, href: string) {
     : pathname === href || pathname.startsWith(`${href}/`);
 }
 
+export function getActiveDashboardHref(pathname: string, navigationGroups: DashboardNavigationGroup[]) {
+  return navigationGroups
+    .flatMap((group) => group.items)
+    .filter((item) => isActiveDashboardRoute(pathname, item.href))
+    .sort((left, right) => right.href.length - left.href.length)[0]?.href;
+}
+
 export function DashboardSidebar({
   workspace,
   navigationGroups,
@@ -39,6 +46,7 @@ export function DashboardSidebar({
   navigationGroups: DashboardNavigationGroup[];
 }) {
   const pathname = usePathname();
+  const activeHref = getActiveDashboardHref(pathname, navigationGroups);
   const { isMobile, setOpenMobile, state } = useSidebar();
   const [failedLogoUrl, setFailedLogoUrl] = React.useState<string | null>(null);
   const WorkspaceIcon = workspace.icon ?? ShoppingBag;
@@ -59,7 +67,7 @@ export function DashboardSidebar({
           {navigationGroups.map((group) => <SidebarGroup key={group.label} className="py-0 pb-4">
             <SidebarGroupLabel className="px-3 pb-1 text-xs font-medium tracking-wide text-muted-foreground">{group.label}</SidebarGroupLabel>
             <SidebarGroupContent><SidebarMenu>{group.items.map((item) => {
-              const isActive = isActiveDashboardRoute(pathname, item.href);
+              const isActive = item.href === activeHref;
               return <SidebarMenuItem key={item.href}><SidebarMenuButton asChild isActive={isActive} tooltip={item.label} className={cn("h-10 rounded-lg px-3 text-sm font-medium transition-colors", isActive ? "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground")}><Link href={item.href} aria-current={isActive ? "page" : undefined} onClick={closeMobileSidebar}><item.icon className="size-[18px] shrink-0" /><span>{item.label}</span></Link></SidebarMenuButton></SidebarMenuItem>;
             })}</SidebarMenu></SidebarGroupContent>
           </SidebarGroup>)}

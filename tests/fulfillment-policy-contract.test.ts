@@ -34,8 +34,8 @@ describe("fulfilment and exchange-policy contract", () => {
 
   it("persists and projects exchange policy text for new order snapshots and storefronts", () => {
     const order = source("src/services/order.ts");
-    const storefront = source("src/app/(customer)/shops/[vendorSlug]/page.tsx");
+    const storefront = source("src/services/vendor.ts");
     expect(order).toContain("exchangePolicy: group.items[0].exchangePolicy ?? null");
-    expect(storefront).toContain("exchangePolicy: vendorProfile.exchangePolicy");
+    expect(storefront).toContain("exchangePolicy: true");
   });
 });

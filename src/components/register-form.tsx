@@ -76,7 +76,7 @@ export function RegisterForm({
 
     try {
       await registerWithEmail(email, password, fullName);
-      toast.success(`Welcome to SmartDuka, ${firstName}!`);
+      toast.success(`Welcome to Mwezora, ${firstName}!`);
       router.push("/");
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "";
@@ -100,7 +100,7 @@ export function RegisterForm({
     <div className={cn("flex flex-1 flex-col gap-6 w-full", className)}>
       <div className="flex flex-col items-start gap-1.5 text-start select-none">
         <h1 className="text-xl font-semibold tracking-tight text-foreground">
-          {step === 1 ? "Create your SmartDuka account" : "Set your password"}
+          {step === 1 ? "Create your Mwezora account" : "Set your password"}
         </h1>
         <p className="text-xs text-muted-foreground leading-relaxed">
           {step === 1

@@ -9,10 +9,10 @@ const service = file("src/lib/vendor-payouts-client.ts");
 const legacyRoute = file("src/app/(vendor)/vendor/settings/payouts/page.tsx");
 
 describe("vendor payout settings navigation", () => {
-  it("composes payouts as a deep-linkable Store Settings tab", () => {
-    expect(settings).toContain('id: "payouts"');
-    expect(settings).toContain("<PayoutSettingsTab />");
-    expect(settings).toContain('"/vendor/settings?tab=payouts"');
+  it("composes direct merchant payment setup as a deep-linkable Store Settings tab", () => {
+    expect(settings).toContain('id: "payments"');
+    expect(settings).toContain("<PaymentSettingsTab />");
+    expect(settings).toContain('"/vendor/settings?tab=payments"');
   });
 
   it("keeps endpoint transport out of page and presentation components", () => {
@@ -22,6 +22,6 @@ describe("vendor payout settings navigation", () => {
   });
 
   it("redirects the retired standalone route to the payout tab", () => {
-    expect(legacyRoute).toContain('redirect("/vendor/settings?tab=payouts")');
+    expect(legacyRoute).toContain('redirect("/vendor/settings?tab=payments")');
   });
 });

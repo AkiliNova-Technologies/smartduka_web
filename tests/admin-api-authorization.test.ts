@@ -22,6 +22,7 @@ vi.mock("@/services/admin", () => ({
   AdminService: {
     getAllUsers: mocks.getAllUsers,
     updateUserRole: mocks.updateUserRole,
+    getAllVendorApplications: mocks.getAllApplications,
   },
 }));
 vi.mock("@/services/vendor", () => ({

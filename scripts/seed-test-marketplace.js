@@ -9,6 +9,7 @@ const pg = require("pg");
 
 const MARKER = "TEST SmartDuka Marketplace";
 const TEST_TAG = "test-marketplace-seed";
+const TEST_BATCH_ID = "test-marketplace-seed-v1";
 const VENDORS = [
   { key: "vendor1", name: "TEST Vendor - Kampala Electronics", slug: "test-vendor-kampala-electronics", emailKey: "TEST_VENDOR_1_EMAIL", passwordKey: "TEST_VENDOR_1_PASSWORD", businessType: "Electronics" },
   { key: "vendor2", name: "TEST Vendor - Home & Lifestyle", slug: "test-vendor-home-lifestyle", emailKey: "TEST_VENDOR_2_EMAIL", passwordKey: "TEST_VENDOR_2_PASSWORD", businessType: "Home / Retail" },
@@ -70,7 +71,7 @@ async function upsertUser(db, identity, name, role) {
 
 async function resolveCategory(db, label) {
   const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-  const existing = await db.productCategory.findFirst({ where: { OR: [{ slug }, { name: { equals: label, mode: "insensitive" } }] } });
+  const existing = await db.productCategory.findFirst({ where: { OR: [{ slug: `test-${slug}` }, { name: { equals: `TEST ${label}`, mode: "insensitive" } }] } });
   return existing ?? db.productCategory.create({ data: { name: `TEST ${label}`, slug: `test-${slug}`, description: `${MARKER}: ${label}` } });
 }
 
@@ -82,18 +83,19 @@ async function upsertVendor(db, definition, identity) {
     create: { ownerId: user.id, storeName: definition.name, slug: definition.slug, status: "ACTIVE", isVerified: true, email: identity.email, phone: "0700000000", address: `${MARKER} fixture`, city: "Kampala", country: "Uganda", currency: "UGX" },
   });
   await db.user.update({ where: { id: user.id }, data: { vendorId: profile.id, vendorRole: "OWNER", platformRole: "VENDOR" } });
-  await db.vendorApplication.upsert({
+  const application = await db.vendorApplication.upsert({
     where: { userId: user.id },
     update: { storeName: definition.name, storeSlug: definition.slug, businessType: definition.businessType, businessEmail: identity.email, businessPhone: "0700000000", streetAddress: `${MARKER} fixture`, city: "Kampala", country: "Uganda", status: "APPROVED", vendorProfileId: profile.id },
     create: { userId: user.id, storeName: definition.name, storeSlug: definition.slug, businessType: definition.businessType, businessEmail: identity.email, businessPhone: "0700000000", streetAddress: `${MARKER} fixture`, city: "Kampala", country: "Uganda", status: "APPROVED", vendorProfileId: profile.id },
   });
   const plan = await db.subscriptionPlan.findFirst({ where: { isActive: true }, orderBy: { createdAt: "asc" } });
+  let subscription = null;
   if (plan) {
-    const subscription = await db.vendorSubscription.findFirst({ where: { vendorId: profile.id, planId: plan.id } });
-    if (subscription) await db.vendorSubscription.update({ where: { id: subscription.id }, data: { status: "ACTIVE" } });
-    else await db.vendorSubscription.create({ data: { vendorId: profile.id, planId: plan.id, status: "ACTIVE" } });
+    subscription = await db.vendorSubscription.findFirst({ where: { vendorId: profile.id, planId: plan.id } });
+    if (subscription) subscription = await db.vendorSubscription.update({ where: { id: subscription.id }, data: { status: "ACTIVE" } });
+    else subscription = await db.vendorSubscription.create({ data: { vendorId: profile.id, planId: plan.id, status: "ACTIVE" } });
   }
-  return { profile, commissionRate: plan ? String(plan.commissionRate) : "canonical default" };
+  return { user, profile, application, subscription, commissionRate: plan ? String(plan.commissionRate) : "canonical default" };
 }
 
 async function upsertProduct(db, definition, vendorId, categoryId) {
@@ -105,8 +107,8 @@ async function upsertProduct(db, definition, vendorId, categoryId) {
   for (const variant of definition.variants ?? []) {
     const existing = await db.productVariant.findUnique({ where: { sku: variant.sku } });
     if (existing && existing.productId !== product.id) throw new Error(`REFUSE TO RUN: variant SKU ${variant.sku} belongs to an unexpected product.`);
-    if (existing) await db.productVariant.update({ where: { id: existing.id }, data: { name: variant.name, price: definition.price, inventoryCount: variant.stock, options: { color: variant.name } } });
-    else await db.productVariant.create({ data: { productId: product.id, sku: variant.sku, name: variant.name, price: definition.price, inventoryCount: variant.stock, options: { color: variant.name } } });
+    if (existing) await db.productVariant.update({ where: { id: existing.id }, data: { name: variant.name, price: definition.price, inventoryCount: variant.stock, options: { color: variant.name }, optionKey: variant.name.toLowerCase() } });
+    else await db.productVariant.create({ data: { productId: product.id, sku: variant.sku, name: variant.name, price: definition.price, inventoryCount: variant.stock, options: { color: variant.name }, optionKey: variant.name.toLowerCase() } });
   }
   return product;
 }
@@ -126,6 +128,25 @@ async function seed() {
     }
     const products = [];
     for (const definition of PRODUCTS) products.push(await upsertProduct(db, definition, vendors[definition.vendor].profile.id, categories[definition.category].id));
+    const variants = await db.productVariant.findMany({ where: { productId: { in: products.map((product) => product.id) } }, select: { id: true } });
+    const records = [
+      { entityType: "User", entityId: customer.id, externalProvider: "FIREBASE", externalId: customer.id },
+      ...Object.values(vendors).flatMap((vendor) => [
+        { entityType: "User", entityId: vendor.user.id, externalProvider: "FIREBASE", externalId: vendor.user.id },
+        { entityType: "VendorProfile", entityId: vendor.profile.id },
+        { entityType: "VendorApplication", entityId: vendor.application.id },
+        ...(vendor.subscription ? [{ entityType: "VendorSubscription", entityId: vendor.subscription.id }] : []),
+      ]),
+      ...Object.values(categories).map((category) => ({ entityType: "ProductCategory", entityId: category.id })),
+      ...products.map((product) => ({ entityType: "Product", entityId: product.id })),
+      ...variants.map((variant) => ({ entityType: "ProductVariant", entityId: variant.id })),
+    ];
+    await db.testDataBatch.upsert({
+      where: { id: TEST_BATCH_ID },
+      update: { status: "VERIFIED", reviewedBy: "controlled-seed-script", verifiedAt: new Date(), cleanedAt: null },
+      create: { id: TEST_BATCH_ID, name: MARKER, description: "Controlled marketplace fixtures created by scripts/seed-test-marketplace.js", environment: process.env.NODE_ENV === "production" ? "PRODUCTION" : "DEVELOPMENT", status: "VERIFIED", createdBy: "controlled-seed-script", reviewedBy: "controlled-seed-script", reviewNote: "Explicitly registered deterministic seed fixtures.", verifiedAt: new Date() },
+    });
+    await db.testDataRegistry.createMany({ data: records.map((record) => ({ ...record, batchId: TEST_BATCH_ID, environment: process.env.NODE_ENV === "production" ? "PRODUCTION" : "DEVELOPMENT", createdBy: "controlled-seed-script", ownershipMetadata: { source: TEST_TAG } })), skipDuplicates: true });
     console.log(JSON.stringify({ marker: MARKER, customer: { id: customer.id, email: customer.email }, vendors: Object.fromEntries(Object.entries(vendors).map(([key, value]) => [key, { id: value.profile.id, email: value.profile.email, commissionRate: value.commissionRate }])), products: products.map((product) => ({ id: product.id, name: product.name, price: String(product.basePrice), stock: product.inventoryCount })) }, null, 2));
   } finally {
     await db.$disconnect();

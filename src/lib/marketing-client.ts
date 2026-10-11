@@ -28,6 +28,7 @@ export type FeaturedProductDto = {
   vendorId: string;
   vendorName: string;
   category: { id: string; name: string; slug: string } | null;
+  sponsored?: boolean;
 };
 export type FeaturedShopDto = PublicShopListing;
 export type PromotionDto = PublicPromotion & {

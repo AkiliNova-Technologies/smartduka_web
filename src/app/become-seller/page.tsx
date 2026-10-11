@@ -1,10 +1,11 @@
 "use client";
 
-import { ShoppingBag, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { VendorKycForm } from "@/components/vendor/kyc-form";
 import { useAuth } from "@/hooks/use-auth";
+import { BrandLink } from "@/components/brand/brand";
 
 export default function BecomeSellerPage() {
   const { loading } = useAuth();
@@ -26,7 +27,7 @@ export default function BecomeSellerPage() {
       <div className="relative hidden bg-zinc-950 lg:block border-r border-border/40 overflow-hidden">
         <Image
           src="https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?auto=format&fit=crop&w=1200&q=85"
-          alt="SmartDuka Vendor Marketplace Opportunity"
+          alt="Mwezora vendor marketplace opportunity"
           fill
           className="absolute inset-0 h-full w-full object-cover opacity-80 object-center transition-transform duration-10000 ease-out brightness-[0.85] dark:brightness-[0.3]"
           priority
@@ -35,17 +36,7 @@ export default function BecomeSellerPage() {
         <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/40 to-transparent" />
 
         <div className="absolute top-10 left-12 z-10">
-          <Link
-            href="/"
-            className="flex items-center gap-2.5 font-bold tracking-tight text-white select-none group"
-          >
-            <div className="flex size-8 items-center justify-center rounded-xl bg-white/15 backdrop-blur-md border border-white/10 text-white shadow-xs transition-transform group-hover:rotate-6">
-              <ShoppingBag className="size-4 stroke-[2.2]" />
-            </div>
-            <span>
-              Smart<span className="text-emerald-400">Duka</span>
-            </span>
-          </Link>
+          <BrandLink className="text-white" logoClassName="h-9 w-[149px]" />
         </div>
 
         <div className="absolute bottom-12 left-12 right-12 z-10 text-white max-w-sm space-y-2 select-none">
@@ -56,7 +47,7 @@ export default function BecomeSellerPage() {
             Turn your inventory into a digital storefront.
           </h2>
           <p className="text-xs text-zinc-400 font-medium leading-relaxed">
-            Join hundreds of verified merchants on SmartDuka. List products, manage orders, and grow your customer base — all from a single dashboard built for Ugandan commerce.
+            Join hundreds of verified merchants on Mwezora. List products, manage orders, and grow your customer base — all from a single dashboard built for Ugandan commerce.
           </p>
         </div>
       </div>
@@ -64,17 +55,7 @@ export default function BecomeSellerPage() {
       {/* RIGHT PANEL: KYC ONBOARDING FORM */}
       <div className="flex flex-col gap-4 p-6 md:p-10 justify-between">
         <div className="flex items-center justify-between">
-          <Link
-            href="/"
-            className="flex items-center gap-2.5 font-bold tracking-tight text-foreground select-none group lg:hidden"
-          >
-            <div className="flex size-8 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-xs transition-transform group-hover:rotate-6">
-              <ShoppingBag className="size-4 stroke-[2.2]" />
-            </div>
-            <span>
-              Smart<span className="text-primary">Duka</span>
-            </span>
-          </Link>
+          <BrandLink className="lg:hidden" logoClassName="h-8 w-[132px]" />
           <div className="hidden lg:block" />
           <Link
             href="/help"
@@ -88,7 +69,7 @@ export default function BecomeSellerPage() {
           <div className="w-full max-w-md">
             <div className="space-y-1.5 mb-6 text-center select-none">
               <h1 className="text-2xl font-bold tracking-tight text-foreground">
-                Start selling on SmartDuka
+                Start selling on Mwezora
               </h1>
               <p className="text-xs text-muted-foreground leading-relaxed">
                 Tell us about your business so we can review your seller application.

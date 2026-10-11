@@ -2,9 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import {
-  ArrowLeft,
   ChevronRight,
   Check,
   Info,
@@ -21,6 +19,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
+import { DashboardPageHeader } from "@/components/dashboard-page-header";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -367,23 +366,7 @@ export default function VendorProductFormPage() {
 
   return (
     <div className="space-y-8 max-w-8xl w-full mx-auto animate-in fade-in duration-300">
-      <div className="flex items-center justify-between border-b border-border/40 pb-4 select-none">
-        <div className="flex items-center gap-3">
-          <Link
-            href="/vendor/products"
-            className="p-2 border border-border/60 hover:bg-muted text-muted-foreground hover:text-foreground rounded-xl transition-all">
-            <ArrowLeft className="w-4 h-4" />
-          </Link>
-          <div>
-            <h1 className="text-xl font-medium tracking-tight text-foreground">
-              New Product Listing
-            </h1>
-            <p className="text-xs text-muted-foreground font-medium mt-0.5">
-              Fill in all details to create a complete product page
-            </p>
-          </div>
-        </div>
-      </div>
+      <DashboardPageHeader title="Add Product" description="Create a new product for your shop" backHref="/vendor/products" />
 
       <div className="bg-muted/10 border border-border/40 rounded-full p-4 flex items-center justify-center select-none">
         <div className="flex items-center gap-4 max-w-3xl w-full justify-between">

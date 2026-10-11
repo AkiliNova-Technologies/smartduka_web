@@ -10,7 +10,7 @@ function authorizationError(error: unknown) {
 
 export async function GET(request: NextRequest) {
   try {
-    const context = await requireVendorContext("vendor:manage_products");
+    const context = await requireVendorContext("vendor:manage_products", { allowInactiveShop: true });
     const { searchParams } = request.nextUrl;
     const categoryId = searchParams.get("categoryId") || undefined;
     const search = searchParams.get("search") || undefined;

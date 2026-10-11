@@ -11,6 +11,8 @@ describe("dashboard sidebar contract", () => {
 
   it("uses a single shell with active nested-route and mobile-close behavior", () => {
     expect(shared).toContain("isActiveDashboardRoute");
+    expect(shared).toContain("getActiveDashboardHref");
+    expect(shared).toContain("right.href.length - left.href.length");
     expect(shared).toContain("pathname.startsWith(`${href}/`)");
     expect(shared).toContain("setOpenMobile(false)");
     expect(shared).toContain('collapsible="icon"');

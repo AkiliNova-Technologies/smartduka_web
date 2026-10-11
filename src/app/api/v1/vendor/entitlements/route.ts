@@ -1,0 +1,5 @@
+import { requireVendorContext } from "@/lib/auth/vendor-context";
+import { v1Data, v1Exception } from "@/lib/api/v1/response";
+import { VendorEntitlementService } from "@/services/vendor-entitlement";
+import { prisma } from "@/lib/prisma/client";
+export async function GET() { try { const context = await requireVendorContext(); const entitlement = await VendorEntitlementService.ensureEligibleVendor(context.vendorId); const subscriptionOrder = await prisma.platformRevenueOrder.findFirst({ where: { vendorId: context.vendorId, type: "SUBSCRIPTION", status: { in: ["AWAITING_PAYMENT", "REVIEW_REQUIRED"] } }, select: { status: true }, orderBy: { updatedAt: "desc" } }); return v1Data({ ...entitlement, subscriptionPaymentState: subscriptionOrder?.status === "REVIEW_REQUIRED" ? "NEEDS_REVIEW" : subscriptionOrder ? "PENDING" : null, staff: await VendorEntitlementService.staffUsage(context.vendorId, context.vendor.ownerId, entitlement), promotionalCreditAvailable: await VendorEntitlementService.promotionalCreditAvailable(context.vendorId) }, 200, { "Cache-Control": "private, no-store" }); } catch (error) { return v1Exception(error); } }

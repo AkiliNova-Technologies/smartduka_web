@@ -4,13 +4,14 @@ import { createCategorySchema, updateCategorySchema, type CreateCategoryInput, t
 import { serializeMarketplaceProduct } from "@/services/product";
 import { cacheLife, cacheTag } from "next/cache";
 import { cacheProfiles, cacheTags } from "@/lib/cache-policy";
+import { publicProductWhere } from "@/lib/marketplace-eligibility";
 
 export type { CreateCategoryInput, UpdateCategoryInput } from "@/lib/category-validation";
 export class CategoryDomainError extends Error {}
 export type CategoryTreeNode = { id: string; name: string; slug: string; description: string; image: string; parentId: string | null; isActive: boolean; sortOrder: number; _count: { products: number; subCategories: number }; children: CategoryTreeNode[]; /** Compatibility alias. */ subCategories: CategoryTreeNode[] };
 export type HomepageCategory = Pick<CategoryTreeNode, "id" | "name" | "slug" | "image"> & { productCount: number };
 type Row = Omit<CategoryTreeNode, "children" | "subCategories">;
-type CategoryOptions = { activeOnly?: boolean };
+type CategoryOptions = { activeOnly?: boolean; discoveryOnly?: boolean };
 
 /** Raw category rows used by both public category projections. */
 async function getAllCategoriesData(options?: CategoryOptions): Promise<Row[]> {
@@ -75,7 +76,15 @@ export class CategoryService {
     cacheTag(cacheTags.marketplace.categories);
     const rows = await getAllCategoriesData(options); if (!options?.activeOnly) return buildCategoryTree(rows);
     const byId = new Map(rows.map((row) => [row.id, row]));
-    return buildCategoryTree(rows.filter((row) => { let cursor: Row | undefined = row; while (cursor) { if (!cursor.isActive) return false; cursor = cursor.parentId ? byId.get(cursor.parentId) : undefined; } return true; }));
+    const activeRows = rows.filter((row) => { let cursor: Row | undefined = row; while (cursor) { if (!cursor.isActive) return false; cursor = cursor.parentId ? byId.get(cursor.parentId) : undefined; } return true; });
+    if (!options?.discoveryOnly) return buildCategoryTree(activeRows);
+    const eligibleAssignments = await prisma.product.findMany({ where: publicProductWhere, select: { categoryId: true, subCategoryId: true }, distinct: ["categoryId", "subCategoryId"] });
+    const visible = new Set<string>();
+    for (const assignment of eligibleAssignments) {
+      let cursor = byId.get(assignment.subCategoryId ?? assignment.categoryId ?? "");
+      while (cursor) { visible.add(cursor.id); cursor = cursor.parentId ? byId.get(cursor.parentId) : undefined; }
+    }
+    return buildCategoryTree(activeRows.filter((row) => visible.has(row.id)));
   }
   private static async assertParent(id: string | undefined, parentId: string | null | undefined) {
     if (!parentId) return; if (id === parentId) throw new CategoryDomainError("A category cannot be its own parent.");
@@ -95,6 +104,6 @@ export class CategoryService {
   static async deleteCategory(id: string) { const category = await prisma.productCategory.findUnique({ where: { id }, select: { _count: { select: { children: true, products: true, subProducts: true } } } }); if (!category) throw new CategoryDomainError("Category not found."); if (category._count.children) throw new CategoryDomainError("This category cannot be deleted while it has child categories."); if (category._count.products || category._count.subProducts) throw new CategoryDomainError("This category cannot be deleted while products reference it."); return prisma.productCategory.delete({ where: { id } }); }
   static async getCategoryById(id: string) { return prisma.productCategory.findUnique({ where: { id }, include: { parent: true, children: true, _count: { select: { products: true, children: true } } } }); }
   static async getCategoryBySlug(slug: string) { const flatten = (nodes: CategoryTreeNode[]): CategoryTreeNode[] => nodes.flatMap((node) => [node, ...flatten(node.children)]); return flatten(await this.getCategoryTree({ activeOnly: true })).find((node) => node.slug === slug) ?? null; }
-  static async getProductsByCategorySlug(slug: string, options?: { sort?: string; limit?: number }) { const category = await this.getCategoryBySlug(slug); if (!category) return []; const ids = descendants(category); const categorySelect = { id: true, name: true, slug: true, parent: { select: { id: true, name: true, slug: true, parent: { select: { id: true, name: true, slug: true } } } } } as const; const products = await prisma.product.findMany({ where: { OR: [{ categoryId: { in: ids } }, { subCategoryId: { in: ids } }], status: { in: ["ACTIVE", "PUBLISHED"] }, deletedAt: null }, include: { images: { take: 1, orderBy: [{ isFeatured: "desc" }, { sortOrder: "asc" }] }, variants: { select: { isActive: true, inventoryCount: true, price: true } }, category: { select: categorySelect }, subCategory: { select: categorySelect }, vendor: { select: { id: true, storeName: true, slug: true } }, reviews: { where: { status: "PUBLISHED" }, select: { rating: true } } }, orderBy: options?.sort === "low-high" ? { basePrice: "asc" } : options?.sort === "high-low" ? { basePrice: "desc" } : { createdAt: "desc" }, take: options?.limit || 50 }); return products.map((product) => serializeMarketplaceProduct(product as unknown as Record<string, unknown>)); }
+  static async getProductsByCategorySlug(slug: string, options?: { sort?: string; limit?: number }) { const category = await this.getCategoryBySlug(slug); if (!category) return []; const ids = descendants(category); const categorySelect = { id: true, name: true, slug: true, parent: { select: { id: true, name: true, slug: true, parent: { select: { id: true, name: true, slug: true } } } } } as const; const products = await prisma.product.findMany({ where: { ...publicProductWhere, OR: [{ categoryId: { in: ids } }, { subCategoryId: { in: ids } }] }, include: { images: { take: 1, orderBy: [{ isFeatured: "desc" }, { sortOrder: "asc" }] }, variants: { select: { isActive: true, inventoryCount: true, price: true } }, category: { select: categorySelect }, subCategory: { select: categorySelect }, vendor: { select: { id: true, storeName: true, slug: true } }, reviews: { where: { status: "PUBLISHED" }, select: { rating: true } } }, orderBy: options?.sort === "low-high" ? { basePrice: "asc" } : options?.sort === "high-low" ? { basePrice: "desc" } : { createdAt: "desc" }, take: options?.limit || 50 }); return products.map((product) => serializeMarketplaceProduct(product as unknown as Record<string, unknown>)); }
   static async assertCompatibleProductCategories(categoryId?: string | null, subCategoryId?: string | null) { const ids = [categoryId, subCategoryId].filter((id): id is string => Boolean(id)); if (!ids.length) return; const categories = await prisma.productCategory.findMany({ where: { id: { in: ids } }, select: { id: true, parentId: true, isActive: true } }); const main = categories.find((c) => c.id === categoryId), sub = categories.find((c) => c.id === subCategoryId); if ((categoryId && (!main || !main.isActive)) || (subCategoryId && (!sub || !sub.isActive))) throw new CategoryDomainError("Select an active approved category."); if (main && sub && sub.parentId !== main.id) throw new CategoryDomainError("The selected subcategory does not belong to the selected category."); }
 }

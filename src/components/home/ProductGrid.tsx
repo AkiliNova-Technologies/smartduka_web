@@ -62,7 +62,7 @@ export function ProductGrid({
     <div className="w-full space-y-10">
       {section(
         "Current offers",
-        "Savings from SmartDuka shops.",
+        "Savings from Mwezora shops.",
         deals,
         "/deals",
       )}
@@ -76,7 +76,7 @@ export function ProductGrid({
         recommendationsPersonalized ? "Recommended for you" : "Discover products",
         recommendationsPersonalized
           ? "Picked from what you’ve been exploring."
-          : "Popular picks from across SmartDuka.",
+          : "Popular picks from across Mwezora.",
         recommendations,
         "/products",
       )}
@@ -89,7 +89,7 @@ export function RecentlyViewedSection() {
   const { recentlyViewedIds, recentlyViewedProducts } = useUserData();
   const [guestRecentlyViewed, setGuestRecentlyViewed] = useState<ProductItem[]>([]);
   const historyIds = useMemo(
-    () => [...new Set(recentlyViewedIds)].slice(0, 8),
+    () => [...new Set(recentlyViewedIds)].slice(0, 4),
     [recentlyViewedIds],
   );
 
@@ -103,7 +103,7 @@ export function RecentlyViewedSection() {
   }, [historyIds, recentlyViewedProducts]);
 
   const recentlyViewed = recentlyViewedProducts.length
-    ? recentlyViewedProducts.slice(0, 8) as ProductItem[]
+    ? recentlyViewedProducts.slice(0, 4) as ProductItem[]
     : historyIds.length ? guestRecentlyViewed : [];
   if (!recentlyViewed.length) return null;
   return (

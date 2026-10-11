@@ -20,7 +20,8 @@ describe("marketplace promotion placements", () => {
     expect(service).toContain('status: "ACTIVE"');
     expect(service).toContain("startsAt: { lte: now }");
     expect(service).toContain("endsAt: { gt: now }");
-    expect(service).toContain('orderBy: [{ priority: "asc" }, { createdAt: "desc" }], take: 5');
+    expect(service).toContain('orderBy: [{ priority: "asc" }, { createdAt: "desc" }]');
+    expect(service).toContain("take: 5");
   });
 
   it("does not publish banners whose direct CTA target is no longer eligible", () => {

@@ -149,9 +149,7 @@ export function useAdminVendors(): UseAdminVendorsReturn {
   );
 
   // Computed counts
-  const totalPending = applications.filter(
-    (a) => a.status === "PENDING" || a.status === "SUBMITTED" || a.status === "UNDER_REVIEW"
-  ).length;
+  const totalPending = applications.filter((a) => a.status === "PENDING").length;
   const totalApproved = applications.filter((a) => a.status === "APPROVED").length;
   const totalRejected = applications.filter((a) => a.status === "REJECTED").length;
 

@@ -32,6 +32,9 @@ describe("cookie consent", () => {
     expect(layout).toContain("<CookieConsentRuntime />");
     expect(runtime).toContain("await cookies()");
     expect(runtime).toContain("initialConsentValue={consent}");
+    expect(consent).toContain("hydrated && !resolvedConsent");
+    expect(consent).toContain("useSyncExternalStore");
+    expect(consent).toContain("readCookieConsent(browserCookie)");
     expect(footer).toContain("<CookieSettingsButton />");
   });
 

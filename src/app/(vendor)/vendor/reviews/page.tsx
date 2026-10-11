@@ -5,6 +5,9 @@ import { type ColumnDef } from "@tanstack/react-table";
 import { Eye, Flag, MessageSquare, MessageSquareReply, Star, Store } from "lucide-react";
 import { toast } from "sonner";
 import { DataTable } from "@/components/data-table";
+import { DataTableStatusFilter } from "@/components/data-table-status-filter";
+import { DataTableRowActions } from "@/components/data-table-row-actions";
+import { StatusBadge } from "@/components/marketplace/status-badge";
 import { DashboardMetricCard } from "@/components/dashboard-metric-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -225,29 +228,12 @@ export default function VendorReviewsPage() {
         id: "reply",
         header: "Reply",
         cell: ({ row }) =>
-          replyFor(row.original) ? (
-            <span className="inline-flex rounded-full border border-emerald-500/20 bg-emerald-500/5 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-400">
-              Replied
-            </span>
-          ) : (
-            <span className="inline-flex rounded-full border border-amber-500/20 bg-amber-500/5 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-400">
-              Awaiting reply
-            </span>
-          ),
+          <StatusBadge status={replyFor(row.original) ? "REPLIED" : "AWAITING_REPLY"} />,
       },
       {
         id: "actions",
         header: "",
-        cell: ({ row }) => (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 gap-1"
-            onClick={() => setSelected(row.original)}>
-            <Eye className="size-4" />
-            <span className="hidden sm:inline">View</span>
-          </Button>
-        ),
+        cell: ({ row }) => <DataTableRowActions actions={[{ id: "view", label: "View review", icon: Eye, onSelect: () => setSelected(row.original) }]} />,
       },
     ];
     return tab === "product"
@@ -314,17 +300,7 @@ export default function VendorReviewsPage() {
           <SelectItem value="replied">Replied</SelectItem>
         </SelectContent>
       </Select>
-      <Select value={status} onValueChange={setStatus}>
-        <SelectTrigger className="h-9 w-32 rounded-lg text-xs">
-          <SelectValue placeholder="Status" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All statuses</SelectItem>
-          <SelectItem value="PUBLISHED">Published</SelectItem>
-          <SelectItem value="HIDDEN">Hidden</SelectItem>
-          <SelectItem value="REMOVED">Removed</SelectItem>
-        </SelectContent>
-      </Select>
+      <DataTableStatusFilter value={status} onValueChange={setStatus} options={[{ value: "all", label: "All statuses" }, { value: "PUBLISHED", label: "Published" }, { value: "HIDDEN", label: "Hidden" }, { value: "REMOVED", label: "Removed" }]} />
       {filtersActive && (
         <Button
           variant="ghost"

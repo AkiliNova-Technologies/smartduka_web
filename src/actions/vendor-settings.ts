@@ -11,6 +11,8 @@ import {
   type FulfillmentMethod,
 } from "@/lib/fulfillment";
 import { toVendorProfileDto } from "@/lib/vendor-profile-dto";
+import { parsePrivateDocumentReference } from "@/lib/private-document-storage";
+import { KYC_MIME_TYPES, STORAGE_UPLOAD_RULES } from "@/lib/supabase/storage-contract";
 
 export interface UpdateStoreProfileInput {
   storeName?: string;
@@ -24,7 +26,7 @@ export interface UpdateStoreProfileInput {
 }
 
 export async function updateStoreProfile(input: UpdateStoreProfileInput) {
-  const context = await requireVendorContext("vendor:manage_shop");
+  const context = await requireVendorContext("vendor:manage_shop", { allowInactiveShop: true });
   const updated = await prisma.vendorProfile.update({
     where: { id: context.vendorId },
     data: {
@@ -173,18 +175,27 @@ export async function uploadVerificationDocument(
   size?: number,
 ) {
   const context = await requireVendorContext("vendor:manage_legal");
+  const reference = parsePrivateDocumentReference(url, context.vendorId);
+  if (!reference) return { success: false, data: undefined, error: "Invalid private document reference." };
+  const { getSupabaseServerClient } = await import("@/lib/supabase/server");
+  const { data: stored, error: storageError } = await getSupabaseServerClient().storage.from(reference.bucket).info(reference.path);
+  if (storageError || !stored) return { success: false, data: undefined, error: "Uploaded document was not found in private storage." };
+  const storedMimeType = stored.contentType || mimeType || "";
+  const storedSize = stored.size ?? size ?? 0;
+  if (!KYC_MIME_TYPES.includes(storedMimeType as (typeof KYC_MIME_TYPES)[number]) || storedSize > STORAGE_UPLOAD_RULES["kyc-document"].maxBytes) return { success: false, data: undefined, error: "Stored document type or size is not allowed." };
   const document = await prisma.document.create({
     data: {
       vendorId: context.vendorId,
       type: documentType,
-      name,
+      name: name.trim().slice(0, 255),
       url,
-      mimeType: mimeType || null,
-      size: size || null,
+      mimeType: storedMimeType,
+      size: storedSize,
     },
   });
 
   revalidatePath("/vendor/settings");
+  revalidatePath("/admin/vendors");
   return { success: true, data: document, error: undefined };
 }
 
@@ -192,11 +203,19 @@ export async function deleteVendorDocument(documentId: string) {
   const context = await requireVendorContext("vendor:manage_legal");
   const document = await prisma.document.findFirst({
     where: { id: documentId, vendorId: context.vendorId },
+    include: { _count: { select: { verificationSubmissions: true } } },
   });
   if (!document) return { success: false, error: "Document not found." };
+  if (document._count.verificationSubmissions > 0) return { success: false, error: "Submitted verification documents are retained as review history. Upload a replacement instead." };
 
   await prisma.document.delete({ where: { id: documentId } });
+  const reference = parsePrivateDocumentReference(document.url, context.vendorId);
+  if (reference) {
+    const { getSupabaseServerClient } = await import("@/lib/supabase/server");
+    await getSupabaseServerClient().storage.from(reference.bucket).remove([reference.path]);
+  }
   revalidatePath("/vendor/settings");
+  revalidatePath("/admin/vendors");
   return { success: true };
 }
 
@@ -204,17 +223,18 @@ export async function getMyVendorDocuments() {
   const context = await requireVendorContext("vendor:manage_legal");
   const documents = await prisma.document.findMany({
     where: { vendorId: context.vendorId },
+    select: { id: true, type: true, name: true, mimeType: true, size: true, createdAt: true },
     orderBy: { createdAt: "desc" },
   });
   return { success: true, data: documents };
 }
 
 export async function getMyFullVendorProfile() {
-  const context = await requireVendorContext();
+  const context = await requireVendorContext(undefined, { allowInactiveShop: true });
   const profile = await prisma.vendorProfile.findUnique({
     where: { id: context.vendorId },
     include: {
-      documents: { orderBy: { createdAt: "desc" } },
+      documents: { select: { id: true, type: true, name: true, mimeType: true, size: true, createdAt: true }, orderBy: { createdAt: "desc" } },
       _count: { select: { products: true, subOrders: true } },
     },
   });

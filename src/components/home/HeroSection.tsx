@@ -3,7 +3,7 @@ import { HeroCarousel, type HeroSlide } from "@/components/marketing/promotion-c
 export const HOME_HERO_SLIDES: HeroSlide[] = [
   {
     id: "new-arrivals",
-    eyebrow: "Fresh on SmartDuka",
+    eyebrow: "Fresh on Mwezora",
     title: "New arrivals",
     highlight: "worth discovering.",
     description: "The latest finds from local shops, selected to make every day feel a little more new.",

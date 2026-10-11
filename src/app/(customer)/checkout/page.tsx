@@ -2,6 +2,7 @@
 
 import { type RefObject, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { MediaImage } from "@/components/marketplace/media-image";
 import { PRODUCT_IMAGE_FALLBACK } from "@/lib/media";
 import { ArrowLeft, MapPin, ShoppingBag, Truck } from "lucide-react";
@@ -24,6 +25,7 @@ function useHydrated() {
 }
 
 export default function CheckoutPage() {
+  const router = useRouter();
   const {
     cart,
     cartCount,
@@ -41,7 +43,6 @@ export default function CheckoutPage() {
   const [address, setAddress] = useState("");
   const [notes, setNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [selectedPaymentGateway, setSelectedPaymentGateway] = useState<"PESAPAL">("PESAPAL");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [shops, setShops] = useState<ShopFulfillment[]>([]);
   const [fulfillment, setFulfillment] = useState<Record<string, "DELIVERY" | "PICKUP">>({});
@@ -49,7 +50,6 @@ export default function CheckoutPage() {
   const phoneRef = useRef<HTMLInputElement>(null);
   const addressRef = useRef<HTMLTextAreaElement>(null);
   const checkoutRequestId = useRef<string | null>(null);
-  const paymentInitiationRequestId = useRef<string | null>(null);
   const [checkoutIdsReady, setCheckoutIdsReady] = useState(false);
 
   const filledFullName = fullName ?? settings.fullName ?? user?.displayName ?? "";
@@ -63,7 +63,6 @@ export default function CheckoutPage() {
   useEffect(() => {
     const timer = window.setTimeout(() => {
       checkoutRequestId.current ??= crypto.randomUUID();
-      paymentInitiationRequestId.current ??= crypto.randomUUID();
       setCheckoutIdsReady(true);
     }, 0);
     return () => window.clearTimeout(timer);
@@ -81,8 +80,7 @@ export default function CheckoutPage() {
 
   const startPayment = async () => {
     const checkoutId = checkoutRequestId.current;
-    const paymentInitiationId = paymentInitiationRequestId.current;
-    if (!checkoutIdsReady || !checkoutId || !paymentInitiationId) return;
+    if (!checkoutIdsReady || !checkoutId) return;
     const nextErrors: Record<string, string> = {};
     if (!filledFullName.trim()) nextErrors.fullName = "Enter your full name.";
     if (!filledPhoneNumber.trim()) nextErrors.phoneNumber = "Enter a phone number.";
@@ -116,7 +114,9 @@ export default function CheckoutPage() {
       checkoutRequestId: checkoutId,
       shippingAddress,
       shippingPhone: filledPhoneNumber.trim(),
-      paymentGateway: "PESAPAL",
+      // Checkout creates the order first. Seller-specific MTN payment setup
+      // is selected afterwards on the order, never as one global cart rail.
+      paymentGateway: "MTN_MOMO",
       fulfillmentSelections: Object.entries(fulfillment).map(([vendorId, method]) => ({ vendorId, method })),
       notes: notes.trim() || undefined,
     });
@@ -127,27 +127,10 @@ export default function CheckoutPage() {
       setIsSubmitting(false);
       return;
     }
-    try {
-      const response = await fetch("/api/payments/pesapal/initiate", {
-        method: "POST",
-        headers: authHeaders(),
-        body: JSON.stringify({
-          orderId: result.orderId,
-          initiationRequestId: paymentInitiationId,
-        }),
-      });
-      const body = await response.json().catch(() => ({}));
-      const redirectUrl = body?.data?.redirectUrl;
-      if (!response.ok || typeof redirectUrl !== "string")
-        throw new Error(body?.error || "Unable to start Pesapal.");
-      clearCart();
-      window.location.assign(redirectUrl);
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Unable to start Pesapal.",
-      );
-      setIsSubmitting(false);
-    }
+    // Each vendor payment is initiated from its order detail/payment group.
+    // Do not redirect through a marketplace gateway or claim payment client-side.
+    clearCart();
+    router.push(`/orders/${result.orderId}`);
   };
 
   if (!cartLoading && cart.length === 0)
@@ -265,40 +248,10 @@ export default function CheckoutPage() {
             <div className="mt-4 space-y-3">{shops.map((shop) => <div key={shop.id} className="min-w-0 rounded-xl border p-4"><div className="flex items-start justify-between gap-3"><p className="min-w-0 break-words font-medium">{shop.storeName}</p><span className="shrink-0 text-xs text-muted-foreground">{fulfillment[shop.id] === "PICKUP" ? "No delivery fee" : `UGX ${shop.deliveryFee.toLocaleString()}`}</span></div><div className="mt-3 flex flex-wrap gap-2">{shop.fulfillmentMethods.map((method) => <Button key={method} type="button" size="sm" variant={fulfillment[shop.id] === method ? "default" : "outline"} className="min-h-11 rounded-full" onClick={() => setFulfillment((current) => ({ ...current, [shop.id]: method }))}>{method === "DELIVERY" ? <Truck className="mr-1.5 size-3.5" /> : <MapPin className="mr-1.5 size-3.5" />}{method === "DELIVERY" ? "Delivery" : "Pickup"}</Button>)}</div>{fulfillment[shop.id] === "PICKUP" && <p className="mt-3 break-words text-xs text-muted-foreground"><span className="font-medium text-foreground">Collect from:</span> {shop.pickupLocation}{shop.pickupDirections ? ` · ${shop.pickupDirections}` : ""}{shop.pickupInstructions ? ` · ${shop.pickupInstructions}` : ""}</p>}{fulfillment[shop.id] === "DELIVERY" && shop.deliveryEstimate && <p className="mt-3 break-words text-xs text-muted-foreground">Estimated delivery: {shop.deliveryEstimate}</p>}{shop.returnPolicy && <p className="mt-3 break-words text-xs text-muted-foreground">Returns: {shop.returnWindowDays} days · {shop.acceptsExchanges ? "Exchanges available" : "Refund/return policy applies"}</p>}</div>)}</div>
             {errors.fulfillment && <FieldError id="fulfilment-error">{errors.fulfillment}</FieldError>}
           </section>
-          <section
-            className="mt-5 rounded-2xl border bg-card p-5"
-            aria-labelledby="payment-method">
-            <h2 id="payment-method" className="text-lg font-semibold">
-              Payment method
-            </h2>
-            <div role="radiogroup" aria-labelledby="payment-method" className="mt-4">
-              <label
-                className={`flex min-w-0 items-start gap-3 rounded-xl border p-3 transition-colors focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 ${selectedPaymentGateway === "PESAPAL" ? "border-primary bg-primary/5" : "border-border bg-card hover:border-primary/50 hover:bg-muted/40"} ${isSubmitting ? "cursor-not-allowed opacity-70" : "cursor-pointer"}`}>
-                <input
-                  type="radio"
-                  name="payment-method"
-                  value="PESAPAL"
-                  checked={selectedPaymentGateway === "PESAPAL"}
-                  onChange={() => setSelectedPaymentGateway("PESAPAL")}
-                  disabled={isSubmitting}
-                  className="sr-only"
-                />
-                <div className="min-w-0 flex-1">
-                  <p className="text-base font-semibold">Pesapal</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Pay securely with card, Mobile Money, or other available methods.
-                  </p>
-                </div>
-                <span
-                  aria-hidden="true"
-                  className={`mt-1 flex size-5 shrink-0 items-center justify-center rounded-full border-2 ${selectedPaymentGateway === "PESAPAL" ? "border-primary" : "border-muted-foreground/50"}`}>
-                  {selectedPaymentGateway === "PESAPAL" && <span className="size-2.5 rounded-full bg-primary" />}
-                </span>
-              </label>
-            </div>
-            <p className="mt-2 text-sm text-muted-foreground">
-              You’ll continue to Pesapal to complete payment securely.
-            </p>
+          <section className="mt-5 rounded-2xl border bg-card p-5" aria-labelledby="payment-method">
+            <h2 id="payment-method" className="text-lg font-semibold">Payment happens per shop</h2>
+            <p className="mt-2 text-sm text-muted-foreground">After placing the order, choose an available payment method for each seller. Payments go directly to that seller’s verified merchant account.</p>
+            <p className="mt-2 text-xs text-muted-foreground">Availability is confirmed per shop; marketplace payments are not enabled until direct merchant routing is verified.</p>
           </section>
         </section>
         <aside className="h-fit rounded-2xl border bg-card p-5 lg:sticky lg:top-24">
@@ -319,7 +272,7 @@ export default function CheckoutPage() {
                     fill
                     sizes="48px"
                     className="object-cover"
-                    fallbackClassName="object-contain p-2"
+                    fallbackClassName="object-cover"
                   />
                 </div>
                 <div className="min-w-0 flex-1">
@@ -352,7 +305,7 @@ export default function CheckoutPage() {
               onClick={startPayment}
               disabled={!hasHydrated || !checkoutIdsReady || isSubmitting || cartLoading || !cart.length}
               className="h-12 w-full rounded-full">
-              {isSubmitting ? "Preparing secure payment…" : "Continue to Pesapal"}
+              {isSubmitting ? "Creating order…" : "Place order"}
             </Button>
           </div>
         </aside>

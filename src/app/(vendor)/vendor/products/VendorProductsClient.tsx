@@ -7,9 +7,11 @@ import { MediaImage } from "@/components/marketplace/media-image";
 import { PRODUCT_IMAGE_FALLBACK } from "@/lib/media";
 import Link from "next/link";
 import { type ColumnDef } from "@tanstack/react-table";
-import { Plus, Edit2, Eye, AlertCircle } from "lucide-react";
+import { Plus, Edit2, Eye, AlertCircle, Megaphone } from "lucide-react";
 import { IllustratedEmptyState } from "@/components/marketplace/illustrated-empty-state";
 import { DataTable } from "@/components/data-table";
+import { DataTableRowActions } from "@/components/data-table-row-actions";
+import { StatusBadge } from "@/components/marketplace/status-badge";
 import { Button } from "@/components/ui/button";
 import { useProducts } from "@/hooks/use-products";
 import { useVendor } from "@/hooks/use-vendor";
@@ -149,41 +151,7 @@ export default function VendorProductsPage() {
         accessorKey: "status",
         header: "Status",
         cell: ({ row }) => {
-          const product = row.original;
-          const status = product.status || "DRAFT";
-          const config: Record<string, { label: string; className: string }> = {
-            PUBLISHED: {
-              label: "Published",
-              className: "bg-emerald-500/5 text-emerald-600 border-emerald-500/20",
-            },
-            ACTIVE: {
-              label: "Active",
-              className: "bg-emerald-500/5 text-emerald-600 border-emerald-500/20",
-            },
-            DRAFT: {
-              label: "Draft",
-              className: "bg-muted text-muted-foreground border-border/40",
-            },
-            ARCHIVED: {
-              label: "Archived",
-              className: "bg-muted text-muted-foreground/50 border-border/30",
-            },
-            OUT_OF_STOCK: {
-              label: "Sold out",
-              className: "bg-rose-500/5 text-rose-500 border-rose-500/20",
-            },
-          };
-          const { label, className } = config[status] || config.DRAFT;
-          return (
-            <span
-              className={cn(
-                "inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium border",
-                className,
-              )}
-            >
-              {label}
-            </span>
-          );
+          return <StatusBadge status={row.original.status || "DRAFT"} />;
         },
       },
       {
@@ -191,24 +159,11 @@ export default function VendorProductsPage() {
         header: () => <div className="text-right">Actions</div>,
         cell: ({ row }) => {
           const product = row.original;
-          return (
-            <div className="flex items-center justify-end gap-1">
-              <Link
-                href={`/vendor/products/${product.id}`}
-                className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors active:scale-95"
-                title="View details"
-              >
-                <Eye className="w-3.5 h-3.5" />
-              </Link>
-              <Link
-                href={`/vendor/products/${product.id}/edit`}
-                className="p-2 rounded-lg text-muted-foreground hover:text-primary hover:bg-muted transition-colors active:scale-95"
-                title="Edit product"
-              >
-                <Edit2 className="w-3.5 h-3.5" />
-              </Link>
-            </div>
-          );
+          return <DataTableRowActions actions={[
+            { id: "view", label: "View details", icon: Eye, href: `/vendor/products/${product.id}` },
+            { id: "edit", label: "Edit product", icon: Edit2, href: `/vendor/products/${product.id}/edit` },
+            { id: "promote", label: "Promote product", icon: Megaphone, href: `/vendor/marketing?productId=${encodeURIComponent(product.id)}`, hidden: product.status !== "ACTIVE" && product.status !== "PUBLISHED" },
+          ]} />;
         },
       },
     ],
@@ -262,6 +217,9 @@ export default function VendorProductsPage() {
         data={productsList}
         getRowId={(product) => product.id}
         isLoading={isLoading}
+        features={{ search: true }}
+        searchPlaceholder="Search products..."
+        getSearchText={(product) => [product.name, product.slug, product.category?.name].filter(Boolean).join(" ")}
         renderTabs={
           <div className="flex items-center select-none">
             <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider px-1">

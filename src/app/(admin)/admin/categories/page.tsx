@@ -14,6 +14,8 @@ import Image from "next/image";
 import { type ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/data-table";
+import { DataTableRowActions } from "@/components/data-table-row-actions";
+import { StatusBadge } from "@/components/marketplace/status-badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -271,7 +273,7 @@ export default function AdminCategoriesPage() {
       {
         id: "status",
         header: "Status",
-        cell: ({ row }) => <span className={`text-xs font-medium ${row.original.isActive === false ? "text-muted-foreground" : "text-emerald-600"}`}>{row.original.isActive === false ? "Inactive" : "Active"}</span>,
+        cell: ({ row }) => <StatusBadge status={row.original.isActive === false ? "INACTIVE" : "ACTIVE"} />,
       },
       {
         accessorKey: "sortOrder",
@@ -291,31 +293,11 @@ export default function AdminCategoriesPage() {
       {
         id: "actions",
         header: () => <div className="text-right">Actions</div>,
-        cell: ({ row }) => (
-          <div className="flex items-center justify-end gap-1.5">
-            <button
-              onClick={() => handleEditCategory(row.original)}
-              className="p-1.5 text-muted-foreground hover:text-foreground rounded-md border border-border/40 hover:bg-muted transition-colors cursor-pointer"
-              title="Edit Category">
-              <Edit2 className="w-3.5 h-3.5" />
-            </button>
-            <button onClick={() => setCategoryStatus?.(row.original.id, row.original.isActive === false)} className="p-1.5 text-muted-foreground hover:text-foreground rounded-md border border-border/40 hover:bg-muted transition-colors cursor-pointer" title={row.original.isActive === false ? "Activate category" : "Deactivate category"}>
-              <Power className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={() =>
-                openDeleteDialog(row.original.id, {
-                  itemName: row.original.name,
-                  itemType: "category",
-                  title: "Delete Category",
-                })
-              }
-              className="p-1.5 text-muted-foreground hover:text-rose-500 rounded-md border border-border/40 hover:bg-rose-500/5 transition-colors cursor-pointer"
-              title="Delete Category">
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        ),
+        cell: ({ row }) => <DataTableRowActions actions={[
+          { id: "edit", label: "Edit category", icon: Edit2, onSelect: () => handleEditCategory(row.original) },
+          { id: "toggle", label: row.original.isActive === false ? "Activate category" : "Deactivate category", icon: Power, onSelect: () => setCategoryStatus?.(row.original.id, row.original.isActive === false) },
+          { id: "delete", label: "Delete category", icon: Trash2, destructive: true, onSelect: () => openDeleteDialog(row.original.id, { itemName: row.original.name, itemType: "category", title: "Delete Category" }) },
+        ]} />,
       },
     ],
     [allCategories, openDeleteDialog, handleEditCategory, setCategoryStatus],

@@ -5,8 +5,8 @@
 /**
  * Standard API success response
  */
-export function successResponse<T>(data: T, status = 200) {
-  return Response.json({ success: true, data }, { status });
+export function successResponse<T>(data: T, status = 200, headers?: HeadersInit) {
+  return Response.json({ success: true, data }, { status, headers });
 }
 
 /**

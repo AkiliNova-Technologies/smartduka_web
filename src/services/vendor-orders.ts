@@ -3,6 +3,7 @@ import { cacheLife, cacheTag } from "next/cache";
 import { prisma } from "@/lib/prisma/client";
 import { cacheProfiles, cacheTags } from "@/lib/cache-policy";
 import { SUB_ORDER_ALLOWED_TRANSITIONS } from "@/services/order";
+import { canFulfillSubOrder } from "@/services/payment-fulfillment";
 
 export type VendorOrdersQuery = { page?: number; pageSize?: number; search?: string; status?: string };
 export type VendorOrdersResult = {
@@ -36,11 +37,25 @@ export async function getVendorOrders(vendorId: string, query: VendorOrdersQuery
   const page = Math.min(Math.max(Number.isInteger(query.page) ? query.page! : 1, 1), totalPages);
   const subOrders = await prisma.subOrder.findMany({
     where,
-    include: { order: { select: { shippingAddress: true, shippingPhone: true, notes: true, paymentStatus: true, customer: { select: { name: true } } } }, items: { include: { product: { select: { name: true } } } }, returnRequests: { select: { status: true } }, refunds: { select: { status: true } }, disputes: { select: { status: true } } },
+    include: { order: { select: { shippingAddress: true, shippingPhone: true, notes: true, paymentStatus: true, paymentGateway: true, customer: { select: { name: true } } } }, paymentIntents: { select: { status: true } }, items: { include: { product: { select: { name: true } } } }, returnRequests: { select: { status: true } }, refunds: { select: { status: true } }, disputes: { select: { status: true } } },
     orderBy: [{ createdAt: "desc" }, { id: "desc" }], skip: (page - 1) * pageSize, take: pageSize,
   });
   return {
-    orders: subOrders.map((subOrder) => ({ id: subOrder.id, subOrderNumber: subOrder.subOrderNumber, status: subOrder.status, allowedActions: (SUB_ORDER_ALLOWED_TRANSITIONS[subOrder.status] || []).filter((status) => status !== "CANCELLED").map((status) => actionsByStatus[subOrder.status]?.find((action) => action.status === status)).filter((action): action is { status: string; label: string } => Boolean(action)), vendorTotal: Number(subOrder.vendorTotal), customerName: subOrder.order.customer.name || "Customer", customerPhone: subOrder.order.shippingPhone, deliveryAddress: subOrder.order.shippingAddress, notes: subOrder.order.notes, paymentStatus: subOrder.order.paymentStatus, createdAt: subOrder.createdAt.toISOString(), items: subOrder.items.map((item) => ({ name: item.productNameSnapshot ?? item.product.name, quantity: item.quantity, price: Number(item.priceAtPurchase), total: Number(item.totalPrice) })), issues: { returns: subOrder.returnRequests.map((item) => item.status), refunds: subOrder.refunds.map((item) => item.status), disputes: subOrder.disputes.map((item) => item.status) } })),
+    orders: subOrders.map((subOrder) => {
+      const paymentConfirmed = canFulfillSubOrder({
+        paymentGateway: subOrder.order.paymentGateway,
+        paymentIntentStatuses: subOrder.paymentIntents.map((intent) => intent.status),
+      });
+      // Payment state in a vendor workspace is seller-scoped. A parent order
+      // may be in an exception state because another seller was reversed;
+      // that must not make this vendor's confirmed payment look reversed.
+      const localPaymentStatus = subOrder.paymentIntents.some((intent) => intent.status === "REVERSED")
+        ? "REVERSED"
+        : subOrder.paymentIntents.some((intent) => intent.status === "SUCCESSFUL")
+          ? "COMPLETED"
+          : subOrder.order.paymentStatus;
+      return { id: subOrder.id, subOrderNumber: subOrder.subOrderNumber, status: subOrder.status, allowedActions: paymentConfirmed ? (SUB_ORDER_ALLOWED_TRANSITIONS[subOrder.status] || []).filter((status) => status !== "CANCELLED").map((status) => actionsByStatus[subOrder.status]?.find((action) => action.status === status)).filter((action): action is { status: string; label: string } => Boolean(action)) : [], vendorTotal: Number(subOrder.vendorTotal), customerName: subOrder.order.customer.name || "Customer", customerPhone: subOrder.order.shippingPhone, deliveryAddress: subOrder.order.shippingAddress, notes: subOrder.order.notes, paymentStatus: localPaymentStatus, createdAt: subOrder.createdAt.toISOString(), items: subOrder.items.map((item) => ({ name: item.productNameSnapshot ?? item.product.name, quantity: item.quantity, price: Number(item.priceAtPurchase), total: Number(item.totalPrice) })), issues: { returns: subOrder.returnRequests.map((item) => item.status), refunds: subOrder.refunds.map((item) => item.status), disputes: subOrder.disputes.map((item) => item.status) } };
+    }),
     pagination: { page, pageSize, total, totalPages }, statusCounts: Object.fromEntries(statusRows.map((row) => [row.status, row._count._all])),
   };
 }

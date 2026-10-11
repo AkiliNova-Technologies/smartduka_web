@@ -20,11 +20,14 @@ import {
   deleteVendorDocument,
   getMyVendorDocuments,
 } from "@/actions/vendor-settings";
-import type { Document, DocumentType } from "@prisma/client";
+import type { DocumentType } from "@prisma/client";
+
+export type VendorSettingsDocument = { id: string; type: DocumentType; name: string; mimeType: string | null; size: number | null; createdAt: Date | string };
 
 interface DocumentsTabProps {
   vendorId: string;
-  initialDocuments: Document[];
+  initialDocuments: VendorSettingsDocument[];
+  onDocumentsChanged?: () => void;
 }
 
 const DOCUMENT_TYPES: { value: DocumentType; label: string; icon: React.ReactNode; description: string }[] = [
@@ -36,9 +39,9 @@ const DOCUMENT_TYPES: { value: DocumentType; label: string; icon: React.ReactNod
   { value: "OTHER", label: "Other Document", icon: <FileText className="w-3.5 h-3.5" />, description: "Any other supporting document" },
 ];
 
-export function DocumentsTab({ vendorId, initialDocuments }: DocumentsTabProps) {
+export function DocumentsTab({ initialDocuments, onDocumentsChanged }: DocumentsTabProps) {
   const [isPending, startTransition] = useTransition();
-  const [documents, setDocuments] = useState<Document[]>(initialDocuments);
+  const [documents, setDocuments] = useState<VendorSettingsDocument[]>(initialDocuments);
   const [selectedType, setSelectedType] = useState<DocumentType>("BUSINESS_REGISTRATION");
   const [uploading, setUploading] = useState(false);
 
@@ -50,9 +53,7 @@ export function DocumentsTab({ vendorId, initialDocuments }: DocumentsTabProps) 
     try {
       const result = await uploadImageToSupabase({
         file,
-        bucket: "marketplace-images",
-        folder: `vendors/${vendorId}/documents`,
-        maxSizeInMB: 10,
+        purpose: "kyc-document",
       });
 
       if (result.success && result.url) {
@@ -67,6 +68,7 @@ export function DocumentsTab({ vendorId, initialDocuments }: DocumentsTabProps) 
         if (docResult.success) {
           const refreshed = await getMyVendorDocuments();
           if (refreshed.success) setDocuments(refreshed.data);
+          onDocumentsChanged?.();
           toast.success("Document uploaded successfully");
         } else {
           toast.error(docResult.error || "Failed to save document");
@@ -87,6 +89,7 @@ export function DocumentsTab({ vendorId, initialDocuments }: DocumentsTabProps) 
       const result = await deleteVendorDocument(documentId);
       if (result.success) {
         setDocuments((prev) => prev.filter((d) => d.id !== documentId));
+        onDocumentsChanged?.();
         toast.success("Document removed");
       } else {
         toast.error(result.error || "Failed to delete document");
@@ -198,7 +201,7 @@ export function DocumentsTab({ vendorId, initialDocuments }: DocumentsTabProps) 
                   </div>
                   <div className="flex items-center gap-2 shrink-0 ml-3">
                     <a
-                      href={doc.url}
+                      href={`/api/vendor/documents/profile/${doc.id}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-[10px] font-bold text-primary hover:underline"

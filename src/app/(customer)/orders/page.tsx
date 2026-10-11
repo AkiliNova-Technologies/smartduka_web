@@ -11,6 +11,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 const payment = (s: string) =>
   s === "COMPLETED"
     ? ["Paid", "success"]
+    : s === "PARTIALLY_PAID"
+      ? ["Partially paid", "warning"]
     : s === "FAILED"
       ? ["Payment failed", "danger"]
       : (["Awaiting payment", "warning"] as const);

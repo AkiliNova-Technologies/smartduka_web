@@ -21,9 +21,9 @@ describe("dashboard header contract", () => {
   });
 
   it("isolates vendor pathname-aware header and sidebar beneath narrow boundaries", () => {
-    const layout = readFileSync(join(process.cwd(), "src/app/(vendor)/vendor/layout.tsx"), "utf8");
-    expect(layout).toContain("<Suspense fallback={<VendorSidebarFallback />}>");
-    expect(layout).toContain("<Suspense fallback={<VendorHeaderFallback />}>");
+    const shell = readFileSync(join(process.cwd(), "src/app/(vendor)/vendor/vendor-dashboard-shell.tsx"), "utf8");
+    expect(shell).toContain("<Suspense fallback={<VendorSidebarFallback />}>");
+    expect(shell).toContain("<Suspense fallback={<VendorHeaderFallback />}>");
   });
 
   it("keeps role-specific account navigation and shared notification/theme controls", () => {

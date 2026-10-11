@@ -1,0 +1,10 @@
+ALTER TABLE "SubscriptionPlan" ADD COLUMN "code" TEXT;
+ALTER TABLE "SubscriptionPlan" ADD COLUMN "staffSeats" INTEGER NOT NULL DEFAULT 2;
+ALTER TABLE "SubscriptionPlan" ADD COLUMN "features" JSONB;
+ALTER TABLE "SubscriptionPlan" ADD COLUMN "sortOrder" INTEGER NOT NULL DEFAULT 0;
+UPDATE "SubscriptionPlan" SET "code" = upper("slug") WHERE "code" IS NULL;
+ALTER TABLE "SubscriptionPlan" ALTER COLUMN "code" SET NOT NULL;
+CREATE UNIQUE INDEX "SubscriptionPlan_code_key" ON "SubscriptionPlan"("code");
+ALTER TABLE "PlatformRevenueOrder" ADD COLUMN "subscriptionId" TEXT;
+CREATE UNIQUE INDEX "PlatformRevenueOrder_subscriptionId_key" ON "PlatformRevenueOrder"("subscriptionId");
+ALTER TABLE "PlatformRevenueOrder" ADD CONSTRAINT "PlatformRevenueOrder_subscriptionId_fkey" FOREIGN KEY ("subscriptionId") REFERENCES "VendorSubscription"("id") ON DELETE SET NULL ON UPDATE CASCADE;

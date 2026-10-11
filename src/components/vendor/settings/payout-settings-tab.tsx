@@ -42,7 +42,7 @@ export function PayoutSettingsTab() {
       <header>
         <h2 className="text-lg font-semibold">Payouts</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Choose where SmartDuka should send your shop&apos;s settlements.
+          Choose where Mwezora should send your shop&apos;s settlements.
         </p>
       </header>
       {error && (

@@ -2,7 +2,7 @@ import { errorResponse, getErrorMessage, successResponse } from "@/lib/api-utils
 import { VendorTeamError, VendorTeamService } from "@/services/vendor-team";
 
 export async function GET() {
-  try { return successResponse({ members: await VendorTeamService.list() }); }
+  try { const [members, staff] = await Promise.all([VendorTeamService.list(), VendorTeamService.seatUsage()]); return successResponse({ members, staff }); }
   catch (error) { return errorResponse(getErrorMessage(error), 403); }
 }
 

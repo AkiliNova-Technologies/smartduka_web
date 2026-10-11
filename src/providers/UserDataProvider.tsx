@@ -32,6 +32,8 @@ export interface UserSettings {
   marketingNewsletter: boolean;
   twoFactorEnabled: boolean;
   buyerProtectionEnabled: boolean;
+  themeMode: "system" | "light" | "dark";
+  accentColor: "classic" | "rose" | "berry" | "plum" | "violet" | "emerald" | "teal" | "coral";
 }
 
 export interface CartItem {
@@ -66,7 +68,7 @@ export interface UserOrder {
   totalShipping: number;
   createdAt: string;
   items: { id: string; productId: string; subOrderId: string; name: string; variantName: string | null; quantity: number; price: number; image: string | null; vendorName: string; canReview: boolean; review: { id: string; rating: number; title: string | null; comment: string | null; imageUrls: string[] } | null }[];
-  subOrders: { id: string; status: string; subOrderNumber: string; vendorName: string; canReview: boolean; review: { id: string; rating: number; comment: string | null } | null }[];
+  subOrders: { id: string; status: string; subOrderNumber: string; vendorName: string; total: number; paymentOptions: ("MTN_MOMO" | "AIRTEL_MONEY")[]; paymentIntents: { id: string; provider: "MTN_MOMO" | "AIRTEL_MONEY" | "PESAPAL"; status: string; amount: number; currency: string; providerReference: string | null; updatedAt: string }[]; canReview: boolean; review: { id: string; rating: number; comment: string | null } | null }[];
 }
 
 export interface UserNotification {
@@ -124,7 +126,7 @@ interface UserDataContextType {
     shippingAddress: string;
     shippingPhone: string;
     fulfillmentSelections?: { vendorId: string; method: "DELIVERY" | "PICKUP" }[];
-    paymentGateway: "PESAPAL";
+    paymentGateway: "MTN_MOMO" | "AIRTEL_MONEY";
     checkoutRequestId: string;
     notes?: string;
   }) => Promise<{ success: boolean; error?: string; orderId?: string }>;
@@ -157,6 +159,8 @@ const defaultSettings: UserSettings = {
   marketingNewsletter: false,
   twoFactorEnabled: false,
   buyerProtectionEnabled: true,
+  themeMode: "system",
+  accentColor: "classic",
 };
 
 function loadFromStorage<T>(key: string, fallback: T): T {
@@ -334,7 +338,7 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
         await fetchWishlist();
       }
     },
-    [uid, wishlist, fetchWishlist],
+    [wishlist, fetchWishlist],
   );
 
   const removeFromWishlist = useCallback(
@@ -354,7 +358,7 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
         await fetchWishlist();
       }
     },
-    [uid, fetchWishlist],
+    [fetchWishlist],
   );
 
   const [orders, setOrders] = useState<UserOrder[]>([]);
@@ -379,7 +383,7 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
       shippingAddress: string;
       shippingPhone: string;
       fulfillmentSelections?: { vendorId: string; method: "DELIVERY" | "PICKUP" }[];
-      paymentGateway: "PESAPAL";
+      paymentGateway: "MTN_MOMO" | "AIRTEL_MONEY";
       checkoutRequestId: string;
       notes?: string;
     }) => {

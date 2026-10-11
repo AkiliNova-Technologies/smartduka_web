@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { type ColumnDef } from "@tanstack/react-table";
 import { DataTable } from "@/components/data-table";
+import { StatusBadge } from "@/components/marketplace/status-badge";
 import {
   Select,
   SelectContent,
@@ -122,11 +123,7 @@ export default function AdminMarketplaceReportsPage() {
       {
         accessorKey: "status",
         header: "Status",
-        cell: ({ row }) => (
-          <span className="text-xs font-semibold">
-            {title(row.original.status)}
-          </span>
-        ),
+        cell: ({ row }) => <StatusBadge status={row.original.status} />,
       },
     ],
     [],
@@ -257,7 +254,9 @@ export default function AdminMarketplaceReportsPage() {
         data={reports}
         getRowId={(row) => row.id}
         isLoading={loading}
-        searchPlaceholder="Search cases"
+        features={{ search: true }}
+        searchPlaceholder="Search reports..."
+        getSearchText={(report) => [report.publicId, report.targetTitleSnapshot, report.targetType, report.reason].filter(Boolean).join(" ")}
       />
     </div>
   );

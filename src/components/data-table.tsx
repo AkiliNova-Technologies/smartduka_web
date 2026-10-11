@@ -30,4 +30,8 @@ function DataTableShell() {
   );
 }
 
-export type { DataTableFeatures, DataTableProps } from "@/components/data-table-runtime";
+export type {
+  DataTableFeatures,
+  DataTableProps,
+  DataTableSearchConfig,
+} from "@/components/data-table-runtime";

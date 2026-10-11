@@ -1,7 +1,8 @@
 import { UserStatus, VendorStatus, VendorUserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma/client";
 import { getCurrentUserId } from "@/lib/auth/session";
-import { AppPermissionKey, hasPermission } from "@/lib/auth/permissions";
+import { hasPermission } from "@/lib/auth/permissions";
+import type { AppPermissionKey } from "@/lib/auth/permissions";
 
 export class VendorAuthorizationError extends Error {}
 
@@ -26,6 +27,7 @@ export interface AuthorizedVendorContext {
  */
 export async function requireVendorContext(
   permission?: AppPermissionKey,
+  options?: { allowInactiveShop?: boolean },
 ): Promise<AuthorizedVendorContext> {
   const userId = await getCurrentUserId();
   const user = await prisma.user.findUnique({
@@ -55,8 +57,12 @@ export async function requireVendorContext(
     vendor && (user.vendorId === vendor.id || vendor.ownerId === user.id),
   );
 
-  if (!vendor || !isMember || !vendorRole || vendor.status !== VendorStatus.ACTIVE) {
-    throw new VendorAuthorizationError("An active vendor membership is required.");
+  if (!vendor || !isMember || !vendorRole) {
+    throw new VendorAuthorizationError("A vendor membership is required.");
+  }
+  const readOnlyInactiveAccess = permission === "vendor:view_orders" || permission === "vendor:view_ledger";
+  if (!options?.allowInactiveShop && !readOnlyInactiveAccess && vendor.status !== VendorStatus.ACTIVE) {
+    throw new VendorAuthorizationError("This shop is not currently authorized for marketplace operations.");
   }
 
   if (permission && !hasPermission({ vendorRole }, permission)) {

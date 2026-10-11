@@ -1,5 +1,11 @@
 import { prisma } from "@/lib/prisma/client";
 import { PlatformRole, UserStatus, VerificationStatus } from "@prisma/client";
+import { ShopModerationService } from "@/services/shop-moderation";
+import {
+  adminVisibleOnboardingDocumentsWhere,
+  adminVisibleProfileDocumentsWhere,
+  countVendorDocuments,
+} from "@/lib/vendor-document-aggregation";
 
 export class AdminService {
   static async getAllUsers(options?: {
@@ -86,15 +92,32 @@ export class AdminService {
         { businessEmail: { contains: filters.search, mode: "insensitive" as const } },
       ];
     }
-    return prisma.vendorApplication.findMany({
+    const applications = await prisma.vendorApplication.findMany({
       where,
       include: {
         user: { select: { id: true, name: true, email: true, phone: true, avatarUrl: true } },
-        documents: { orderBy: { createdAt: "desc" } },
-        vendorProfile: { select: { logoUrl: true, bannerUrl: true } },
+        documents: { where: adminVisibleOnboardingDocumentsWhere, select: { id: true, type: true, name: true, status: true }, orderBy: { createdAt: "desc" } },
+        _count: { select: { documents: { where: adminVisibleOnboardingDocumentsWhere } } },
+        vendorProfile: {
+          select: {
+            id: true,
+            logoUrl: true,
+            bannerUrl: true,
+            status: true,
+            moderationReason: true,
+            _count: { select: { documents: { where: adminVisibleProfileDocumentsWhere } } },
+          },
+        },
       },
       orderBy: { createdAt: "desc" },
     });
+    return applications.map((application) => ({
+      ...application,
+      documentCount: countVendorDocuments({
+        onboarding: application._count.documents,
+        profile: application.vendorProfile?._count.documents,
+      }),
+    }));
   }
 
   static async getVendorApplicationById(applicationId: string) {
@@ -102,45 +125,21 @@ export class AdminService {
       where: { id: applicationId },
       include: {
         user: { select: { id: true, name: true, email: true, phone: true, avatarUrl: true } },
-        documents: { orderBy: { createdAt: "desc" } },
+        documents: { select: { id: true, type: true, name: true, mimeType: true, size: true, status: true, notes: true, createdAt: true }, orderBy: { createdAt: "desc" } },
       },
     });
   }
 
   static async verifyVendor(applicationId: string, status: VerificationStatus, reviewerNotes: string | null, reviewedBy: string) {
-    const application = await prisma.vendorApplication.update({
-      where: { id: applicationId },
-      data: { status, reviewerNotes, reviewedBy, reviewedAt: new Date() },
+    if (status !== VerificationStatus.APPROVED && status !== VerificationStatus.REJECTED)
+      throw new Error("Only approval and rejection are supported by this compatibility action.");
+    await ShopModerationService.transition({
+      applicationId,
+      action: status === VerificationStatus.APPROVED ? "APPROVE" : "REJECT",
+      reason: reviewerNotes,
+      actorId: reviewedBy,
     });
-    if (status === "APPROVED") {
-      await prisma.vendorProfile.upsert({
-        where: { ownerId: application.userId },
-        update: {
-          storeName: application.storeName, slug: application.storeSlug,
-          email: application.businessEmail, phone: application.businessPhone,
-          website: application.website, address: application.streetAddress,
-          city: application.city, country: application.country,
-          status: "ACTIVE", activatedAt: new Date(),
-        },
-        create: {
-          ownerId: application.userId, storeName: application.storeName,
-          slug: application.storeSlug, registrationNumber: application.registrationNumber,
-          email: application.businessEmail, phone: application.businessPhone,
-          website: application.website, address: application.streetAddress,
-          city: application.city, country: application.country,
-          status: "ACTIVE", activatedAt: new Date(),
-        },
-      });
-      const vendorProfile = await prisma.vendorProfile.findUnique({ where: { ownerId: application.userId } });
-      if (vendorProfile) {
-        await prisma.vendorApplication.update({ where: { id: applicationId }, data: { vendorProfileId: vendorProfile.id } });
-        await prisma.user.update({ where: { id: application.userId }, data: { vendorId: vendorProfile.id, vendorRole: "OWNER", platformRole: "VENDOR" } });
-      }
-    }
-    await prisma.auditLog.create({
-      data: { userId: reviewedBy, action: `VENDOR_${status}`, entity: "VendorApplication", entityId: applicationId, newValues: { status } },
-    });
-    return application;
+    return prisma.vendorApplication.findUniqueOrThrow({ where: { id: applicationId } });
   }
 
     static async getAllOrders() {

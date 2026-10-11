@@ -54,7 +54,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { GripVerticalIcon, Columns3Icon, ChevronDownIcon } from "lucide-react";
+import {
+  GripVerticalIcon,
+  Columns3Icon,
+  ChevronDownIcon,
+  SearchIcon,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 
@@ -71,12 +76,22 @@ export interface DataTableFeatures {
   emptyState?: boolean;
 }
 
+export interface DataTableSearchConfig {
+  value?: string;
+  onValueChange?: (value: string) => void;
+  placeholder?: string;
+  ariaLabel?: string;
+  debounceMs?: number;
+}
+
 export interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
   getRowId: (row: TData) => string;
   onReorder?: (newData: TData[]) => void;
   features?: DataTableFeatures;
+  search?: DataTableSearchConfig;
+  getSearchText?: (row: TData) => string;
   searchPlaceholder?: string;
   searchColumn?: string;
   defaultPageSize?: number;
@@ -141,6 +156,8 @@ export function DataTableRuntime<TData, TValue>({
   getRowId,
   onReorder,
   features,
+  search,
+  getSearchText,
   searchPlaceholder = "Search...",
   searchColumn,
   defaultPageSize = 5,
@@ -176,6 +193,10 @@ export function DataTableRuntime<TData, TValue>({
   );
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = React.useState("");
+  const [controlledSearchValue, setControlledSearchValue] = React.useState(
+    search?.value ?? "",
+  );
+  const searchTimeout = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const [pagination, setPagination] = React.useState({
     pageIndex: 0,
     pageSize: defaultPageSize,
@@ -198,6 +219,19 @@ export function DataTableRuntime<TData, TValue>({
     };
     return [dragColumn, ...columns];
   }, [columns, onReorder]);
+
+  const usesControlledSearch = Boolean(search?.onValueChange);
+
+  React.useEffect(() => {
+    if (usesControlledSearch) setControlledSearchValue(search?.value ?? "");
+  }, [search?.value, usesControlledSearch]);
+
+  React.useEffect(
+    () => () => {
+      if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    },
+    [],
+  );
 
   // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
@@ -235,8 +269,16 @@ export function DataTableRuntime<TData, TValue>({
       ? (onPaginationChange ?? setPagination)
       : undefined,
     getCoreRowModel: getCoreRowModel(),
+    globalFilterFn: getSearchText
+      ? (row, _columnId, filterValue) =>
+          getSearchText(row.original)
+            .toLocaleLowerCase()
+            .includes(String(filterValue).toLocaleLowerCase())
+      : undefined,
     getFilteredRowModel:
-      enabled.filtering || enabled.search ? getFilteredRowModel() : undefined,
+      enabled.filtering || (enabled.search && !usesControlledSearch)
+        ? getFilteredRowModel()
+        : undefined,
     getPaginationRowModel: enabled.pagination
       ? getPaginationRowModel()
       : undefined,
@@ -248,9 +290,11 @@ export function DataTableRuntime<TData, TValue>({
   });
 
   const rows = table.getRowModel().rows;
-  const searchValue = searchColumn
-    ? ((table.getColumn(searchColumn)?.getFilterValue() as string) ?? "")
-    : globalFilter;
+  const searchValue = usesControlledSearch
+    ? controlledSearchValue
+    : searchColumn
+      ? ((table.getColumn(searchColumn)?.getFilterValue() as string) ?? "")
+      : globalFilter;
   const dataIds = React.useMemo(() => {
     return rows.map((row) => row.id);
   }, [rows]);
@@ -272,6 +316,20 @@ export function DataTableRuntime<TData, TValue>({
     }
   }
 
+  function handleSearchChange(value: string) {
+    if (usesControlledSearch) {
+      setControlledSearchValue(value);
+      if (searchTimeout.current) clearTimeout(searchTimeout.current);
+      searchTimeout.current = setTimeout(() => {
+        search?.onValueChange?.(value);
+      }, search?.debounceMs ?? 300);
+      return;
+    }
+
+    if (searchColumn) table.getColumn(searchColumn)?.setFilterValue(value);
+    else table.setGlobalFilter(value);
+  }
+
   return (
     <div
       className={cn(
@@ -280,26 +338,25 @@ export function DataTableRuntime<TData, TValue>({
       )}>
       {enabled.toolbar &&
         (renderTabs || toolbarContent || toolbarActions || enabled.search || enabled.columnVisibility) && (
-          <div className="flex flex-col justify-between gap-4 border-b border-border/40 pb-4 sm:flex-row sm:items-center">
-            <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <div className="flex flex-col gap-3 border-b border-border/40 pb-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+              {enabled.search && (
+                <div className="relative w-full max-w-sm">
+                  <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={searchValue}
+                    onChange={(event) => handleSearchChange(event.target.value)}
+                    placeholder={search?.placeholder ?? searchPlaceholder}
+                    aria-label={search?.ariaLabel ?? search?.placeholder ?? searchPlaceholder}
+                    className="h-9 w-full rounded-xl pl-9 text-xs"
+                  />
+                </div>
+              )}
               {renderTabs}
               {toolbarContent}
             </div>
 
-            <div className="flex flex-wrap items-center gap-2.5 self-end sm:self-auto">
-              {enabled.search && (
-                <Input
-                  value={searchValue}
-                  onChange={(event) => {
-                    const value = event.target.value;
-                    if (searchColumn) table.getColumn(searchColumn)?.setFilterValue(value);
-                    else table.setGlobalFilter(value);
-                  }}
-                  placeholder={searchPlaceholder}
-                  aria-label={searchPlaceholder}
-                  className="h-9 w-48 rounded-xl text-xs"
-                />
-              )}
+            <div className="flex flex-wrap items-center gap-2.5 self-start sm:self-auto">
               {enabled.columnVisibility && (
                 <DropdownMenu>
             <DropdownMenuTrigger asChild>

@@ -7,7 +7,6 @@ import {
   CreateProductInput,
   UpdateProductInput,
   serializeProductBasic as serializeProductForClient,
-  serializeMarketplaceProduct,
   serializePublicProductDetail,
 } from "@/services/product";
 import { withErrorHandling, validateRequiredFields } from "@/lib/api-utils";

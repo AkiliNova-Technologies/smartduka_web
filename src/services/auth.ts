@@ -43,7 +43,7 @@ export class AuthService {
     if (!response.ok) {
       const body = await response.json().catch(() => ({}));
       throw new Error(
-        body.error || "Failed to synchronize session with SmartDuka server."
+        body.error || "Failed to synchronize session with Mwezora server."
       );
     }
 

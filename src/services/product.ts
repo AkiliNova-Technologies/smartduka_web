@@ -6,6 +6,8 @@ import { createVariantWithSku, generateVariantSku, isSkuCollision } from "@/lib/
 import { randomUUID } from "node:crypto";
 import { cacheLife, cacheTag } from "next/cache";
 import { cacheProfiles, cacheTags } from "@/lib/cache-policy";
+import { VendorEntitlementService } from "@/services/vendor-entitlement";
+import { publicProductWhere } from "@/lib/marketplace-eligibility";
 
 // ==========================================
 // INPUT TYPES
@@ -328,6 +330,9 @@ export class ProductService {
       where.status = Array.isArray(options.status)
         ? { in: options.status }
         : options.status;
+      const statuses = Array.isArray(options.status) ? options.status : [options.status];
+      if (statuses.length > 0 && statuses.every((status) => status === "ACTIVE" || status === "PUBLISHED"))
+        where.vendor = publicProductWhere.vendor;
     }
     if (options?.search) {
       where.OR = [
@@ -376,14 +381,15 @@ export class ProductService {
     search?: string;
     sort?: CatalogSort;
     limit?: number;
+    offset?: number;
+    shopId?: string;
   } & CatalogFilters) {
     "use cache";
     cacheLife(cacheProfiles.marketplace);
     cacheTag(cacheTags.marketplace.products);
     const search = options?.search?.trim();
     const where: Prisma.ProductWhereInput = {
-      status: { in: ["ACTIVE", "PUBLISHED"] },
-      deletedAt: null,
+      ...publicProductWhere,
     };
 
     if (search) {
@@ -395,6 +401,7 @@ export class ProductService {
         { vendor: { storeName: { contains: search, mode: "insensitive" } } },
       ];
     }
+    if (options?.shopId) where.vendorId = options.shopId;
     if (options?.brand) where.brand = { equals: options.brand, mode: "insensitive" };
     if (options?.categoryId) {
       const tree = await CategoryService.getCategoryTree({ activeOnly: true });
@@ -432,7 +439,7 @@ export class ProductService {
       },
       orderBy,
       take: options?.limit || 50,
-      skip: Math.max(0, ((options?.page ?? 1) - 1) * (options?.limit || 50)),
+      skip: options?.offset ?? Math.max(0, ((options?.page ?? 1) - 1) * (options?.limit || 50)),
     });
     return products.map((product) => serializeMarketplaceProduct(product as unknown as Record<string, unknown>));
   }
@@ -441,7 +448,7 @@ export class ProductService {
     "use cache";
     cacheLife(cacheProfiles.marketplace);
     cacheTag(cacheTags.marketplace.products);
-    const brands = await prisma.product.findMany({ where: { status: { in: ["ACTIVE", "PUBLISHED"] }, deletedAt: null, brand: { not: null } }, distinct: ["brand"], select: { brand: true }, orderBy: { brand: "asc" }, take: 50 });
+    const brands = await prisma.product.findMany({ where: { ...publicProductWhere, brand: { not: null } }, distinct: ["brand"], select: { brand: true }, orderBy: { brand: "asc" }, take: 50 });
     return brands.flatMap((item) => item.brand?.trim() ? [item.brand.trim()] : []);
   }
 
@@ -465,7 +472,7 @@ export class ProductService {
   /** Get a public product by ID (only active/published, non-deleted). */
   static async getPublicProductById(id: string) {
     return prisma.product.findFirst({
-      where: { id, status: { in: ["ACTIVE", "PUBLISHED"] }, deletedAt: null },
+      where: { id, ...publicProductWhere },
       include: {
         images: { orderBy: { sortOrder: "asc" } }, category: true, subCategory: true,
         vendor: { select: { id: true, storeName: true, slug: true, logoUrl: true, verificationStatus: true } },
@@ -551,8 +558,7 @@ export class ProductService {
     return prisma.product.findFirst({
       where: {
         slug,
-        status: { in: ["ACTIVE", "PUBLISHED"] },
-        deletedAt: null,
+        ...publicProductWhere,
       },
       include: {
         images: { orderBy: { sortOrder: "asc" } },
@@ -625,8 +631,7 @@ export class ProductService {
 
     const products = await prisma.product.findMany({
       where: {
-        status: { in: ["ACTIVE", "PUBLISHED"] },
-        deletedAt: null,
+        ...publicProductWhere,
         createdAt: { gte: fourteenDaysAgo },
       },
       include: {
@@ -652,8 +657,7 @@ export class ProductService {
     cacheTag(cacheTags.marketplace.products, cacheTags.marketplace.discovery);
     const products = await prisma.product.findMany({
       where: {
-        status: { in: ["ACTIVE", "PUBLISHED"] },
-        deletedAt: null,
+        ...publicProductWhere,
         compareAtPrice: { not: null },
       },
       include: {
@@ -705,8 +709,7 @@ export class ProductService {
     const candidateLimit = Math.max(limit * 3, limit);
     const baseWhere: Prisma.ProductWhereInput = {
       id: { not: product.id },
-      status: { in: ["ACTIVE", "PUBLISHED"] },
-      deletedAt: null,
+      ...publicProductWhere,
     };
     const categoryWhere = (ids: string[]): Prisma.ProductWhereInput => ({
       ...baseWhere,
@@ -753,6 +756,7 @@ export class ProductService {
    * Create a new product with images
    */
   static async createProduct(input: CreateProductInput) {
+    VendorEntitlementService.requireCapability(await VendorEntitlementService.summary(input.vendorId), "PRODUCT_PUBLISHING");
     await CategoryService.assertCompatibleProductCategories(input.categoryId, input.subCategoryId);
     const variants = validateVariants(input.variants);
     const needsAutomaticVariantSkus = variants.some((variant) => !variant.sku);
@@ -874,6 +878,7 @@ export class ProductService {
    * Update an existing product
    */
   static async updateProduct(input: UpdateProductInput) {
+    if (input.status === "PUBLISHED" || input.status === "ACTIVE") { const owner = await prisma.product.findUnique({ where: { id: input.id }, select: { vendorId: true, status: true } }); if (owner && owner.status !== "PUBLISHED" && owner.status !== "ACTIVE") VendorEntitlementService.requireCapability(await VendorEntitlementService.summary(owner.vendorId), "PRODUCT_PUBLISHING"); }
     if (input.categoryId !== undefined || input.subCategoryId !== undefined) {
       const existing = await prisma.product.findUnique({ where: { id: input.id }, select: { categoryId: true, subCategoryId: true } });
       await CategoryService.assertCompatibleProductCategories(input.categoryId !== undefined ? input.categoryId : existing?.categoryId, input.subCategoryId !== undefined ? input.subCategoryId : existing?.subCategoryId);

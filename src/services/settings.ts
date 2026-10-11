@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma/client";
+import { isAccentPreset, isThemeMode, type AccentPreset, type ThemeMode } from "@/lib/appearance";
 
 // ==========================================
 // TYPES
@@ -19,6 +20,8 @@ export interface UserSettingsPayload {
   marketingNewsletter?: boolean;
   twoFactorEnabled?: boolean;
   buyerProtectionEnabled?: boolean;
+  themeMode?: ThemeMode;
+  accentColor?: AccentPreset;
 }
 
 const SETTINGS_STRING_FIELDS = new Set<keyof UserSettingsPayload>([
@@ -43,6 +46,16 @@ export function sanitizeUserSettingsPayload(input: unknown): UserSettingsPayload
   for (const [key, value] of Object.entries(input)) {
     const settingsKey = key as keyof UserSettingsPayload;
     if (!SETTINGS_STRING_FIELDS.has(settingsKey) && !SETTINGS_BOOLEAN_FIELDS.has(settingsKey)) {
+      if (settingsKey === "themeMode") {
+        if (!isThemeMode(value)) throw new UserSettingsPayloadError("Unsupported theme mode.");
+        payload.themeMode = value;
+        continue;
+      }
+      if (settingsKey === "accentColor") {
+        if (!isAccentPreset(value)) throw new UserSettingsPayloadError("Unsupported accent colour.");
+        payload.accentColor = value;
+        continue;
+      }
       throw new UserSettingsPayloadError("Unsupported settings field: " + key);
     }
 
@@ -85,6 +98,8 @@ export class SettingsService {
           marketingNewsletter: false,
           twoFactorEnabled: false,
           buyerProtectionEnabled: true,
+          themeMode: "system",
+          accentColor: "classic",
         },
       });
     }
@@ -119,6 +134,8 @@ export class SettingsService {
         marketingNewsletter: safeData.marketingNewsletter ?? false,
         twoFactorEnabled: safeData.twoFactorEnabled ?? false,
         buyerProtectionEnabled: safeData.buyerProtectionEnabled ?? true,
+        themeMode: safeData.themeMode ?? "system",
+        accentColor: safeData.accentColor ?? "classic",
       },
     });
   }

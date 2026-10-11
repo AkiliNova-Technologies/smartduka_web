@@ -3,6 +3,7 @@ import { AccountInactiveError, AuthenticationRequiredError, requireActiveUserId 
 import { errorResponse, successResponse } from "@/lib/api-utils";
 import { PesapalPaymentError, PesapalPaymentService } from "@/services/payments/pesapal-payment-service";
 import { PesapalClientError } from "@/services/payments/pesapal-client";
+import { PaymentProviderRegistry } from "@/lib/payments/payment-provider";
 
 function sanitizedProviderMessage(message: string | undefined) {
   return message
@@ -14,6 +15,7 @@ function sanitizedProviderMessage(message: string | undefined) {
 
 export async function POST(request: NextRequest) {
   try {
+    PaymentProviderRegistry.assertEnabled("PESAPAL");
     const userId = await requireActiveUserId();
     const body: unknown = await request.json();
     const input = typeof body === "object" && body !== null ? body as Record<string, unknown> : {};

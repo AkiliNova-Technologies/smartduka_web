@@ -1,0 +1,31 @@
+{
+  "version": "women-v1",
+  "mappings": {
+    "women.fashion.clothing.dresses": "34c83084-7f0e-48ea-9e30-462f06b1f533",
+    "women.fashion.clothing.skirts": "04505000-a728-4085-a814-e037a553d9e4",
+    "women.bags-and-accessories.fashion-accessories.hats-and-caps": "0afb2d4f-e993-4df7-bd27-e9dc4a24445f",
+    "women.jewellery-and-watches.watches": "dbf2dddc-0691-42f4-9628-f5996be1f0a5"
+  },
+  "approvedReparents": {
+    "women.fashion.clothing.dresses": {
+      "id": "34c83084-7f0e-48ea-9e30-462f06b1f533",
+      "fromParentId": "4b8cd879-5877-4230-b2c8-8e964cf90e80",
+      "toParentKey": "women.fashion.clothing"
+    },
+    "women.fashion.clothing.skirts": {
+      "id": "04505000-a728-4085-a814-e037a553d9e4",
+      "fromParentId": "4b8cd879-5877-4230-b2c8-8e964cf90e80",
+      "toParentKey": "women.fashion.clothing"
+    },
+    "women.bags-and-accessories.fashion-accessories.hats-and-caps": {
+      "id": "0afb2d4f-e993-4df7-bd27-e9dc4a24445f",
+      "fromParentId": "4b8cd879-5877-4230-b2c8-8e964cf90e80",
+      "toParentKey": "women.bags-and-accessories.fashion-accessories"
+    },
+    "women.jewellery-and-watches.watches": {
+      "id": "dbf2dddc-0691-42f4-9628-f5996be1f0a5",
+      "fromParentId": "4b8cd879-5877-4230-b2c8-8e964cf90e80",
+      "toParentKey": "women.jewellery-and-watches"
+    }
+  }
+}

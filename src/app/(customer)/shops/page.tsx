@@ -8,6 +8,7 @@ import { MarketplacePagination } from "@/components/marketplace/marketplace-pagi
 import { VendorService } from "@/services/vendor";
 import { parseMarketplacePage } from "@/lib/marketplace-page";
 import type { PublicShopListing } from "@/lib/public-shop-dto";
+import { connection } from "next/server";
 
 type ShopsPageProps = { searchParams: Promise<{ page?: string }> };
 const SHOPS_PAGE_SIZE = 12;
@@ -29,14 +30,19 @@ async function ShopsGrid({ stores, searchParams }: ShopsPageProps & { stores: Pu
   return <><ShopsCards stores={visibleStores} priority /><MarketplacePagination total={stores.length} /></>;
 }
 
-export default async function ShopsPage({ searchParams }: ShopsPageProps) {
+export default function ShopsPage({ searchParams }: ShopsPageProps) {
+  return <Suspense fallback={<PageContainer className="py-6 sm:py-8"><PageHeader title="Browse shops" description="Discover products from local businesses on Mwezora." /></PageContainer>}><ShopsRuntime searchParams={searchParams} /></Suspense>;
+}
+
+async function ShopsRuntime({ searchParams }: ShopsPageProps) {
+  await connection();
   const stores = await VendorService.getPublicStoreListings();
   return (
     <PageContainer className="py-6 sm:py-8">
       <div className="space-y-7">
+        <PageHeader title="Browse shops" description="Discover products from local businesses on Mwezora." />
         <PromotionSection placement="SHOPS" compact />
-        <PageHeader title="Browse shops" description="Discover products from local businesses on SmartDuka." />
-        {stores.length ? <Suspense fallback={<ShopsGridFallback stores={stores} />}><ShopsGrid stores={stores} searchParams={searchParams} /></Suspense> : <IllustratedEmptyState illustration="/illustrations/empty-shops.svg" title="No shops available yet" description="SmartDuka shops will appear here as they become available." action={{ label: "Browse products", href: "/products" }} />}
+        {stores.length ? <Suspense fallback={<ShopsGridFallback stores={stores} />}><ShopsGrid stores={stores} searchParams={searchParams} /></Suspense> : <IllustratedEmptyState illustration="/illustrations/empty-shops.svg" title="No shops available yet" description="Mwezora shops will appear here as they become available." action={{ label: "Browse products", href: "/products" }} />}
       </div>
     </PageContainer>
   );

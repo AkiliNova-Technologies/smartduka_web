@@ -6,7 +6,8 @@ const source = (path: string) => readFileSync(resolve(process.cwd(), path), "utf
 
 describe("vendor orders pagination", () => {
   it("shares one generic pagination control with DataTable", () => {
-    expect(source("src/components/data-table.tsx")).toContain("PaginationControls");
+    expect(source("src/components/data-table.tsx")).toContain("DataTableRuntime");
+    expect(source("src/components/data-table-runtime.tsx")).toContain("PaginationControls");
     const controls = source("src/components/ui/pagination-controls.tsx");
     expect(controls).toContain("onPageChange");
     expect(controls).toContain("First page");

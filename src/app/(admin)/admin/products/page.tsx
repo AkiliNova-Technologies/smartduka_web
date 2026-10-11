@@ -1,13 +1,14 @@
 "use client";
 
 import * as React from "react";
-import { Store, Search, Boxes, EyeOff, Eye, Package } from "lucide-react";
+import { Store, Boxes, EyeOff, Eye, Package } from "lucide-react";
 import { MediaImage } from "@/components/marketplace/media-image";
 import { PRODUCT_IMAGE_FALLBACK } from "@/lib/media";
 import { type ColumnDef } from "@tanstack/react-table";
 import { cn } from "@/lib/utils";
 import { DataTable } from "@/components/data-table";
-import { Input } from "@/components/ui/input";
+import { DataTableRowActions } from "@/components/data-table-row-actions";
+import { StatusBadge } from "@/components/marketplace/status-badge";
 import {
   Sheet,
   SheetContent,
@@ -49,21 +50,9 @@ function getProductImage(product: Product): string {
 export default function AdminProductsPage() {
   const { products, isLoading, error } = useProducts();
 
-  const [searchQuery, setSearchQuery] = React.useState("");
   const [selectedProduct, setSelectedProduct] = React.useState<Product | null>(
     null,
   );
-
-  const filteredProducts = React.useMemo(() => {
-    if (!searchQuery) return products;
-    const q = searchQuery.toLowerCase();
-    return products.filter(
-      (p) =>
-        p.name?.toLowerCase().includes(q) ||
-        (p.brand ?? "").toLowerCase().includes(q) ||
-        (p.vendor?.storeName ?? "").toLowerCase().includes(q),
-    );
-  }, [products, searchQuery]);
 
   const totalProducts = products.length;
   const publishedProducts = products.filter(
@@ -125,22 +114,7 @@ export default function AdminProductsPage() {
       {
         accessorKey: "status",
         header: "Status",
-        cell: ({ row }) => {
-          const status = row.original.status;
-          return (
-            <span
-              className={cn(
-                "inline-flex items-center gap-1 text-xs font-medium leading-none px-2.5 py-1 rounded-full border",
-                status === "ACTIVE" || status === "PUBLISHED"
-                  ? "text-white bg-emerald-600 border-transparent"
-                  : status === "DRAFT"
-                    ? "text-zinc-700 bg-zinc-100 border-zinc-200 dark:text-zinc-300 dark:bg-zinc-800 dark:border-zinc-700"
-                    : "text-zinc-700 bg-zinc-100 border-zinc-200 dark:text-zinc-300 dark:bg-zinc-800 dark:border-zinc-700",
-              )}>
-              {status ? status.replaceAll("_", " ").toLowerCase().replace(/^./, (letter) => letter.toUpperCase()) : "Unknown"}
-            </span>
-          );
-        },
+        cell: ({ row }) => <StatusBadge status={row.original.status} />,
       },
       {
         accessorKey: "inventoryCount",
@@ -162,16 +136,7 @@ export default function AdminProductsPage() {
       {
         id: "actions",
         header: () => <div className="text-right">View</div>,
-        cell: ({ row }) => (
-          <div className="flex items-center justify-end">
-            <button
-              onClick={() => setSelectedProduct(row.original)}
-              className="p-1.5 text-muted-foreground hover:text-foreground rounded-lg border border-border/40 hover:bg-muted transition-colors cursor-pointer"
-              title="View product details">
-              <Eye className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        ),
+        cell: ({ row }) => <DataTableRowActions actions={[{ id: "view", label: "View product details", icon: Eye, onSelect: () => setSelectedProduct(row.original) }]} />,
       },
     ],
     [],
@@ -206,20 +171,12 @@ export default function AdminProductsPage() {
 
       <DataTable
         columns={columns}
-        data={filteredProducts}
+        data={products}
         getRowId={(row) => row.id}
         isLoading={isLoading}
-        renderTabs={
-          <div className="flex items-center gap-3 w-full max-w-xs relative group">
-            <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" />
-            <Input
-              placeholder="Search by name, brand, or store..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 h-9 border-border/60 rounded-full bg-muted/20 placeholder:text-muted-foreground/40 text-xs focus-visible:ring-primary/20"
-            />
-          </div>
-        }
+        features={{ search: true }}
+        searchPlaceholder="Search products..."
+        getSearchText={(product) => [product.name, product.brand, product.slug, product.vendor?.storeName].filter(Boolean).join(" ")}
       />
 
       <Sheet

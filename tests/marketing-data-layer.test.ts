@@ -8,12 +8,12 @@ describe("UI-11B.2 marketing data layer", () => {
     expect(source("src/lib/marketing-client.ts")).toContain("/api/marketing/");
     expect(source("src/hooks/use-marketing.ts")).toContain("AbortController");
   });
-  it("keeps customer pages free of raw marketing endpoints and server service imports", () => {
+  it("keeps customer pages free of raw marketing endpoints while server pages may call services directly", () => {
     for (const file of ["src/app/(customer)/page.tsx", "src/app/(customer)/products/page.tsx", "src/app/(customer)/shops/page.tsx"]) {
       const page = source(file);
       expect(page).not.toContain("/api/marketing/");
-      expect(page).not.toContain("MarketingService");
     }
+    expect(source("src/app/(customer)/page.tsx")).toContain("MarketingService.publicFeaturedProducts()");
   });
   it("keeps the admin marketing UI behind the centralized hook", () => {
     const adminPage = source("src/components/marketing/promotions-manager.tsx");

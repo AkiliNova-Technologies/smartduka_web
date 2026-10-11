@@ -16,6 +16,7 @@ export type PublicShopListing = {
   deliveryFee: number | null;
   deliveryEstimate: string | null;
   productCount: number;
+  sponsored?: boolean;
 };
 
 type PublicShopListingRecord = {

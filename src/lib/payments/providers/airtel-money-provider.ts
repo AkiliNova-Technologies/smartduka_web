@@ -1,0 +1,4 @@
+import { PaymentProvider } from "@prisma/client";
+import { type InitiatePaymentInput, type InitiatePaymentResult, type PaymentProviderAdapter, type ProviderPaymentStatusResult, PaymentProviderUnavailableError } from "@/lib/payments/payment-provider";
+/** Airtel’s authenticated Uganda contract is required before any request mapping is written. */
+export class AirtelMoneyProvider implements PaymentProviderAdapter { readonly provider = PaymentProvider.AIRTEL_MONEY; async initiatePayment(input: InitiatePaymentInput): Promise<InitiatePaymentResult> { void input; throw new PaymentProviderUnavailableError(this.provider, "Airtel’s direct-vendor API contract is not configured."); } async getPaymentStatus(reference: string): Promise<ProviderPaymentStatusResult> { void reference; throw new PaymentProviderUnavailableError(this.provider, "Airtel status polling is not configured."); } }

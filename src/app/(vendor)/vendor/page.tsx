@@ -13,9 +13,12 @@ import {
   PackageCheck,
   PackagePlus,
   ShoppingCart,
+  ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/data-table";
+import { DataTableRowActions } from "@/components/data-table-row-actions";
+import { StatusBadge } from "@/components/marketplace/status-badge";
 import { DashboardMetricCard } from "@/components/dashboard-metric-card";
 import {
   ChartContainer,
@@ -47,13 +50,6 @@ function formatDate(value: string) {
   }).format(new Date(value));
 }
 
-function statusLabel(status: string) {
-  return status
-    .replaceAll("_", " ")
-    .toLowerCase()
-    .replace(/^./, (letter) => letter.toUpperCase());
-}
-
 function isDeliveredSale(order: VendorOrder) {
   return order.paymentStatus === "COMPLETED" && order.status === "DELIVERED";
 }
@@ -65,20 +61,6 @@ function productInventory(product: Product) {
   return variants?.length
     ? variants.reduce((total, variant) => total + variant.inventoryCount, 0)
     : (product.inventoryCount ?? 0);
-}
-
-function OrdersStatus({ status }: { status: string }) {
-  const tone = ["DELIVERED"].includes(status)
-    ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-700 dark:text-emerald-400"
-    : ["CANCELLED", "REFUNDED"].includes(status)
-      ? "border-rose-500/20 bg-rose-500/5 text-rose-700 dark:text-rose-400"
-      : "border-amber-500/20 bg-amber-500/5 text-amber-700 dark:text-amber-400";
-  return (
-    <span
-      className={`inline-flex whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-medium ${tone}`}>
-      {statusLabel(status)}
-    </span>
-  );
 }
 
 function MetricCard({
@@ -223,21 +205,12 @@ export default function VendorOverviewPage() {
       {
         accessorKey: "status",
         header: "Status",
-        cell: ({ row }) => <OrdersStatus status={row.original.status} />,
+        cell: ({ row }) => <StatusBadge status={row.original.status} />,
       },
       {
         id: "actions",
         header: "",
-        cell: ({ row }) => (
-          <Button asChild variant="ghost" size="sm" className="h-8 gap-1">
-            <Link
-              href="/vendor/orders"
-              aria-label={`View ${row.original.subOrderNumber}`}>
-              <Eye className="size-4" />
-              <span className="hidden sm:inline">View</span>
-            </Link>
-          </Button>
-        ),
+        cell: ({ row }) => <DataTableRowActions actions={[{ id: "view", label: `View ${row.original.subOrderNumber}`, icon: Eye, href: "/vendor/orders" }]} />,
       },
     ],
     [],
@@ -276,6 +249,8 @@ export default function VendorOverviewPage() {
           </Button>
         </div>
       </header>
+
+      {profile && <VerificationCard status={profile.verificationStatus}/>}
 
       <section
         aria-label="Business performance"
@@ -427,8 +402,6 @@ export default function VendorOverviewPage() {
               Customer orders will appear here when your products start selling.
             </span>
           }
-          className="rounded-xl p-0"
-          containerClassName="gap-0"
         />
       </section>
 
@@ -512,7 +485,7 @@ export default function VendorOverviewPage() {
                       {order.items.length === 1 ? "" : "s"}
                     </p>
                   </div>
-                  <OrdersStatus status={order.status} />
+                  <StatusBadge status={order.status} />
                 </li>
               ))}
             </ul>
@@ -525,6 +498,13 @@ export default function VendorOverviewPage() {
       </section>
     </div>
   );
+}
+
+function VerificationCard({ status }: { status: string }) {
+  const verified = status === "VERIFIED";
+  const pending = status === "PENDING" || status === "UNDER_REVIEW";
+  const needsAttention = status === "NEEDS_INFORMATION" || status === "REJECTED";
+  return <section aria-labelledby="verification-card-heading" className="flex flex-col gap-4 rounded-xl border border-border/60 bg-card p-5 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-start gap-3"><div className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><ShieldCheck className="size-5"/></div><div><h2 id="verification-card-heading" className="font-semibold">{verified ? "Verified Shop" : pending ? "Verification under review" : needsAttention ? "Verification needs attention" : "Get your shop verified"}</h2><p className="mt-1 text-sm text-muted-foreground">{verified ? "Your shop verification is active." : pending ? "Your verification application is being reviewed. We’ll notify you when a decision is made." : needsAttention ? "Review the requested corrections and continue your verification application." : "Build more trust with customers by completing shop verification."}</p></div></div>{!verified && <Button asChild variant={pending ? "outline" : "default"} className="shrink-0 rounded-full"><Link href="/vendor/verification">{pending ? "View verification status" : needsAttention ? "Continue verification" : "Apply for verification"}</Link></Button>}</section>;
 }
 
 function buildSalesChart(orders: VendorOrder[], now: number | null) {

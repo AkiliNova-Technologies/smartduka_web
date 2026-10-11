@@ -5,22 +5,20 @@ import { describe, expect, it } from "vitest";
 const source = readFileSync(resolve(process.cwd(), "src/app/(customer)/checkout/page.tsx"), "utf8");
 
 describe("checkout payment method", () => {
-  it("renders Pesapal as the selected, accessible payment option", () => {
-    expect(source).toContain('role="radiogroup"');
-    expect(source).toContain('type="radio"');
-    expect(source).toContain('name="payment-method"');
-    expect(source).toContain('checked={selectedPaymentGateway === "PESAPAL"}');
+  it("creates the order before seller-specific direct payment", () => {
+    expect(source).toContain("Payment happens per shop");
+    expect(source).toContain("Payments go directly to that seller’s verified merchant account.");
+    expect(source).toContain('paymentGateway: "MTN_MOMO"');
   });
 
-  it("keeps the complete payment option clickable and compact", () => {
-    expect(source).toContain("<label");
-    expect(source).toContain('src="/payment-logos/pesapal.svg"');
-    expect(source).toContain('width={44}');
-    expect(source).toContain('disabled={isSubmitting}');
+  it("does not route the cart through a marketplace payment collector", () => {
+    expect(source).not.toContain("PESAPAL");
+    expect(source).not.toContain("/api/payments/pesapal/initiate");
+    expect(source).toContain("router.push(`/orders/${result.orderId}`)");
   });
 
-  it("separates the redirect helper text from the payment option", () => {
-    expect(source).toContain("Pay securely with card, Mobile Money, or other available methods.");
-    expect(source).toContain("You’ll continue to Pesapal to complete payment securely.");
+  it("does not claim payment availability before seller routing is verified", () => {
+    expect(source).toContain("Availability is confirmed per shop");
+    expect(source).toContain("marketplace payments are not enabled until direct merchant routing is verified");
   });
 });

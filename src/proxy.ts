@@ -41,7 +41,9 @@ export function isPublicMarketplaceRead(method: string, pathname: string): boole
   const normalizedPathname = normalizePathname(pathname);
   return (
     hasPathPrefix(normalizedPathname, "/api/v1/products") ||
+    hasPathPrefix(normalizedPathname, "/api/v1/shops") ||
     normalizedPathname === "/api/v1/categories" ||
+    normalizedPathname === "/api/v1/search" ||
     normalizedPathname === "/api/v1/marketplace/home" ||
     /^\/api\/marketing\/(HOMEPAGE|PRODUCTS|SHOPS)$/.test(normalizedPathname)
   );

@@ -12,7 +12,7 @@ import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetT
 import { Skeleton } from "@/components/ui/skeleton";
 import { DashboardMetricCard } from "@/components/dashboard-metric-card";
 import { DataTable } from "@/components/data-table";
-import { humanizeOperation, operationBadgeClass } from "@/lib/admin-operations";
+import { StatusBadge } from "@/components/marketplace/status-badge";
 import { useVendorFinance } from "@/hooks/use-vendor-finance";
 import type { VendorFinanceSummary, VendorWithdrawal } from "@/lib/vendor-finance-client";
 
@@ -33,7 +33,7 @@ export default function VendorFinancePage() {
     { accessorKey: "createdAt", header: "Requested", cell: ({ row }) => <span className="whitespace-nowrap">{formatDate(row.original.createdAt)}</span> },
     { accessorKey: "amount", header: "Amount", cell: ({ row }) => <span className="whitespace-nowrap font-semibold">{formatUgx(String(row.original.amount))}</span> },
     { accessorKey: "maskedDestination", header: "Payout method", cell: ({ row }) => <span className="block max-w-48 truncate" title={row.original.maskedDestination || ""}>{row.original.maskedDestination || "Destination unavailable"}</span> },
-    { accessorKey: "status", header: "Status", cell: ({ row }) => <span className={`inline-flex rounded-full px-2 py-1 text-[10px] font-semibold ${operationBadgeClass(row.original.status)}`}>{humanizeOperation(row.original.status)}</span> },
+    { accessorKey: "status", header: "Status", cell: ({ row }) => <StatusBadge status={row.original.status} /> },
     { accessorKey: "updatedAt", header: "Updated", cell: ({ row }) => <span className="whitespace-nowrap text-muted-foreground">{formatDate(row.original.updatedAt)}</span> },
   ], []);
 

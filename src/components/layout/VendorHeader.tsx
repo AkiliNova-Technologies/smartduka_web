@@ -10,6 +10,7 @@ function titleFor(pathname: string) {
   if (pathname.startsWith("/vendor/products")) return "Stock & Inventory";
   if (pathname.startsWith("/vendor/settings")) return "Store Settings";
   if (pathname.startsWith("/vendor/finance")) return "Earnings & withdrawals";
+  if (pathname.startsWith("/vendor/marketing")) return "Marketing";
   return "Dashboard Overview";
 }
 

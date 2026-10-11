@@ -1,29 +1,29 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import {
-  Search,
   Eye,
   MoreVertical,
   Ban,
   CheckCircle2,
   XCircle,
   Clock,
-  FileSearch,
   Mail,
   Phone,
-  MapPin,
   Loader2,
   FileText,
   Download,
+  RotateCcw,
+  ShieldX,
+  ExternalLink,
 } from "lucide-react";
 import { MediaImage } from "@/components/marketplace/media-image";
 import { SHOP_LOGO_FALLBACK } from "@/lib/media";
 import { type ColumnDef } from "@tanstack/react-table";
-import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { DataTable } from "@/components/data-table";
-import { Input } from "@/components/ui/input";
 import {
   Sheet,
   SheetContent,
@@ -38,45 +38,21 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { VerificationStatus } from "@prisma/client";
 import { useAdmin } from "@/hooks/use-admin";
-import { verifyVendorAction } from "@/actions/admin";
+import { moderateShopAction } from "@/actions/admin";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AdminMetricCard } from "@/components/admin/admin-metric-card";
 import type { VendorApplicationRow } from "@/types/marketplace";
-
-
-const STATUS_CONFIG: Record<
-  VerificationStatus,
-  { label: string; color: string; icon: React.ElementType }
-> = {
-  PENDING: {
-    label: "Pending",
-    color: "text-white bg-amber-500 border-transparent",
-    icon: Clock,
-  },
-  SUBMITTED: {
-    label: "Submitted",
-    color: "text-white bg-amber-500 border-transparent",
-    icon: FileSearch,
-  },
-  UNDER_REVIEW: {
-    label: "Under Review",
-    color: "text-white bg-amber-500 border-transparent",
-    icon: FileSearch,
-  },
-  APPROVED: {
-    label: "Approved",
-    color: "text-white bg-emerald-600 border-transparent",
-    icon: CheckCircle2,
-  },
-  REJECTED: {
-    label: "Rejected",
-    color: "text-white bg-rose-600 border-transparent",
-    icon: XCircle,
-  },
-};
+import type {
+  ShopModerationAction,
+  ShopModerationState,
+} from "@/lib/shop-moderation-state";
+import { useAdminVendorVerificationDetails } from "@/hooks/use-admin-vendor-verification-details";
+import { ShopVerificationStatusBadge } from "@/components/marketplace/shop-verification-status-badge";
+import { StatusBadge } from "@/components/marketplace/status-badge";
+import { DataTableStatusFilter } from "@/components/data-table-status-filter";
+import { ShopModerationDialog } from "@/components/admin/shop-moderation-dialog";
 
 const DOCUMENT_TYPE_LABELS: Record<string, string> = {
   NATIONAL_ID: "National ID",
@@ -111,35 +87,50 @@ export default function AdminVendorsPage() {
     refreshVendors,
   } = useAdmin();
 
-  const [searchQuery, setSearchQuery] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState<
-    VerificationStatus | "ALL"
+    ShopModerationState | "ALL"
   >("ALL");
   const [selectedApp, setSelectedApp] =
     React.useState<VendorApplicationRow | null>(null);
   const [actionLoading, setActionLoading] = React.useState<string | null>(null);
+  const [moderationRequest, setModerationRequest] = React.useState<{ shop: VendorApplicationRow; action: ShopModerationAction } | null>(null);
+  const verification = useAdminVendorVerificationDetails(
+    selectedApp?.id ?? null,
+  );
+
+  const openDetails = React.useCallback((application: VendorApplicationRow) => {
+    setSelectedApp(application);
+    const url = new URL(window.location.href);
+    url.searchParams.set("applicationId", application.id);
+    window.history.replaceState(null, "", url);
+  }, []);
+  const closeDetails = React.useCallback(() => {
+    setSelectedApp(null);
+    const url = new URL(window.location.href);
+    url.searchParams.delete("applicationId");
+    window.history.replaceState(null, "", url);
+  }, []);
+
+  React.useEffect(() => {
+    if (selectedApp || applications.length === 0) return;
+    const applicationId = new URL(window.location.href).searchParams.get(
+      "applicationId",
+    );
+    const application = applications.find((item) => item.id === applicationId);
+    if (!application) return;
+    const task = window.setTimeout(() => setSelectedApp(application), 0);
+    return () => window.clearTimeout(task);
+  }, [applications, selectedApp]);
 
   const filteredApplications = React.useMemo(() => {
     let result = applications;
     if (statusFilter !== "ALL")
       result = result.filter((a) => a.status === statusFilter);
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      result = result.filter(
-        (a) =>
-          a.storeName.toLowerCase().includes(q) ||
-          a.storeSlug.toLowerCase().includes(q) ||
-          a.userEmail.toLowerCase().includes(q),
-      );
-    }
     return result;
-  }, [applications, searchQuery, statusFilter]);
+  }, [applications, statusFilter]);
 
   const totalPending = applications.filter(
-    (a) =>
-      a.status === "PENDING" ||
-      a.status === "SUBMITTED" ||
-      a.status === "UNDER_REVIEW",
+    (a) => a.status === "PENDING",
   ).length;
   const totalApproved = applications.filter(
     (a) => a.status === "APPROVED",
@@ -148,30 +139,40 @@ export default function AdminVendorsPage() {
     (a) => a.status === "REJECTED",
   ).length;
 
-  const handleVerify = React.useCallback(async (id: string, status: VerificationStatus) => {
-    setActionLoading(id);
-    try {
-      const result = await verifyVendorAction(
-        id,
-        status,
-        status === "APPROVED" ? "Approved by admin." : "Rejected by admin.",
-      );
-      if (result.success) {
-        toast.success(
-          status === "APPROVED"
-            ? "Store approved successfully!"
-            : "Application rejected.",
-        );
-        refreshVendors();
-      } else {
-        toast.error(result.error || "Failed to update application");
+  const handleModerate = React.useCallback(
+    async (id: string, action: ShopModerationAction) => {
+      setActionLoading(id);
+      try {
+        const result = await moderateShopAction(id, action);
+        if (result.success) {
+          toast.success(
+            {
+              APPROVE: "Store approved.",
+              REJECT: "Application rejected.",
+              SUSPEND: "Store suspended.",
+              RESTORE: "Store restored.",
+              BAN: "Store banned.",
+            }[action],
+          );
+          closeDetails();
+          refreshVendors();
+        } else {
+          toast.error(result.error || "Failed to update application");
+        }
+      } catch {
+        toast.error("Failed to update application");
+      } finally {
+        setActionLoading(null);
       }
-    } catch {
-      toast.error("Failed to update application");
-    } finally {
-      setActionLoading(null);
-    }
-  }, [refreshVendors]);
+    },
+    [closeDetails, refreshVendors],
+  );
+  const openModeration = React.useCallback((shop: VendorApplicationRow, action: ShopModerationAction) => setModerationRequest({ shop, action }), []);
+  const moderationSucceeded = React.useCallback((action: ShopModerationAction) => {
+    toast.success({ REJECT: "Application rejected.", SUSPEND: "Store suspended.", RESTORE: "Store restored.", BAN: "Store banned.", APPROVE: "Store approved." }[action]);
+    closeDetails();
+    refreshVendors();
+  }, [closeDetails, refreshVendors]);
 
   const columns = React.useMemo<ColumnDef<VendorApplicationRow, unknown>[]>(
     () => [
@@ -181,13 +182,25 @@ export default function AdminVendorsPage() {
         cell: ({ row }) => (
           <div className="flex items-center gap-3">
             <div className="relative size-10 rounded-lg bg-muted border border-border/40 overflow-hidden shrink-0">
-              <MediaImage src={row.original.logoUrl} fallback={SHOP_LOGO_FALLBACK} alt={row.original.storeName} fill sizes="40px" className="object-cover" fallbackClassName="object-cover" />
+              <MediaImage
+                src={row.original.logoUrl}
+                fallback={SHOP_LOGO_FALLBACK}
+                alt={row.original.storeName}
+                fill
+                sizes="40px"
+                className="object-cover"
+                fallbackClassName="object-cover"
+              />
             </div>
             <div className="space-y-0.5 min-w-0">
-              <p className="line-clamp-2 text-sm font-semibold text-foreground" title={row.original.storeName}>
+              <p
+                className="line-clamp-2 text-sm font-semibold text-foreground"
+                title={row.original.storeName}>
                 {row.original.storeName}
               </p>
-              <p className="truncate text-[10px] text-muted-foreground" title={row.original.storeSlug}>
+              <p
+                className="truncate text-[10px] text-muted-foreground"
+                title={row.original.storeSlug}>
                 {row.original.storeSlug}
               </p>
             </div>
@@ -202,7 +215,9 @@ export default function AdminVendorsPage() {
             <p className="text-xs font-medium text-foreground">
               {row.original.userName}
             </p>
-            <p className="truncate text-[10px] text-muted-foreground" title={row.original.userEmail}>
+            <p
+              className="truncate text-[10px] text-muted-foreground"
+              title={row.original.userEmail}>
               {row.original.userEmail}
             </p>
           </div>
@@ -221,20 +236,7 @@ export default function AdminVendorsPage() {
       {
         accessorKey: "status",
         header: "Status",
-        cell: ({ row }) => {
-          const config = STATUS_CONFIG[row.original.status];
-          const Icon = config.icon;
-          return (
-            <span
-              className={cn(
-                "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium leading-none",
-                config.color,
-              )}>
-              <Icon className="w-3 h-3" />
-              {config.label}
-            </span>
-          );
-        },
+        cell: ({ row }) => <StatusBadge status={row.original.status} />,
       },
       {
         accessorKey: "createdAt",
@@ -253,33 +255,26 @@ export default function AdminVendorsPage() {
         id: "actions",
         header: () => <div className="text-right">Actions</div>,
         cell: ({ row }) => {
-          const isPending =
-            row.original.status === "PENDING" ||
-            row.original.status === "SUBMITTED" ||
-            row.original.status === "UNDER_REVIEW";
+          const isPending = row.original.status === "PENDING";
           const isLoading = actionLoading === row.original.id;
           return (
-            <div className="flex items-center justify-end gap-1.5">
-              <button
-                onClick={() => setSelectedApp(row.original)}
-                className="p-1.5 text-muted-foreground hover:text-foreground rounded-lg border border-border/40 hover:bg-muted transition-colors cursor-pointer"
-                title="View details">
-                <Eye className="w-3.5 h-3.5" />
-              </button>
+            <TooltipProvider><div className="flex items-center justify-end gap-1.5">
+              <Tooltip><TooltipTrigger asChild><button aria-label="View details" onClick={() => openDetails(row.original)} className="grid size-8 shrink-0 place-items-center rounded-full border border-border/40 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><Eye aria-hidden="true" className="size-3.5" /></button></TooltipTrigger><TooltipContent side="top" sideOffset={6}>View details</TooltipContent></Tooltip>
               <DropdownMenu>
-                <DropdownMenuTrigger asChild>
+                <Tooltip><TooltipTrigger asChild><DropdownMenuTrigger asChild>
                   <Button
-                    variant="ghost"
+                    variant="outline"
                     size="icon"
                     disabled={isLoading}
-                    className="size-7 border border-border/40 rounded-lg text-muted-foreground cursor-pointer">
+                    aria-label="More options"
+                    className="size-8 shrink-0 rounded-full border-border/40 bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground">
                     {isLoading ? (
                       <Loader2 className="size-3.5 animate-spin" />
                     ) : (
                       <MoreVertical className="size-3.5" />
                     )}
                   </Button>
-                </DropdownMenuTrigger>
+                </DropdownMenuTrigger></TooltipTrigger><TooltipContent side="top" sideOffset={6}>More options</TooltipContent></Tooltip>
                 <DropdownMenuContent
                   align="end"
                   className="w-44 rounded-xl border border-border/60 p-1 text-xs font-medium">
@@ -287,7 +282,7 @@ export default function AdminVendorsPage() {
                     <>
                       <DropdownMenuItem
                         onClick={() =>
-                          handleVerify(row.original.id, "APPROVED")
+                          handleModerate(row.original.id, "APPROVE")
                         }
                         disabled={!!actionLoading}
                         className="rounded-lg py-2 px-2.5 text-xs flex items-center gap-2 cursor-pointer text-emerald-600 focus:bg-emerald-500/5">
@@ -296,7 +291,7 @@ export default function AdminVendorsPage() {
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() =>
-                          handleVerify(row.original.id, "REJECTED")
+                          openModeration(row.original, "REJECT")
                         }
                         disabled={!!actionLoading}
                         className="rounded-lg py-2 px-2.5 text-xs flex items-center gap-2 cursor-pointer text-rose-600 focus:bg-rose-500/5">
@@ -307,28 +302,54 @@ export default function AdminVendorsPage() {
                   )}
                   {row.original.status === "APPROVED" && (
                     <DropdownMenuItem
-                      onClick={() => handleVerify(row.original.id, "REJECTED")}
+                      onClick={() => openModeration(row.original, "SUSPEND")}
                       disabled={!!actionLoading}
                       className="rounded-lg py-2 px-2.5 text-xs flex items-center gap-2 cursor-pointer text-amber-600 focus:bg-amber-500/5">
                       <Ban className="size-3.5" />
                       Suspend Store
                     </DropdownMenuItem>
                   )}
+                  {row.original.status === "APPROVED" && (
+                    <DropdownMenuItem
+                      onClick={() => openModeration(row.original, "BAN")}
+                      disabled={!!actionLoading}
+                      className="rounded-lg py-2 px-2.5 text-xs flex items-center gap-2 cursor-pointer text-rose-700">
+                      <ShieldX className="size-3.5" /> Ban Store
+                    </DropdownMenuItem>
+                  )}
+                  {row.original.status === "SUSPENDED" && (
+                    <>
+                      <DropdownMenuItem
+                        onClick={() =>
+                          openModeration(row.original, "RESTORE")
+                        }
+                        disabled={!!actionLoading}
+                        className="rounded-lg py-2 px-2.5 text-xs flex items-center gap-2 cursor-pointer text-emerald-600">
+                        <RotateCcw className="size-3.5" /> Restore Store
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => openModeration(row.original, "BAN")}
+                        disabled={!!actionLoading}
+                        className="rounded-lg py-2 px-2.5 text-xs flex items-center gap-2 cursor-pointer text-rose-700">
+                        <ShieldX className="size-3.5" /> Ban Store
+                      </DropdownMenuItem>
+                    </>
+                  )}
                   <DropdownMenuSeparator className="bg-border/40 my-1" />
                   <DropdownMenuItem
-                    onClick={() => setSelectedApp(row.original)}
+                    onClick={() => openDetails(row.original)}
                     className="rounded-lg py-2 px-2.5 text-xs flex items-center gap-2 cursor-pointer">
                     <Eye className="size-3.5" />
                     View Details
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-            </div>
+            </div></TooltipProvider>
           );
         },
       },
     ],
-    [actionLoading, handleVerify],
+    [actionLoading, handleModerate, openDetails, openModeration],
   );
 
   if (loading && applications.length === 0) return <VendorsSkeleton />;
@@ -345,60 +366,56 @@ export default function AdminVendorsPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <AdminMetricCard label="Pending Review" value={loading ? "—" : totalPending} icon={Clock} tone="warning" />
-        <AdminMetricCard label="Approved Stores" value={loading ? "—" : totalApproved} icon={CheckCircle2} />
-        <AdminMetricCard label="Rejected" value={loading ? "—" : totalRejected} icon={XCircle} tone="danger" />
+        <AdminMetricCard
+          label="Pending Review"
+          value={loading ? "—" : totalPending}
+          icon={Clock}
+          tone="warning"
+        />
+        <AdminMetricCard
+          label="Approved Stores"
+          value={loading ? "—" : totalApproved}
+          icon={CheckCircle2}
+        />
+        <AdminMetricCard
+          label="Rejected"
+          value={loading ? "—" : totalRejected}
+          icon={XCircle}
+          tone="danger"
+        />
       </div>
 
-      <div className="flex gap-2 flex-wrap">
-        {(
-          [
-            "ALL",
-            "PENDING",
-            "SUBMITTED",
-            "UNDER_REVIEW",
-            "APPROVED",
-            "REJECTED",
-          ] as const
-        ).map((status) => (
-          <button
-            key={status}
-            onClick={() => setStatusFilter(status)}
-            className={cn(
-              "px-3 py-1.5 rounded-full text-[10px] font-semibold border transition-all cursor-pointer",
-              statusFilter === status
-                ? "bg-primary text-white border-primary"
-                : "bg-card text-muted-foreground border-border/60 hover:border-primary/30",
-            )}>
-            {status === "ALL"
-              ? "All"
-              : STATUS_CONFIG[status as VerificationStatus]?.label || status}
-          </button>
-        ))}
-      </div>
+      <DataTableStatusFilter
+        value={statusFilter}
+        onValueChange={setStatusFilter}
+        options={([
+          ["ALL", "All statuses"],
+          ["PENDING", "Pending"],
+          ["APPROVED", "Approved"],
+          ["REJECTED", "Rejected"],
+          ["SUSPENDED", "Suspended"],
+          ["BANNED", "Banned"],
+        ] as const).map(([value, label]) => ({ value, label }))}
+      />
 
       <DataTable
         columns={columns}
         data={filteredApplications}
         getRowId={(row) => row.id}
         isLoading={loading}
-        renderTabs={
-          <div className="flex items-center gap-3 w-full max-w-xs relative group">
-            <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search stores or owners..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 h-9 border-border/60 rounded-full bg-muted/20 placeholder:text-muted-foreground/40 text-xs focus-visible:ring-primary/20"
-            />
-          </div>
+        features={{ search: true }}
+        searchPlaceholder="Search vendors..."
+        getSearchText={(vendor) =>
+          [vendor.storeName, vendor.storeSlug, vendor.userEmail]
+            .filter(Boolean)
+            .join(" ")
         }
       />
 
       {/* Detail Sheet with Documents */}
       <Sheet
         open={!!selectedApp}
-        onOpenChange={(open) => !open && setSelectedApp(null)}>
+        onOpenChange={(open) => !open && closeDetails()}>
         {selectedApp && (
           <SheetContent
             side="right"
@@ -415,21 +432,18 @@ export default function AdminVendorsPage() {
             <div className="space-y-5 mt-6">
               <div className="flex items-center justify-between">
                 <span className="text-xs text-muted-foreground">Status</span>
-                {(() => {
-                  const config = STATUS_CONFIG[selectedApp.status];
-                  const Icon = config.icon;
-                  return (
-                    <span
-                      className={cn(
-                        "inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full border",
-                        config.color,
-                      )}>
-                      <Icon className="w-3 h-3" />
-                      {config.label}
-                    </span>
-                  );
-                })()}
+                <StatusBadge status={selectedApp.status} />
               </div>
+              {selectedApp.moderationReason && (
+                <div className="rounded-xl border border-border/60 bg-muted/30 p-3 text-xs">
+                  <p className="font-semibold text-foreground">
+                    Moderation reason
+                  </p>
+                  <p className="mt-1 whitespace-pre-wrap text-muted-foreground">
+                    {selectedApp.moderationReason}
+                  </p>
+                </div>
+              )}
 
               <div className="border-t border-border/40 pt-4 space-y-3">
                 <h4 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
@@ -463,8 +477,8 @@ export default function AdminVendorsPage() {
                     <strong className="text-foreground">Slug:</strong>{" "}
                     {selectedApp.storeSlug}
                   </p>
-                  <div className="flex items-start gap-2">
-                    <MapPin className="w-3 h-3 mt-0.5 shrink-0" />
+                  <div className="flex items-start gap-1">
+                    <strong className="text-foreground">Location:</strong>{" "}
                     {selectedApp.streetAddress}, {selectedApp.city}
                     {selectedApp.district ? `, ${selectedApp.district}` : ""}
                   </div>
@@ -475,57 +489,178 @@ export default function AdminVendorsPage() {
                 </div>
               </div>
 
-              {/* Documents Section */}
+              {/* Documents & Verification Section */}
               <div className="border-t border-border/40 pt-4 space-y-3">
                 <h4 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
                   <FileText className="w-3.5 h-3.5" />
-                  Verification Documents ({selectedApp.documents?.length || 0})
+                  Documents &amp; Verification
                 </h4>
-                {selectedApp.documents && selectedApp.documents.length > 0 ? (
-                  <div className="space-y-2">
-                    {selectedApp.documents.map((doc) => (
+                {verification.loading && (
+                  <Skeleton className="h-28 rounded-xl" />
+                )}
+                {verification.error && (
+                  <p role="alert" className="text-xs text-destructive">
+                    {verification.error}
+                  </p>
+                )}
+                {verification.data && (
+                  <div className="flex items-center justify-between rounded-xl border border-border/50 bg-muted/20 p-3">
+                    <div>
+                      <p className="text-xs font-medium">Shop verification</p>
+                      <p className="mt-1 text-[10px] text-muted-foreground">
+                        {verification.data.applications.length} application
+                        {verification.data.applications.length === 1 ? "" : "s"}{" "}
+                        on record
+                      </p>
+                    </div>
+                    <ShopVerificationStatusBadge
+                      status={verification.data.verificationStatus}
+                    />
+                  </div>
+                )}
+                {verification.loading && (
+                  <div className="space-y-2" aria-hidden="true">
+                    {Array.from({ length: 2 }).map((_, index) => (
                       <div
-                        key={doc.id}
-                        className="flex items-center justify-between p-3 bg-muted/30 border border-border/40 rounded-xl">
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-9 h-9 rounded-lg bg-primary/5 border border-border/40 flex items-center justify-center shrink-0">
-                            <FileText className="w-4 h-4 text-muted-foreground" />
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-xs font-medium text-foreground truncate">
-                              {doc.name}
-                            </p>
-                            <p className="text-[10px] text-muted-foreground">
-                              {DOCUMENT_TYPE_LABELS[doc.type] || doc.type}
-                            </p>
-                          </div>
+                        key={index}
+                        className="flex items-center gap-3 rounded-xl border border-border/40 bg-card p-3">
+                        <Skeleton className="size-9 shrink-0 rounded-lg" />
+                        <div className="flex-1 space-y-1.5">
+                          <Skeleton className="h-3 w-2/3" />
+                          <Skeleton className="h-2.5 w-1/3" />
+                          <Skeleton className="h-2.5 w-1/2" />
                         </div>
-                        <a
-                          href={doc.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors shrink-0"
-                          title="View document">
-                          <Download className="w-3.5 h-3.5" />
-                        </a>
+                        <Skeleton className="size-7 shrink-0 rounded-lg" />
                       </div>
                     ))}
                   </div>
-                ) : (
+                )}
+                {verification.data?.applications[0] && (
+                  <Link
+                    href={`/admin/verifications/${verification.data.applications[0].id}`}
+                    className="flex items-center justify-between rounded-xl border border-primary/20 bg-primary/5 p-3 text-xs font-medium text-primary hover:bg-primary/10">
+                    Open latest verification application{" "}
+                    <ExternalLink className="size-3.5" />
+                  </Link>
+                )}
+                {!verification.loading && verification.data?.documents.length ? (
+                  <div className="space-y-2">
+                    {verification.data.documents.map((doc) => (
+                      <div
+                        key={`${doc.source}-${doc.id}`}
+                        className="p-3 bg-muted/30 border border-border/40 rounded-xl">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-9 h-9 rounded-lg bg-primary/5 border border-border/40 flex items-center justify-center shrink-0">
+                              <FileText className="w-4 h-4 text-muted-foreground" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-xs font-medium text-foreground truncate">
+                                {doc.name}
+                              </p>
+                              <p className="text-[10px] text-muted-foreground">
+                                {DOCUMENT_TYPE_LABELS[doc.type] || doc.type}
+                              </p>
+                              <p className="text-[10px] text-muted-foreground">
+                                Uploaded{" "}
+                                {new Date(doc.uploadedAt).toLocaleString(
+                                  "en-UG",
+                                  { dateStyle: "medium", timeStyle: "short" },
+                                )}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex shrink-0 gap-1">
+                            <a
+                              href={doc.viewUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg"
+                              title="Secure preview">
+                              <Eye className="size-3.5" />
+                            </a>
+                            <a
+                              href={doc.downloadUrl}
+                              className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg"
+                              title="Secure download">
+                              <Download className="size-3.5" />
+                            </a>
+                          </div>
+                        </div>
+                        <div className="mt-2 flex flex-wrap gap-1.5 text-[9px] uppercase tracking-wide text-muted-foreground">
+                          <span className="rounded-full bg-background px-2 py-0.5">
+                            {doc.source === "profile"
+                              ? "Shop document"
+                              : "Onboarding"}
+                          </span>
+                          <span className="rounded-full bg-background px-2 py-0.5">
+                            {doc.status.replaceAll("_", " ")}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : !verification.loading ? (
                   <p className="text-xs text-muted-foreground italic">
                     No documents uploaded yet.
                   </p>
+                ) : null}
+                {!!verification.data?.applications.length && (
+                  <div className="space-y-2 pt-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Application history
+                    </p>
+                    {verification.data.applications.map((application) => (
+                      <Link
+                        key={application.id}
+                        href={`/admin/verifications/${application.id}`}
+                        className="block rounded-xl border border-border/40 p-3 hover:bg-muted/30">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-mono text-[10px]">
+                            {application.publicId}
+                          </span>
+                          <ShopVerificationStatusBadge
+                            status={application.status}
+                          />
+                        </div>
+                        <p className="mt-2 text-[10px] text-muted-foreground">
+                          Submitted{" "}
+                          {new Date(application.submittedAt).toLocaleString(
+                            "en-UG",
+                            { dateStyle: "medium", timeStyle: "short" },
+                          )}{" "}
+                          · {application.documentCount} document
+                          {application.documentCount === 1 ? "" : "s"}
+                        </p>
+                        {application.decidedAt && (
+                          <p className="mt-1 text-[10px] text-muted-foreground">
+                            Decided{" "}
+                            {new Date(application.decidedAt).toLocaleString(
+                              "en-UG",
+                              { dateStyle: "medium", timeStyle: "short" },
+                            )}
+                            {application.decisionBy
+                              ? ` by ${application.decisionBy}`
+                              : ""}
+                          </p>
+                        )}
+                        {application.rejectionReason && (
+                          <p className="mt-2 text-[10px] text-rose-600">
+                            {application.rejectionReason}
+                          </p>
+                        )}
+                      </Link>
+                    ))}
+                  </div>
                 )}
               </div>
             </div>
 
             <div className="flex flex-col gap-2 border-t border-border/40 pt-4 mt-6">
-              {(selectedApp.status === "PENDING" ||
-                selectedApp.status === "SUBMITTED" ||
-                selectedApp.status === "UNDER_REVIEW") && (
+              {selectedApp.status === "PENDING" && (
                 <>
                   <Button
-                    onClick={() => handleVerify(selectedApp.id, "APPROVED")}
+                    onClick={() => handleModerate(selectedApp.id, "APPROVE")}
                     disabled={actionLoading === selectedApp.id}
                     className="w-full h-10 rounded-xl text-xs font-medium bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer">
                     {actionLoading === selectedApp.id ? (
@@ -537,7 +672,7 @@ export default function AdminVendorsPage() {
                   </Button>
                   <Button
                     variant="destructive"
-                    onClick={() => handleVerify(selectedApp.id, "REJECTED")}
+                    onClick={() => openModeration(selectedApp, "REJECT")}
                     disabled={actionLoading === selectedApp.id}
                     className="w-full h-10 rounded-xl text-xs font-medium cursor-pointer">
                     <XCircle className="w-3.5 h-3.5" />
@@ -545,9 +680,40 @@ export default function AdminVendorsPage() {
                   </Button>
                 </>
               )}
+              {selectedApp.status === "APPROVED" && (
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={() => openModeration(selectedApp, "SUSPEND")}
+                    disabled={actionLoading === selectedApp.id}>
+                    <Ban className="size-3.5" /> Suspend Store
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={() => openModeration(selectedApp, "BAN")}
+                    disabled={actionLoading === selectedApp.id}>
+                    <ShieldX className="size-3.5" /> Ban Store
+                  </Button>
+                </>
+              )}
+              {selectedApp.status === "SUSPENDED" && (
+                <>
+                  <Button
+                    onClick={() => openModeration(selectedApp, "RESTORE")}
+                    disabled={actionLoading === selectedApp.id}>
+                    <RotateCcw className="size-3.5" /> Restore Store
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={() => openModeration(selectedApp, "BAN")}
+                    disabled={actionLoading === selectedApp.id}>
+                    <ShieldX className="size-3.5" /> Ban Store
+                  </Button>
+                </>
+              )}
               <Button
                 variant="secondary"
-                onClick={() => setSelectedApp(null)}
+                onClick={closeDetails}
                 className="w-full h-10 rounded-xl text-xs font-medium border cursor-pointer">
                 Close
               </Button>
@@ -555,6 +721,7 @@ export default function AdminVendorsPage() {
           </SheetContent>
         )}
       </Sheet>
+      <ShopModerationDialog shop={moderationRequest?.shop ?? null} action={moderationRequest?.action ?? null} open={!!moderationRequest} onOpenChange={(open) => !open && setModerationRequest(null)} onSuccess={moderationSucceeded}/>
     </div>
   );
 }

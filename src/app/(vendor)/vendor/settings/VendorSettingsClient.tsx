@@ -4,30 +4,32 @@
 
 import React, { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Store, Shield, Globe, ImageIcon, Landmark, Users } from "lucide-react";
+import { Store, Shield, Globe, ImageIcon, Landmark, Palette, Users } from "lucide-react";
 import { PackageCheck } from "lucide-react";
 import { useVendor } from "@/hooks/use-vendor";
 import { StoreBrandingTab } from "@/components/vendor/settings/store-branding-tab";
 import { StoreInfoTab } from "@/components/vendor/settings/store-info-tab";
-import { DocumentsTab } from "@/components/vendor/settings/documents-tab";
+import { DocumentsTab, type VendorSettingsDocument } from "@/components/vendor/settings/documents-tab";
 import { PreviewTab } from "@/components/vendor/settings/preview-tab";
 import { FulfillmentPolicyTab } from "@/components/vendor/settings/fulfillment-policy-tab";
 import { TeamTab } from "@/components/vendor/settings/team-tab";
-import { PayoutSettingsTab } from "@/components/vendor/settings/payout-settings-tab";
-import type { VendorProfile, Document } from "@prisma/client";
+import { PaymentSettingsTab } from "@/components/vendor/settings/payment-settings-tab";
+import type { VendorProfile } from "@prisma/client";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AppearanceSettings } from "@/components/settings/AppearanceSettings";
 
 type TabID =
   | "branding"
   | "information"
   | "fulfillment"
   | "documents"
-  | "payouts"
+  | "payments"
+  | "appearance"
   | "team"
   | "preview";
 
 type FullVendorProfile = VendorProfile & {
-  documents: Document[];
+  documents: VendorSettingsDocument[];
   _count: { products: number; subOrders: number };
 };
 
@@ -40,7 +42,8 @@ const TABS = [
     icon: PackageCheck,
   },
   { id: "documents" as const, label: "Verification Docs", icon: Shield },
-  { id: "payouts" as const, label: "Payouts", icon: Landmark },
+  { id: "payments" as const, label: "Payments", icon: Landmark },
+  { id: "appearance" as const, label: "Appearance", icon: Palette },
   { id: "team" as const, label: "Shop Team", icon: Users },
   { id: "preview" as const, label: "Live Preview", icon: Globe },
 ];
@@ -50,11 +53,11 @@ export default function VendorSettingsPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabID>(() =>
-    searchParams.get("tab") === "payouts" ? "payouts" : "branding",
+    ["payments", "payouts"].includes(searchParams.get("tab") ?? "") ? "payments" : "branding",
   );
   const selectTab = (tab: TabID) => {
     setActiveTab(tab);
-    router.replace(tab === "payouts" ? "/vendor/settings?tab=payouts" : "/vendor/settings", { scroll: false });
+    router.replace(tab === "payments" ? "/vendor/settings?tab=payments" : "/vendor/settings", { scroll: false });
   };
 
   // Loading skeleton — only shows on first load, not on subsequent navigations
@@ -140,7 +143,8 @@ export default function VendorSettingsPage() {
               initialDocuments={profile.documents}
             />
           )}
-          {activeTab === "payouts" && <PayoutSettingsTab />}
+          {activeTab === "payments" && <PaymentSettingsTab />}
+          {activeTab === "appearance" && <AppearanceSettings />}
           {activeTab === "team" && <TeamTab />}
           {activeTab === "preview" && <PreviewTab profile={profile} />}
         </div>

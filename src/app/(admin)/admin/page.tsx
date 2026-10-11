@@ -3,9 +3,11 @@
 import * as React from "react";
 import Link from "next/link";
 import { type ColumnDef } from "@tanstack/react-table";
-import { ArrowRight, CircleDollarSign, Clock, ShoppingCart, Store, Users } from "lucide-react";
+import { ArrowRight, CircleDollarSign, Eye, ShoppingCart, Store, Users } from "lucide-react";
 import { DataTable } from "@/components/data-table";
+import { DataTableRowActions } from "@/components/data-table-row-actions";
 import { DashboardMetricCard } from "@/components/dashboard-metric-card";
+import { StatusBadge } from "@/components/marketplace/status-badge";
 import { useAdmin } from "@/hooks/use-admin";
 import type { OrderRow, VendorApplicationRow } from "@/types/marketplace";
 
@@ -16,12 +18,6 @@ type DashboardUser = { id: string; name: string; email: string; status: string; 
 
 const date = (value: string | Date) => new Intl.DateTimeFormat("en-UG", { day: "numeric", month: "short", year: "numeric" }).format(new Date(value));
 const money = (value: number) => `UGX ${value.toLocaleString("en-UG", { maximumFractionDigits: 0 })}`;
-const label = (value: string) => value.replaceAll("_", " ").toLowerCase().replace(/^./, (letter) => letter.toUpperCase());
-
-function StatusBadge({ value }: { value: string }) {
-  const tone = ["COMPLETED", "DELIVERED", "APPROVED", "ACTIVE"].includes(value) ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-700 dark:text-emerald-400" : ["REJECTED", "CANCELLED", "REFUNDED", "SUSPENDED"].includes(value) ? "border-rose-500/20 bg-rose-500/5 text-rose-700 dark:text-rose-400" : "border-amber-500/20 bg-amber-500/5 text-amber-700 dark:text-amber-400";
-  return <span className={`inline-flex whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] font-medium ${tone}`}>{label(value)}</span>;
-}
 
 function SectionHeader({ title, description, href, action }: { title: string; description: string; href: string; action: string }) {
   return <div className="flex flex-wrap items-end justify-between gap-3"><div><h2 className="text-lg font-semibold tracking-tight text-foreground">{title}</h2><p className="mt-1 text-sm text-muted-foreground">{description}</p></div><Link href={href} className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">{action}<ArrowRight className="size-4" aria-hidden="true" /></Link></div>;
@@ -38,21 +34,21 @@ export default function AdminDashboardPage() {
     { accessorKey: "customerName", header: "Customer", cell: ({ row }) => <span className="block max-w-36 truncate text-sm font-medium">{row.original.customerName}</span> },
     { accessorKey: "storeName", header: "Shop", cell: ({ row }) => <span className="block max-w-36 truncate text-sm text-muted-foreground">{row.original.storeName}</span> },
     { accessorKey: "totalAmount", header: "Total", cell: ({ row }) => <span className="whitespace-nowrap text-sm font-medium tabular-nums">{money(row.original.totalAmount)}</span> },
-    { accessorKey: "paymentStatus", header: "Payment", cell: ({ row }) => <StatusBadge value={row.original.paymentStatus} /> },
-    { accessorKey: "subOrderStatus", header: "Fulfilment", cell: ({ row }) => <StatusBadge value={row.original.subOrderStatus} /> },
+    { accessorKey: "paymentStatus", header: "Payment", cell: ({ row }) => <StatusBadge status={row.original.paymentStatus} /> },
+    { accessorKey: "subOrderStatus", header: "Fulfilment", cell: ({ row }) => <StatusBadge status={row.original.subOrderStatus} /> },
     { accessorKey: "date", header: "Date", cell: ({ row }) => <span className="whitespace-nowrap text-xs text-muted-foreground">{date(row.original.date)}</span> },
   ], []);
 
   const vendorColumns = React.useMemo<ColumnDef<VendorApplicationRow, unknown>[]>(() => [
     { accessorKey: "storeName", header: "Shop / applicant", cell: ({ row }) => <div className="min-w-32"><p className="truncate text-sm font-medium">{row.original.storeName}</p><p className="truncate text-xs text-muted-foreground">{row.original.userName}</p></div> },
-    { accessorKey: "status", header: "Status", cell: ({ row }) => <StatusBadge value={row.original.status} /> },
+    { accessorKey: "status", header: "Status", cell: ({ row }) => <StatusBadge status={row.original.status} /> },
     { accessorKey: "createdAt", header: "Submitted", cell: ({ row }) => <span className="whitespace-nowrap text-xs text-muted-foreground">{date(row.original.createdAt)}</span> },
-    { id: "action", header: "", cell: () => <Link href="/admin/vendors" className="text-sm font-medium text-primary hover:underline">Review</Link> },
+    { id: "action", header: "", cell: () => <DataTableRowActions actions={[{ id: "review", label: "Review vendor", icon: Eye, href: "/admin/vendors" }]} /> },
   ], []);
 
   const userColumns = React.useMemo<ColumnDef<DashboardUser, unknown>[]>(() => [
     { accessorKey: "name", header: "Customer", cell: ({ row }) => <div className="min-w-36"><p className="truncate text-sm font-medium">{row.original.name || "Unnamed customer"}</p><p className="truncate text-xs text-muted-foreground">{row.original.email}</p></div> },
-    { accessorKey: "status", header: "Status", cell: ({ row }) => <StatusBadge value={row.original.status} /> },
+    { accessorKey: "status", header: "Status", cell: ({ row }) => <StatusBadge status={row.original.status} /> },
     { accessorKey: "createdAt", header: "Joined", cell: ({ row }) => <span className="whitespace-nowrap text-xs text-muted-foreground">{date(row.original.createdAt)}</span> },
   ], []);
 

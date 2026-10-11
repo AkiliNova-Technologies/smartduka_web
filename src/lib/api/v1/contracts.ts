@@ -11,7 +11,7 @@ export const checkoutBodySchema = z.object({
   checkoutRequestId: z.string().min(16).max(128).regex(/^[A-Za-z0-9_-]+$/),
   items: z.array(z.object({ productId: z.string().min(1), variantId: z.string().min(1).nullable().optional(), quantity: z.number().int().positive() })).min(1),
   shippingAddress: z.string().trim().min(3).max(1000), shippingPhone: z.string().trim().min(3).max(100),
-  shippingEmail: z.string().email().optional(), paymentGateway: z.enum(["PESAPAL", "CASH_ON_DELIVERY"]),
+  shippingEmail: z.string().email().optional(), paymentGateway: z.enum(["MTN_MOMO", "AIRTEL_MONEY", "CASH_ON_DELIVERY"]),
   notes: z.string().max(2000).optional(), fulfillmentSelections: z.array(z.object({ vendorId: z.string().min(1), method: z.enum(["DELIVERY", "PICKUP"]) })).optional(),
 });
 export const mePatchSchema = z.object({ name: z.string().trim().min(1).max(120).optional(), phone: z.string().trim().max(40).nullable().optional(), avatarUrl: z.string().url().max(2000).nullable().optional() }).strict();

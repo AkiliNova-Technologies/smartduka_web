@@ -6,7 +6,7 @@ export function Newsletter() {
       <div className="absolute right-0 top-0 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
       
       <div className="relative z-10 text-center md:text-left space-y-2">
-        <h3 className="text-2xl font-bold tracking-tight text-white">Join the SmartDuka Club</h3>
+        <h3 className="text-2xl font-bold tracking-tight text-white">Join the Mwezora Club</h3>
         <p className="text-sm text-zinc-400 font-medium max-w-sm leading-relaxed">
           Get exclusive offers, early access to multi-vendor collection drops, and zero-tax checkout windows.
         </p>

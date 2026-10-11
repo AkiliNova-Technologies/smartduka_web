@@ -4,6 +4,8 @@ import { DocumentType } from "@prisma/client";
 import { AuthenticationRequiredError } from "@/lib/auth/session";
 import { ApplicantAuthorizationError, requireApplicantContext } from "@/lib/auth/applicant-context";
 import { successResponse, errorResponse, getErrorMessage } from "@/lib/api-utils";
+import { parsePrivateDocumentReference } from "@/lib/private-document-storage";
+import { KYC_MIME_TYPES, STORAGE_UPLOAD_RULES } from "@/lib/supabase/storage-contract";
 
 interface DocumentPayload { name: string; url: string; mimeType?: string; size?: number; }
 
@@ -30,14 +32,22 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ven
 
     const entries = Object.entries(documents as Record<string, DocumentPayload>);
     if (!entries.length) return errorResponse("At least one document is required.", 400);
+    const validated: Array<[DocumentType, DocumentPayload & { mimeType: string; size: number }]> = [];
+    const { getSupabaseServerClient } = await import("@/lib/supabase/server");
     for (const [type, document] of entries) {
       if (!Object.values(DocumentType).includes(type as DocumentType) || !document || typeof document.name !== "string" || !document.name.trim() || typeof document.url !== "string" || !document.url.trim()) return errorResponse("Invalid document payload.", 400);
       if (document.size !== undefined && (!Number.isInteger(document.size) || document.size < 0)) return errorResponse("Invalid document size.", 400);
+      const reference = parsePrivateDocumentReference(document.url, vendor.id);
+      if (!reference) return errorResponse("Invalid private document reference.", 400);
+      const { data: stored, error: storageError } = await getSupabaseServerClient().storage.from(reference.bucket).info(reference.path);
+      const storedMimeType = stored?.contentType || document.mimeType || "", storedSize = stored?.size ?? document.size ?? 0;
+      if (storageError || !stored || !KYC_MIME_TYPES.includes(storedMimeType as (typeof KYC_MIME_TYPES)[number]) || storedSize > STORAGE_UPLOAD_RULES["kyc-document"].maxBytes) return errorResponse("Stored document type or size is not allowed.", 400);
+      validated.push([type as DocumentType, { ...document, mimeType: storedMimeType, size: storedSize }]);
     }
 
     const documentRecords = await prisma.$transaction(async (tx) => {
-      const created = await Promise.all(entries.map(([type, document]) => tx.vendorDocument.create({
-        data: { applicationId: vendor.vendorApplication!.id, type: type as DocumentType, name: document.name.trim(), url: document.url.trim(), mimeType: document.mimeType || null, size: document.size || null, status: "SUBMITTED" },
+      const created = await Promise.all(validated.map(([type, document]) => tx.vendorDocument.create({
+        data: { applicationId: vendor.vendorApplication!.id, type, name: document.name.trim().slice(0, 255), url: document.url.trim(), mimeType: document.mimeType, size: document.size, status: "SUBMITTED" },
       })));
       await tx.vendorApplication.update({ where: { id: vendor.vendorApplication!.id }, data: { status: "UNDER_REVIEW" } });
       return created;

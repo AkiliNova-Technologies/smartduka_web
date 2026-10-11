@@ -12,13 +12,12 @@ import { useAuth } from "@/providers/AuthProvider";
 import { getMyVendorApplication, getMyVendorProfile } from "@/actions/vendor";
 import { getMyFullVendorProfile } from "@/actions/vendor-settings";
 import { fetchApi, authHeaders } from "@/lib/providers/useProviderFetch";
-import type { VerificationStatus, Document } from "@prisma/client";
+import type { VerificationStatus, DocumentType } from "@prisma/client";
 
 export interface VendorDocument {
   id: string;
   type: string;
   name: string;
-  url: string;
   status: string;
 }
 
@@ -50,6 +49,8 @@ export interface VendorProfile {
   storeName: string;
   slug: string;
   status: string;
+  verificationStatus: string;
+  moderationReason: string | null;
   logoUrl: string | null;
   bannerUrl: string | null;
   description: string | null;
@@ -60,7 +61,7 @@ export interface VendorProfile {
   city: string | null;
   country: string | null;
   _count: { products: number; subOrders: number };
-  documents: Document[];
+  documents: Array<{ id: string; type: DocumentType; name: string; mimeType: string | null; size: number | null; createdAt: Date | string }>;
 }
 
 export interface PublicStore {

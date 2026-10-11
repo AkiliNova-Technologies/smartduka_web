@@ -1,7 +1,10 @@
 import { prisma } from "@/lib/prisma/client";
+import { VendorEntitlementService } from "@/services/vendor-entitlement";
 import { VerificationStatus, Prisma } from "@prisma/client";
+import { ShopModerationService } from "@/services/shop-moderation";
 import { cacheLife, cacheTag } from "next/cache";
 import { cacheProfiles, cacheTags } from "@/lib/cache-policy";
+import { publicShopWhere } from "@/lib/marketplace-eligibility";
 import { serializeMarketplaceProduct } from "@/services/product";
 import { ReviewService } from "@/services/reviews";
 import type { MarketplaceProduct } from "@/components/marketplace/product-card";
@@ -53,7 +56,6 @@ export interface VendorApplicationWithUser {
     id: string;
     type: string;
     name: string;
-    url: string;
     status: string;
   }[];
 }
@@ -62,6 +64,27 @@ export interface VendorApplicationFilters {
   status?: VerificationStatus;
   search?: string;
 }
+
+export type SellerApplicationInput = {
+  storeName: string;
+  storeSlug: string;
+  businessType: string;
+  businessEmail: string;
+  businessPhone: string;
+  streetAddress: string;
+  city: string;
+  district: string | null;
+  hasPhysicalStore: boolean;
+  storeLocation: string | null;
+  registrationNumber?: string | null;
+  taxId?: string | null;
+  website?: string | null;
+  momoNetwork?: string | null;
+  momoNumber?: string | null;
+  bankName?: string | null;
+  bankAccountName?: string | null;
+  bankAccountNumber?: string | null;
+};
 
 export type PublicShopDetail = {
   store: {
@@ -103,6 +126,56 @@ export type PublicShopDetail = {
 // ==========================================
 
 export class VendorService {
+  static async submitApplication(userId: string, input: SellerApplicationInput) {
+    try {
+      return await prisma.$transaction(async (tx) => {
+        const [existingApplication, existingProfile] = await Promise.all([
+          tx.vendorApplication.findUnique({ where: { userId }, select: { id: true } }),
+          tx.vendorProfile.findUnique({ where: { ownerId: userId }, select: { id: true } }),
+        ]);
+        if (existingApplication || existingProfile) {
+          throw new Error("DUPLICATE_APPLICATION");
+        }
+
+        const application = await tx.vendorApplication.create({
+          data: {
+            userId,
+            ...input,
+            country: "Uganda",
+          },
+        });
+        await tx.notification.create({
+          data: {
+            userId,
+            type: "INFO",
+            title: "Seller application submitted",
+            message: "Your seller application has been received and is currently under review. We will notify you when a decision is made.",
+            actionPath: "/become-seller",
+            idempotencyKey: `seller-application:${application.id}:submitted`,
+          },
+        });
+        await tx.auditLog.create({
+          data: {
+            userId,
+            action: "SELLER_APPLICATION_SUBMITTED",
+            entity: "VendorApplication",
+            entityId: application.id,
+            newValues: { status: application.status },
+          },
+        });
+        return application;
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message === "DUPLICATE_APPLICATION") throw error;
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        const target = String(error.meta?.target ?? "");
+        if (target.includes("storeSlug")) throw new Error("SLUG_TAKEN");
+        throw new Error("DUPLICATE_APPLICATION");
+      }
+      throw error;
+    }
+  }
+
   /**
    * Get a user's vendor application by userId
    */
@@ -110,7 +183,7 @@ export class VendorService {
     return prisma.vendorApplication.findUnique({
       where: { userId },
       include: {
-        documents: { orderBy: { createdAt: "desc" } },
+        documents: { select: { id: true, type: true, name: true, mimeType: true, size: true, status: true, notes: true, createdAt: true }, orderBy: { createdAt: "desc" } },
       },
     });
   }
@@ -147,7 +220,7 @@ export class VendorService {
             avatarUrl: true,
           },
         },
-        documents: { orderBy: { createdAt: "desc" } },
+        documents: { select: { id: true, type: true, name: true, status: true }, orderBy: { createdAt: "desc" } },
       },
       orderBy: { createdAt: "desc" },
     }) as Promise<VendorApplicationWithUser[]>;
@@ -162,6 +235,15 @@ export class VendorService {
     reviewerNotes?: string,
     reviewedBy?: string
   ) {
+    if ((status === "APPROVED" || status === "REJECTED") && reviewedBy) {
+      await ShopModerationService.transition({
+        applicationId,
+        action: status === "APPROVED" ? "APPROVE" : "REJECT",
+        reason: reviewerNotes,
+        actorId: reviewedBy,
+      });
+      return prisma.vendorApplication.findUniqueOrThrow({ where: { id: applicationId } });
+    }
     const application = await prisma.vendorApplication.update({
       where: { id: applicationId },
       data: {
@@ -210,6 +292,7 @@ export class VendorService {
       });
 
       if (vendorProfile) {
+        await VendorEntitlementService.ensureEligibleVendor(vendorProfile.id);
         await prisma.vendorApplication.update({
           where: { id: applicationId },
           data: { vendorProfileId: vendorProfile.id },
@@ -272,8 +355,7 @@ export class VendorService {
     cacheTag(cacheTags.marketplace.shops);
     const vendors = await prisma.vendorProfile.findMany({
       where: {
-        status: "ACTIVE",
-        deletedAt: null,
+        ...publicShopWhere,
       },
       select: {
         id: true,
@@ -301,7 +383,7 @@ export class VendorService {
     cacheLife(cacheProfiles.marketplace);
     cacheTag(cacheTags.marketplace.shops, cacheTags.shopSlug(vendorSlug));
     const vendorProfile = await prisma.vendorProfile.findUnique({
-      where: { slug: vendorSlug, status: "ACTIVE", deletedAt: null },
+      where: { slug: vendorSlug, ...publicShopWhere },
       select: {
         id: true,
         storeName: true,

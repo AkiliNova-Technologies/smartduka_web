@@ -1,5 +1,4 @@
 import { NextRequest } from "next/server";
-import { prisma } from "@/lib/prisma/client";
 import { AuthenticationRequiredError } from "@/lib/auth/session";
 import { ApplicantAuthorizationError, requireApplicantContext } from "@/lib/auth/applicant-context";
 import { VendorService } from "@/services/vendor";
@@ -35,33 +34,24 @@ export async function POST(request: NextRequest) {
     if (!storeName || !storeSlug || !businessEmail || !businessPhone) return errorResponse("Missing required core application fields: storeName, storeSlug, businessEmail, businessPhone.", 400, "VALIDATION_ERROR");
     if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(storeSlug)) return errorResponse("Store slug must contain only lowercase letters, numbers, and hyphens.", 400, "INVALID_SLUG");
 
-    const [existingSlug, existingApp, existingProfile] = await Promise.all([
-      prisma.vendorApplication.findUnique({ where: { storeSlug } }),
-      prisma.vendorApplication.findUnique({ where: { userId: applicant.userId } }),
-      prisma.vendorProfile.findUnique({ where: { ownerId: applicant.userId } }),
-    ]);
-    if (existingSlug) return errorResponse("This store name/slug is already taken by another merchant.", 409, "SLUG_TAKEN");
-    if (existingApp || existingProfile) return errorResponse("You already have a vendor application or store profile.", 400, "DUPLICATE_APPLICATION");
-
     const text = (key: string) => typeof input[key] === "string" ? input[key] : null;
     const momoNetwork = text("momoNetwork");
     const momoNumber = text("momoNumber");
     if (momoNetwork && momoNumber && !/^(07|\+2567|2567)\d{8}$/.test(momoNumber.replace(/\s/g, ""))) return errorResponse("Please provide a valid Ugandan mobile money number (e.g., 077XXXXXXX).", 400, "INVALID_MOMO");
 
-    const application = await prisma.vendorApplication.create({
-      data: {
-        userId: applicant.userId, storeName, storeSlug, businessType: text("businessType") || "Sole Proprietorship",
+    const application = await VendorService.submitApplication(applicant.userId, {
+        storeName, storeSlug, businessType: text("businessType") || "Sole Proprietorship",
         registrationNumber: text("registrationNumber"), taxId: text("taxId"), businessEmail, businessPhone,
         website: text("website"), streetAddress: text("streetAddress") || "", city: text("city") || "Kampala",
-        district: text("district"), country: "Uganda", hasPhysicalStore: input.hasPhysicalStore === true,
+        district: text("district"), hasPhysicalStore: input.hasPhysicalStore === true,
         storeLocation: text("storeLocation"), momoNetwork, momoNumber, bankName: text("bankName"),
         bankAccountName: text("bankAccountName"), bankAccountNumber: text("bankAccountNumber"),
-      },
     });
     return successResponse({ id: application.id, storeName: application.storeName, status: application.status, createdAt: application.createdAt }, 201);
   } catch (error: unknown) {
     console.error("[Vendor Apply API POST]", error);
-    if (typeof error === "object" && error !== null && "code" in error && (error as { code: string }).code === "P2002") return errorResponse("A duplicate record was detected.", 409, "DUPLICATE_RECORD");
+    if (error instanceof Error && error.message === "SLUG_TAKEN") return errorResponse("This store name/slug is already taken by another merchant.", 409, "SLUG_TAKEN");
+    if (error instanceof Error && error.message === "DUPLICATE_APPLICATION") return errorResponse("You already have a seller application or shop profile.", 409, "DUPLICATE_APPLICATION");
     return applicantError(error);
   }
 }

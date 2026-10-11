@@ -1,0 +1,15 @@
+import { prisma } from "@/lib/prisma/client";
+import { requireAdminContext } from "@/lib/auth/admin-context";
+import { Prisma } from "@prisma/client";
+export type RevenueFilter = "ALL" | "PENDING" | "PAID" | "FAILED" | "REVERSED" | "NEEDS_REVIEW";
+export class AdminPlatformRevenueService {
+  static async list(input: { page?: number; pageSize?: number; search?: string; filter?: RevenueFilter; type?: string } = {}) {
+    await requireAdminContext("platform:manage_billing"); const page = Math.max(1, input.page ?? 1), pageSize = Math.min(100, Math.max(10, input.pageSize ?? 25)), q = input.search?.trim();
+    const status = input.filter === "PENDING" ? "AWAITING_PAYMENT" : input.filter === "PAID" ? "PAID" : input.filter === "FAILED" ? "FAILED" : input.filter === "NEEDS_REVIEW" || input.filter === "REVERSED" ? "REVIEW_REQUIRED" : undefined;
+    const where: Prisma.PlatformRevenueOrderWhereInput = { ...(status ? { status: status as "AWAITING_PAYMENT" | "PAID" | "FAILED" | "REVIEW_REQUIRED" } : {}), ...(input.type && input.type !== "ALL" ? { type: input.type as "PRODUCT_PROMOTION" | "SHOP_PROMOTION" | "SUBSCRIPTION" } : {}), ...(q ? { OR: [{ id: { contains: q } }, { vendor: { storeName: { contains: q } } }, { campaign: { product: { name: { contains: q } } } }] } : {}) };
+    const [items, total, all] = await Promise.all([prisma.platformRevenueOrder.findMany({ where, include: { vendor: { select: { storeName: true } }, campaign: { include: { product: { select: { name: true } } } }, paymentIntents: { orderBy: { createdAt: "desc" }, take: 1 } }, orderBy: { createdAt: "desc" }, skip: (page - 1) * pageSize, take: pageSize }), prisma.platformRevenueOrder.count({ where }), prisma.platformRevenueOrder.findMany({ where: { qualificationKind: "NONE" }, include: { paymentIntents: { select: { status: true } } } })]);
+    const counts = { cashRevenue: 0, pending: 0, promotionRevenue: 0, needsReview: 0 };
+    for (const row of all) { if (row.status === "PAID") { counts.cashRevenue += Number(row.amountDue); if (row.type !== "SUBSCRIPTION") counts.promotionRevenue += Number(row.amountDue); } if (row.status === "AWAITING_PAYMENT") counts.pending++; if (row.status === "REVIEW_REQUIRED" || row.paymentIntents.some((p) => p.status === "REVERSED")) counts.needsReview++; }
+    return { rows: items.map((row) => ({ id: row.id, vendor: row.vendor.storeName, type: row.type, status: row.status, qualificationKind: row.qualificationKind, serviceValue: row.subtotal.toFixed(2), creditApplied: row.creditApplied.toFixed(2), cashAmount: row.amountDue.toFixed(2), createdAt: row.createdAt, updatedAt: row.updatedAt, campaign: row.campaign ? { id: row.campaign.id, productName: row.campaign.product?.name ?? null, status: row.campaign.status } : null, payment: row.paymentIntents[0] ? { status: row.paymentIntents[0].status, provider: row.paymentIntents[0].provider, reference: row.paymentIntents[0].providerReference ? `••••${row.paymentIntents[0].providerReference.slice(-4)}` : null } : null })), counts, pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) } };
+  }
+}

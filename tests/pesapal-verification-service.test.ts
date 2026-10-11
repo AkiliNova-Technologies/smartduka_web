@@ -2,8 +2,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Decimal } from "@prisma/client/runtime/client";
 import { PaymentAttemptStatus } from "@prisma/client";
 const economics = vi.hoisted(() => ({ allocate: vi.fn() }));
+const reversals = vi.hoisted(() => ({ reverse: vi.fn() }));
 vi.mock("@/services/marketplace-economics", () => ({
   MarketplaceEconomicsService: { allocatePaidOrderEconomics: economics.allocate },
+}));
+vi.mock("@/services/returns-refunds", () => ({
+  ReturnsRefundsService: { reversePaymentEarnings: reversals.reverse },
 }));
 
 import { PesapalVerificationService } from "@/services/payments/pesapal-verification-service";
@@ -32,6 +36,7 @@ describe("PesapalVerificationService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     economics.allocate.mockResolvedValue({ allocated: true });
+    reversals.reverse.mockResolvedValue(undefined);
   });
 
   it("preserves verified payment completion when allocation fails and permits later retry", async () => {
@@ -100,6 +105,7 @@ describe("PesapalVerificationService", () => {
     await expect(h.service.verifyPesapalTransaction({ orderTrackingId: "tracking-1", source: "RECONCILIATION" })).resolves.toMatchObject({ outcome: "REVERSED" });
     expect(h.paymentAttempt.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: "REVERSED", reversedAt: expect.any(Date) }) }));
     expect(h.order.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: { paymentStatus: "REVERSED" } }));
+    expect(reversals.reverse).toHaveBeenCalledWith("attempt-1");
   });
 
   it("does not regress a completed attempt when a stale FAILED status is observed", async () => {

@@ -22,14 +22,14 @@ describe("mobile commerce navigation", () => {
     ).toContain("NotificationsSheet");
   });
 
-  it("renders a safe-area-aware floating five-item navigation with active semantics", () => {
+  it("renders a safe-area-aware five-item navigation with active semantics", () => {
     for (const label of ["Home", "Categories", "Search", "Cart", "Account"]) {
       expect(navigation).toContain(label);
     }
-    expect(navigation).toContain("env(safe-area-inset-bottom)+0.75rem");
-    expect(navigation).toContain("rounded-2xl");
+    expect(navigation).toContain("pb-[env(safe-area-inset-bottom)]");
+    expect(navigation).toContain("grid-cols-5");
     expect(navigation).toContain('aria-current={active ? "page" : undefined}');
-    expect(navigation).toContain("bg-primary/10");
+    expect(navigation).toContain("font-semibold text-primary");
     expect(navigation).toContain('cartCount > 99 ? "99+" : cartCount');
   });
 
@@ -40,9 +40,9 @@ describe("mobile commerce navigation", () => {
   });
 
   it("uses a mobile back link and positions purchase controls above the navigation", () => {
-    expect(detail).toContain("<ArrowLeft aria-hidden");
-    expect(detail).toContain("Back to products");
-    expect(detail).toContain("md:hidden");
-    expect(detail).toContain("bottom-[calc(5.5rem+env(safe-area-inset-bottom))]");
+    expect(detail).toContain("<ChevronLeft");
+    expect(detail).toContain('aria-label="Back to products"');
+    expect(detail).toContain("lg:hidden");
+    expect(detail).toContain("bottom-[calc(3.5rem+env(safe-area-inset-bottom))]");
   });
 });

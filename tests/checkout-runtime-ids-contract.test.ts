@@ -10,16 +10,16 @@ describe("checkout runtime idempotency IDs", () => {
     expect(source).not.toContain("useRef(crypto.randomUUID())");
   });
 
-  it("creates stable checkout and payment IDs after mount", () => {
+  it("creates a stable checkout ID after mount", () => {
     expect(source).toContain("checkoutRequestId.current ??= crypto.randomUUID()");
-    expect(source).toContain("paymentInitiationRequestId.current ??= crypto.randomUUID()");
     expect(source).toContain("setCheckoutIdsReady(true)");
+    expect(source).not.toContain("paymentInitiationRequestId");
   });
 
-  it("gates submission until both runtime IDs are available", () => {
-    expect(source).toContain("if (!checkoutIdsReady || !checkoutId || !paymentInitiationId) return");
+  it("gates submission until the checkout ID is available", () => {
+    expect(source).toContain("if (!checkoutIdsReady || !checkoutId) return");
     expect(source).toContain("!checkoutIdsReady");
     expect(source).toContain("checkoutRequestId: checkoutId");
-    expect(source).toContain("initiationRequestId: paymentInitiationId");
+    expect(source).not.toContain("initiationRequestId:");
   });
 });

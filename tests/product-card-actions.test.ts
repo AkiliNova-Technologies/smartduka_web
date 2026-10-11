@@ -7,7 +7,8 @@ const card = readFileSync(resolve(process.cwd(), "src/components/marketplace/pro
 describe("marketplace product card actions", () => {
   it("uses the direct cart action for simple products and quick add for variants", () => {
     expect(card).toContain("<ShoppingCart className=\"size-4\" /> Add to Cart");
-    expect(card).toContain("<SlidersHorizontal className=\"size-4\" /> Choose Options");
+    expect(card).toContain('<SlidersHorizontal className="size-4" />');
+    expect(card).toContain('<span className="hidden sm:inline">Choose Options</span>');
     expect(card).toContain("getPublicProductAction(product.slug)");
   });
 

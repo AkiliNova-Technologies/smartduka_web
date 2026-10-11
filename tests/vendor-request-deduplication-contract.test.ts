@@ -13,6 +13,7 @@ describe("vendor initial request deduplication", () => {
 
   it("shares reviews and finance initial requests without widening vendor scope", () => {
     expect(source("src/app/(vendor)/vendor/reviews/page.tsx")).toContain("if (requestRef.current) return requestRef.current");
-    expect(source("src/app/(vendor)/vendor/finance/page.tsx")).toContain("if (requestRef.current) return requestRef.current");
+    expect(source("src/app/(vendor)/vendor/finance/page.tsx")).toContain("useVendorFinance");
+    expect(source("src/hooks/use-vendor-finance.ts")).toContain("requestRef.current");
   });
 });

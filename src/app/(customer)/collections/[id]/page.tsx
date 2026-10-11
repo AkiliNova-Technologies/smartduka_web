@@ -10,7 +10,7 @@ export default function CollectionDetailPage() {
       <div className="space-y-7">
         <PageHeader
           title="Collection unavailable"
-          description="SmartDuka does not currently publish data-backed collections."
+          description="Mwezora does not currently publish data-backed collections."
         />
         <EmptyState
           icon={Layers}

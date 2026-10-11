@@ -24,8 +24,9 @@ export type HeroSlide = {
 
 function ResponsiveSlideImage({ slide, priority }: { slide: HeroSlide; priority: boolean }) {
   const shared = { alt: slide.imageAlt, sizes: "100vw" };
-  const { props: desktop } = getImageProps({ ...shared, src: slide.desktopImage, width: 1600, height: 720, quality: 75 });
-  const { props: mobile } = getImageProps({ ...shared, src: slide.mobileImage ?? slide.desktopImage, width: 750, height: 900, quality: 75 });
+  const loading = priority ? "eager" : "lazy";
+  const { props: desktop } = getImageProps({ ...shared, src: slide.desktopImage, width: 1600, height: 720, quality: 75, loading });
+  const { props: mobile } = getImageProps({ ...shared, src: slide.mobileImage ?? slide.desktopImage, width: 750, height: 900, quality: 75, loading });
 
   return (
     <picture className="absolute inset-0">

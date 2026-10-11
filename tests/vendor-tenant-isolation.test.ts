@@ -130,6 +130,7 @@ describe("vendor tenant isolation", () => {
     });
     expect(mocks.findDocument).toHaveBeenCalledWith({
       where: { id: "document-b", vendorId: "vendor-a" },
+      include: { _count: { select: { verificationSubmissions: true } } },
     });
 
     mocks.updateVendor.mockResolvedValue({ id: "vendor-a" });

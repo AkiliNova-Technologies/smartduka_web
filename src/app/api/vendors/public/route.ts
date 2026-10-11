@@ -1,4 +1,5 @@
 import { VendorService } from "@/services/vendor";
+import { connection } from "next/server";
 import {
   successResponse,
   errorResponse,
@@ -6,6 +7,7 @@ import {
 } from "@/lib/api-utils";
 
 export async function GET() {
+  await connection();
   try {
     const stores = await VendorService.getPublicStoreListings();
     return successResponse(stores);

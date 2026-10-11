@@ -37,4 +37,8 @@ export const adminAuth = {
     const auth = getFirebaseAuth();
     return auth.getUser(uid);
   },
+  deleteUser: (uid: string) => {
+    const auth = getFirebaseAuth();
+    return auth.deleteUser(uid);
+  },
 };

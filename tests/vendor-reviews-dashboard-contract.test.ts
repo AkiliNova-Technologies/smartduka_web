@@ -32,8 +32,9 @@ describe("vendor reviews dashboard", () => {
 
   it("retains server-side vendor isolation and the enriched display projection", () => {
     expect(service).toContain('requireVendorContext("vendor:manage_shop")');
-    expect(service).toContain("product: { vendorId: context.vendorId }");
-    expect(service).toContain("where: { vendorId: context.vendorId }");
+    expect(service).toContain("return this.listForVendor(context.vendorId)");
+    expect(service).toContain("product: { vendorId }");
+    expect(service).toContain("where: { vendorId }");
     expect(service).toContain("imageUrls");
     expect(service).toContain("images: { select: { url: true }");
   });

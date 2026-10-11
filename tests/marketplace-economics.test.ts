@@ -12,35 +12,36 @@ import { VendorContext } from "@/lib/vendor/vendor-context";
 beforeEach(() => vi.clearAllMocks());
 
 describe("Phase 3F marketplace economics", () => {
-  it("uses the centralized intentional 10 percent fallback", () => {
-    expect(DEFAULT_MARKETPLACE_COMMISSION_RATE.toString()).toBe("10");
+  it("uses zero marketplace commission for direct-to-vendor payments", () => {
+    expect(DEFAULT_MARKETPLACE_COMMISSION_RATE.toString()).toBe("0");
     expect(resolveCommissionRate(null)).toBe(DEFAULT_MARKETPLACE_COMMISSION_RATE);
   });
 
-  it.each(["-1", "101", "NaN", "Infinity", "malformed persisted value"])("rejects invalid persisted commission configuration: %s", (value) => {
-    expect(() => resolveCommissionRate(value)).toThrow("Vendor commission configuration is invalid");
+  it.each(["-1", "101", "NaN", "Infinity", "malformed persisted value"])("ignores legacy commission configuration under direct settlement: %s", (value) => {
+    expect(resolveCommissionRate(value).toString()).toBe("0");
   });
 
-  it("calculates independent vendor snapshots with Decimal half-up rounding and excludes shipping", () => {
+  it("calculates independent vendor totals without diverting merchandise value", () => {
     const result = calculateCheckoutTotals([
       { productId: "a", variantId: null, vendorId: "a", quantity: 1, unitPrice: new Decimal("10.05"), commissionRate: new Decimal("5") },
       { productId: "b", variantId: null, vendorId: "b", quantity: 1, unitPrice: new Decimal("20"), commissionRate: new Decimal("10") },
     ]);
 
-    expect(result.vendorGroups[0]).toMatchObject({ platformCommission: new Decimal("0.5"), vendorNetEntitlement: new Decimal("9.55"), shipping: new Decimal("3500") });
-    expect(result.subtotal).toEqual(new Decimal("30.05"));
+    expect(result.vendorGroups[0].platformCommission.toString()).toBe("0");
+    expect(result.vendorGroups[0].vendorNetEntitlement.toString()).toBe("3510.05");
+    expect(result.vendorGroups[0].shipping.toString()).toBe("3500");
+    expect(result.subtotal.toString()).toBe("30.05");
   });
 
-  it("keeps historical economics snapshots stable when the active plan rate changes", () => {
+  it("does not let subscription-plan rates alter customer-to-vendor settlement", () => {
     const line = { productId: "a", variantId: null, vendorId: "a", quantity: 1, unitPrice: new Decimal("100") };
     const historical = calculateCheckoutTotals([{ ...line, commissionRate: new Decimal("5") }]).vendorGroups[0];
     const currentPlan = calculateCheckoutTotals([{ ...line, commissionRate: new Decimal("20") }]).vendorGroups[0];
 
-    expect(historical.commissionRate).toEqual(new Decimal("5"));
-    expect(historical.platformCommission).toEqual(new Decimal("5"));
-    expect(historical.vendorNetEntitlement).toEqual(new Decimal("95"));
-    expect(currentPlan.vendorNetEntitlement).toEqual(new Decimal("80"));
-    expect(historical.vendorNetEntitlement).toEqual(new Decimal("95"));
+    expect(historical.commissionRate.toString()).toBe("0");
+    expect(historical.platformCommission.toString()).toBe("0");
+    expect(historical.vendorNetEntitlement.toString()).toBe("3600");
+    expect(currentPlan.vendorNetEntitlement.toString()).toBe("3600");
   });
 
   it("derives vendor balances per currency and bucket without mixing currencies", async () => {
@@ -73,18 +74,19 @@ describe("Phase 3F marketplace economics", () => {
     await expect(MarketplaceEconomicsService.vendorBalancesForCurrentVendor("UGX")).rejects.toThrow("Vendor context");
   });
 
-  it("reconciles GMV, commission revenue, and pending vendor liability separately", () => {
+  it("reconciles GMV entirely to vendor value under direct settlement", () => {
     const result = calculateCheckoutTotals([
       { productId: "a", variantId: null, vendorId: "a", quantity: 1, unitPrice: new Decimal("100"), commissionRate: new Decimal("10") },
       { productId: "b", variantId: null, vendorId: "b", quantity: 1, unitPrice: new Decimal("50"), commissionRate: new Decimal("20") },
     ]);
     const gmv = result.vendorGroups.reduce((sum, group) => sum.plus(group.subtotal), new Decimal(0));
     const platformCommissionRevenue = result.vendorGroups.reduce((sum, group) => sum.plus(group.platformCommission), new Decimal(0));
-    const vendorLiabilityPending = result.vendorGroups.reduce((sum, group) => sum.plus(group.vendorNetEntitlement), new Decimal(0));
+    const directVendorValue = result.vendorGroups.reduce((sum, group) => sum.plus(group.vendorNetEntitlement), new Decimal(0));
+    const checkoutTotal = result.vendorGroups.reduce((sum, group) => sum.plus(group.total), new Decimal(0));
 
-    expect(gmv).toEqual(new Decimal("150"));
-    expect(platformCommissionRevenue).toEqual(new Decimal("20"));
-    expect(vendorLiabilityPending).toEqual(new Decimal("130"));
-    expect(gmv).toEqual(platformCommissionRevenue.plus(vendorLiabilityPending));
+    expect(gmv.toString()).toBe("150");
+    expect(platformCommissionRevenue.toString()).toBe("0");
+    expect(directVendorValue.toString()).toBe("7150");
+    expect(checkoutTotal.toString()).toBe(directVendorValue.toString());
   });
 });

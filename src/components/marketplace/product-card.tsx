@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { PRODUCT_IMAGE_FALLBACK } from "@/lib/media";
+import { calculateDiscountPercentage } from "@/lib/commerce/pricing";
 import { getPublicProductAction } from "@/actions/product";
 
 export type MarketplaceProduct = {
@@ -65,9 +66,13 @@ export function ProductCard({ product }: { product: MarketplaceProduct }) {
   const inventoryCount = product.inventoryCount ?? 0;
   const isOutOfStock = inventoryCount <= 0 || product.isPurchasable === false;
   const isLowStock = inventoryCount > 0 && inventoryCount <= 5;
-  const isDeal = Boolean(
-    product.compareAtPrice && product.compareAtPrice > product.basePrice,
+  // Marketplace serialization makes basePrice the displayed lowest available
+  // variant price, so the badge and visible card price use the same value.
+  const discountPercentage = calculateDiscountPercentage(
+    product.basePrice,
+    product.compareAtPrice,
   );
+  const isDeal = discountPercentage !== null;
   const isNew = product.isNewArrival === true;
   const categoryName = product.categoryName ?? product.category?.name ?? null;
   const subCategoryName =
@@ -189,7 +194,13 @@ export function ProductCard({ product }: { product: MarketplaceProduct }) {
             className="object-cover transition-transform duration-300 motion-safe:group-hover:scale-[1.03]"
             fallbackClassName="object-cover"
           />
-          <div className="absolute bottom-2 left-2 flex max-w-[calc(100%-1rem)] flex-wrap gap-1.5">
+          <div
+            className={cn(
+              "absolute bottom-2 left-2 flex flex-wrap gap-1.5",
+              discountPercentage === null
+                ? "max-w-[calc(100%-1rem)]"
+                : "max-w-[calc(100%-5rem)]",
+            )}>
             {(isOutOfStock || isLowStock) && (
               <span
                 className={cn(
@@ -209,6 +220,11 @@ export function ProductCard({ product }: { product: MarketplaceProduct }) {
               </span>
             )}
           </div>
+          {discountPercentage !== null && (
+            <span className="absolute bottom-2 right-2 rounded-full border border-border/70 bg-background/90 px-2 py-0.5 text-xs font-semibold text-foreground shadow-xs backdrop-blur">
+              -{discountPercentage}%
+            </span>
+          )}
         </div>
         <div className="space-y-1 px-4 pt-2">
           <p
@@ -230,11 +246,6 @@ export function ProductCard({ product }: { product: MarketplaceProduct }) {
             </span>
           ) : (
             <>
-              {product.priceFrom && (
-                <span className="mb-0.5 block text-xs text-muted-foreground">
-                  From
-                </span>
-              )}
               <PriceDisplay
                 price={product.basePrice}
                 compareAtPrice={product.compareAtPrice}

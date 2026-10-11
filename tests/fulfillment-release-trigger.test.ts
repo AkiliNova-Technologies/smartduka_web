@@ -21,7 +21,7 @@ import { OrderService } from "@/services/order";
 describe("fulfillment-triggered earnings release", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.findFirst.mockResolvedValue({ id: "suborder-1", status: "SHIPPED" });
+    mocks.findFirst.mockResolvedValue({ id: "suborder-1", status: "SHIPPED", order: { paymentGateway: "CASH_ON_DELIVERY" }, paymentIntents: [] });
     mocks.update.mockResolvedValue({
       id: "suborder-1", subOrderNumber: "SD-1-V1", status: "DELIVERED",
       order: { id: "order-1", customerId: "customer-1", orderNumber: "SD-1" },
@@ -30,12 +30,12 @@ describe("fulfillment-triggered earnings release", () => {
 
   it("releases only after the vendor's own shipped SubOrder reaches DELIVERED", async () => {
     await OrderService.updateSubOrderStatus("suborder-1", "DELIVERED", "vendor-a");
-    expect(mocks.findFirst).toHaveBeenCalledWith({ where: { id: "suborder-1", vendorId: "vendor-a" }, select: { id: true, status: true } });
+    expect(mocks.findFirst).toHaveBeenCalledWith({ where: { id: "suborder-1", vendorId: "vendor-a" }, select: { id: true, status: true, order: { select: { paymentGateway: true } }, paymentIntents: { select: { status: true } } } });
     expect(mocks.release).toHaveBeenCalledWith("suborder-1");
   });
 
   it("rejects lifecycle jumps such as PROCESSING directly to DELIVERED", async () => {
-    mocks.findFirst.mockResolvedValue({ id: "suborder-1", status: "PROCESSING" });
+    mocks.findFirst.mockResolvedValue({ id: "suborder-1", status: "PROCESSING", order: { paymentGateway: "CASH_ON_DELIVERY" }, paymentIntents: [] });
     await expect(OrderService.updateSubOrderStatus("suborder-1", "DELIVERED", "vendor-a")).rejects.toThrow("Invalid SubOrder fulfillment status transition");
     expect(mocks.update).not.toHaveBeenCalled();
   });

@@ -8,7 +8,10 @@ import {
   Settings,
   ShoppingBag,
   ShoppingCart,
-  Wallet,
+  ReceiptText,
+  Megaphone,
+  CreditCard,
+  ShieldCheck,
 } from "lucide-react";
 import { useVendor } from "@/hooks/use-vendor";
 import {
@@ -20,21 +23,21 @@ const navigationGroups: DashboardNavigationGroup[] = [
   {
     label: "Operations",
     items: [
-      { label: "Dashboard", href: "/vendor", icon: LayoutDashboard },
+      { label: "Overview", href: "/vendor", icon: LayoutDashboard },
       { label: "Orders", href: "/vendor/orders", icon: ShoppingCart },
+      { label: "Transactions", href: "/vendor/transactions", icon: ReceiptText },
+      { label: "Marketing", href: "/vendor/marketing", icon: Megaphone },
+      { label: "Subscription", href: "/vendor/subscription", icon: CreditCard },
       { label: "Products", href: "/vendor/products", icon: Package },
       { label: "Reviews", href: "/vendor/reviews", icon: MessageSquare },
+      { label: "Verification", href: "/vendor/settings/verification", icon: ShieldCheck },
     ],
   },
   {
-    label: "Finance",
+    label: "Settings",
     items: [
-      { label: "Earnings & withdrawals", href: "/vendor/finance", icon: Wallet },
+      { label: "Shop settings", href: "/vendor/settings", icon: Settings },
     ],
-  },
-  {
-    label: "Shop management",
-    items: [{ label: "Store settings", href: "/vendor/settings", icon: Settings }],
   },
 ];
 

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma/client";
 import { serializeMarketplaceProduct } from "@/services/product";
+import { publicProductWhere } from "@/lib/marketplace-eligibility";
 
 const CANDIDATE_LIMIT = 72;
 const MAX_PER_VENDOR = 2;
@@ -49,7 +50,7 @@ export class RecommendationService {
     }
     const exclusions = new Set([...(input.excludeProductIds ?? []), ...cartIds]);
     const candidates = await prisma.product.findMany({
-      where: { id: { notIn: [...exclusions] }, status: { in: ["ACTIVE", "PUBLISHED"] }, deletedAt: null, vendor: { status: "ACTIVE", deletedAt: null } },
+      where: { id: { notIn: [...exclusions] }, ...publicProductWhere },
       include: {
         images: { take: 1, orderBy: [{ isFeatured: "desc" }, { sortOrder: "asc" }] },
         vendor: { select: { id: true, storeName: true, slug: true } },

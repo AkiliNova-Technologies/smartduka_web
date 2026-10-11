@@ -1,0 +1,22 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+import { peakOccupancy } from "@/services/promotion-inventory";
+
+const at=(hour:number)=>new Date(`2026-10-10T${String(hour).padStart(2,"0")}:00:00.000Z`);
+const source=(path:string)=>readFileSync(resolve(process.cwd(),path),"utf8");
+
+describe("promotion placement inventory",()=>{
+  it("calculates peak occupancy across partial overlaps",()=>{expect(peakOccupancy([{startAt:at(8),endAt:at(11)},{startAt:at(10),endAt:at(12)},{startAt:at(11),endAt:at(13)}])).toBe(2)});
+  it("treats intervals as half-open and permits back-to-back bookings",()=>{expect(peakOccupancy([{startAt:at(8),endAt:at(10)},{startAt:at(10),endAt:at(12)}])).toBe(1)});
+  it("counts all targets against one shared placement inventory",()=>{const productA={startAt:at(8),endAt:at(12)},productB={startAt:at(9),endAt:at(11)},productC={startAt:at(10),endAt:at(13)};expect(peakOccupancy([productA,productB,productC])).toBe(3)});
+  it("locks shared placement inventory and retries serializable conflicts",()=>{const inventory=source("src/services/promotion-inventory.ts");expect(inventory).toContain("pg_advisory_xact_lock");expect(inventory).toContain('error.code==="P2034"');expect(inventory).toContain("attempts=3")});
+  it("excludes expired holds and releases failed/cancelled bookings",()=>{const inventory=source("src/services/promotion-inventory.ts"),scheduler=source("src/services/promotion-campaign-scheduler.ts");expect(inventory).toContain('holdExpiresAt: { gt: now }');expect(inventory).toContain('status:"CANCELLED"|"EXPIRED"');expect(scheduler).toMatch(/status:\s*"HOLD",\s*holdExpiresAt:\s*{\s*lte:\s*now\s*}/)});
+  it("binds checkout to an expiring quote and preserves paid late-payment recovery",()=>{const vendor=source("src/services/vendor-promotions.ts"),reconcile=source("src/services/platform-payment-reconciliation.ts");expect(vendor).toContain("quote.expiresAt<=now");expect(vendor).toContain("quoteId:string");expect(reconcile).toContain("PromotionInventoryService.confirmPaid");expect(inventoryRecovery()).toContain('fulfillmentStatus:"RECOVERY_REQUIRED"')});
+  it("serializes cancellation against payment initiation and blocks pending-payment cancellation",()=>{const vendor=source("src/services/vendor-promotions.ts"),payment=source("src/services/platform-payment.ts");expect(vendor).toContain("PromotionInventoryService.lock(tx,candidate.placement)");expect(vendor).toContain('status:{in:["CREATED","PENDING"]}');expect(payment).toContain("PromotionInventoryService.runSerializable(prepare)")});
+  it("confirms full-credit bookings atomically and retains idempotency",()=>{const vendor=source("src/services/vendor-promotions.ts"),schema=source("prisma/schema.prisma");expect(vendor).toContain('status:fullyFunded?"PAID":"AWAITING_PAYMENT"');expect(vendor).toContain('status:fullyFunded?"CONFIRMED":"HOLD"');expect(vendor).toContain("idempotencyKey:input.idempotencyKey");expect(schema).toContain("@@unique([vendorId, idempotencyKey])")});
+  it("releases failed and expired holds while preserving uncertain payments",()=>{const payment=source("src/services/platform-payment.ts"),scheduler=source("src/services/promotion-campaign-scheduler.ts");expect(payment).toContain('"SUBMISSION_UNKNOWN"');expect(payment).toContain("PromotionInventoryService.release(tx, order.campaign.id)");expect(scheduler).toContain("PAYMENT_HOLD_EXPIRED");expect(scheduler).toContain('status: "EXPIRED"')});
+  it("delivers only eligible confirmed paid placements and labels sponsorship",()=>{const marketing=source("src/services/marketing.ts"),component=source("src/components/marketing/featured-sections.tsx");expect(marketing).toMatch(/reservation:\s*{\s*status:\s*"CONFIRMED"\s*}/);expect(marketing).toContain("ProductStatus.PUBLISHED");expect(marketing).toContain("paidSlots");expect(component).toContain("Sponsored")});
+  it("preserves legacy commitments and reports over-capacity periods without auto-cancellation",()=>{const migration=source("prisma/migrations/20261010130000_promotion_slot_reservations/migration.sql"),inventory=inventoryRecovery();expect(migration).toContain('WHERE "status" IN (\'ACTIVE\', \'SCHEDULED\')');expect(inventory).toContain("if(peak>inventory.capacity)conflicts.push");expect(inventory).toContain("return{inventories,recovery,conflicts}")});
+});
+function inventoryRecovery(){return source("src/services/promotion-inventory.ts")}

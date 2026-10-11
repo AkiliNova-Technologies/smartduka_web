@@ -17,8 +17,8 @@ describe("Shops hydration contract", () => {
   it("keeps the Shops page shell stable while shop data loads", () => {
     const page = source("src/app/(customer)/shops/page.tsx");
 
-    expect(page).not.toContain("if (isLoading)");
-    expect(page).toContain('aria-label="Loading shops"');
+    expect(page).toContain("<Suspense fallback={<ShopsGridFallback stores={stores} />}");
+    expect(page).toContain("<ShopsCards stores={stores.slice(0, SHOPS_PAGE_SIZE)}");
   });
 
   it("uses supported promotional image quality values", () => {

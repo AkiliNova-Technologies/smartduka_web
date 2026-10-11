@@ -1,6 +1,10 @@
+"use client";
+
 import Link from "next/link";
 import Image from "next/image";
 import { CookieSettingsButton } from "@/components/legal/cookie-consent";
+import { MwezoraLogoLink } from "@/components/brand/MwezoraLogo";
+import { brand } from "@/config/brand";
 
 const groups = [
   {
@@ -22,7 +26,7 @@ const groups = [
   },
   { title: "Help", links: [{ label: "Help center", href: "/help" }, { label: "Privacy Policy", href: "/privacy-policy" }, { label: "Cookie Policy", href: "/cookie-policy" }] },
   {
-    title: "Sell on SmartDuka",
+    title: `Sell on ${brand.name}`,
     links: [{ label: "Become a seller", href: "/become-seller" }],
   },
 ];
@@ -30,8 +34,6 @@ const groups = [
 const paymentMethods = [
   { name: "MTN MoMo", src: "/payment-logos/mtn-momo.svg", width: 60 },
   { name: "Airtel Money", src: "/payment-logos/airtel.svg", width: 28 },
-  { name: "Visa", src: "/payment-logos/visa.svg", width: 36 },
-  { name: "Mastercard", src: "/payment-logos/mastercard.svg", width: 28 },
 ];
 
 export function MarketplaceFooter() {
@@ -40,12 +42,14 @@ export function MarketplaceFooter() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.7fr)_repeat(4,minmax(0,1fr))] lg:gap-7">
           <section className="max-w-sm" aria-labelledby="footer-brand">
-            <Link
-              href="/"
+            {/* MwezoraLogoLink provides the two-tone live accent. */}
+            <MwezoraLogoLink
               id="footer-brand"
-              className="inline-flex text-lg font-semibold tracking-tight text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2">
-              SmartDuka
-            </Link>
+              variant="horizontal"
+              size="md"
+              label="Mwezora marketplace home"
+              linkClassName="text-foreground"
+            />
             <p className="mt-3 text-sm font-medium leading-6 text-foreground">
               Shop from local businesses in one place.
             </p>
@@ -82,7 +86,7 @@ export function MarketplaceFooter() {
           ))}
         </div>
         <div className="mt-8 flex flex-col gap-1 border-t border-border/70 pt-4 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-          <p>© {new Date().getFullYear()} SmartDuka. All Rights Reserved</p>
+          <p>© {new Date().getFullYear()} {brand.name}. All Rights Reserved</p>
 
           <div className="flex flex-wrap items-center gap-2" aria-label="Accepted payment methods">
             <CookieSettingsButton />

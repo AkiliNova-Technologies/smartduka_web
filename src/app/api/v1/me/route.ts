@@ -1,6 +1,5 @@
 import { prisma } from "@/lib/prisma/client";
 import { requireActiveUserId } from "@/lib/auth/session";
-import { requireVendorContext } from "@/lib/auth/vendor-context";
 import { DEFAULT_ROLE_PERMISSIONS } from "@/lib/auth/permissions";
 import { mePatchSchema } from "@/lib/api/v1/contracts";
 import { v1Data, v1Exception } from "@/lib/api/v1/response";

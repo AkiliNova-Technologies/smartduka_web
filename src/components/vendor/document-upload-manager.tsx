@@ -22,11 +22,12 @@ import {
   deleteVendorDocument,
   getMyVendorDocuments
 } from "@/actions/vendor-settings";
-import type { Document, DocumentType } from "@prisma/client";
+import type { DocumentType } from "@prisma/client";
+import type { VendorSettingsDocument } from "@/components/vendor/settings/documents-tab";
 
 interface DocumentUploadManagerProps {
   vendorId: string;
-  initialDocuments: Document[];
+  initialDocuments: VendorSettingsDocument[];
 }
 
 const documentTypeConfig: Record<DocumentType, { label: string; icon: React.ReactNode; description: string }> = {
@@ -64,7 +65,7 @@ const documentTypeConfig: Record<DocumentType, { label: string; icon: React.Reac
 
 export function DocumentUploadManager({ vendorId, initialDocuments }: DocumentUploadManagerProps) {
   const [isPending, startTransition] = useTransition();
-  const [documents, setDocuments] = useState<Document[]>(initialDocuments);
+  const [documents, setDocuments] = useState<VendorSettingsDocument[]>(initialDocuments);
   const [selectedType, setSelectedType] = useState<DocumentType>("BUSINESS_REGISTRATION");
   const [uploading, setUploading] = useState(false);
 
@@ -237,7 +238,7 @@ export function DocumentUploadManager({ vendorId, initialDocuments }: DocumentUp
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <a
-                    href={doc.url}
+                    href={`/api/vendor/documents/profile/${doc.id}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-[10px] font-bold text-primary hover:underline"

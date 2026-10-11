@@ -54,7 +54,11 @@ vi.mock("@/services/category", () => ({
     getAllCategories: mocks.getAllCategories,
   },
 }));
-vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn(), updateTag: vi.fn() }));
+vi.mock("next/server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/server")>()),
+  connection: vi.fn(),
+}));
 
 import * as productsRoute from "@/app/api/products/route";
 import * as productRoute from "@/app/api/products/[id]/route";
