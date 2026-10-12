@@ -2,6 +2,7 @@
 /* eslint-disable react-hooks/refs, react-hooks/set-state-in-effect -- refs and synchronous resets guard account transitions before async responses settle. */
 
 import * as React from "react";
+import { toast } from "sonner";
 import { useAuth } from "@/providers/AuthProvider";
 import {
   DEFAULT_APPEARANCE,
@@ -9,7 +10,9 @@ import {
   type AppearancePreferences,
   type AccentPreset,
   type ThemeMode,
+  type PlatformPersonality,
 } from "@/lib/appearance";
+import { getPersonalityToastMessage } from "@/lib/personality-messages";
 
 const GUEST_STORAGE_KEY = "smartduka_guest_appearance";
 const accountCache = new Map<string, AppearancePreferences>();
@@ -31,6 +34,7 @@ type AppearanceContextValue = AppearancePreferences & {
   setAppearance: (updates: Partial<AppearancePreferences>) => void;
   setThemeMode: (themeMode: ThemeMode) => void;
   setAccentColor: (accentColor: AccentPreset) => void;
+  setPersonality: (personality: PlatformPersonality) => void;
   resetAccent: () => void;
   retry: () => void;
 };
@@ -135,6 +139,7 @@ export function AppearanceProvider({ children }: { children: React.ReactNode }) 
 
     if (!userId) {
       writeGuestAppearance(next);
+      toast.success(getPersonalityToastMessage("toast.preferences.updated", next.personality));
       return;
     }
     if (!sessionReady) {
@@ -162,9 +167,10 @@ export function AppearanceProvider({ children }: { children: React.ReactNode }) 
         const saved = normalizeAppearance(body.data);
         if (activeUser.current !== userId || generation.current !== requestGeneration) return;
         accountCache.set(userId, saved);
-        if (appearanceRef.current.themeMode === next.themeMode && appearanceRef.current.accentColor === next.accentColor) {
+        if (appearanceRef.current.themeMode === next.themeMode && appearanceRef.current.accentColor === next.accentColor && appearanceRef.current.personality === next.personality) {
           setAppearanceState(saved);
         }
+        toast.success(getPersonalityToastMessage("toast.preferences.updated", saved.personality));
       })
       .catch((cause: unknown) => {
         if (activeUser.current === userId && generation.current === requestGeneration) {
@@ -186,6 +192,7 @@ export function AppearanceProvider({ children }: { children: React.ReactNode }) 
     setAppearance: persist,
     setThemeMode: (themeMode) => persist({ themeMode }),
     setAccentColor: (accentColor) => persist({ accentColor }),
+    setPersonality: (personality) => persist({ personality }),
     resetAccent: () => persist({ accentColor: "classic" }),
     retry: () => persist(appearanceRef.current),
   }), [appearance, error, loading, mounted, persist, saving]);

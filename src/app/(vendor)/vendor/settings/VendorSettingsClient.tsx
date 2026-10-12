@@ -14,7 +14,7 @@ import { PreviewTab } from "@/components/vendor/settings/preview-tab";
 import { FulfillmentPolicyTab } from "@/components/vendor/settings/fulfillment-policy-tab";
 import { TeamTab } from "@/components/vendor/settings/team-tab";
 import { PaymentSettingsTab } from "@/components/vendor/settings/payment-settings-tab";
-import type { VendorProfile } from "@prisma/client";
+import type { VendorProfileDto } from "@/lib/vendor-profile-dto";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AppearanceSettings } from "@/components/settings/AppearanceSettings";
 
@@ -28,7 +28,7 @@ type TabID =
   | "team"
   | "preview";
 
-type FullVendorProfile = VendorProfile & {
+type FullVendorProfile = VendorProfileDto & {
   documents: VendorSettingsDocument[];
   _count: { products: number; subOrders: number };
 };

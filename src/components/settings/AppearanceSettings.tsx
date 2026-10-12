@@ -7,6 +7,7 @@ import {
   ACCENT_PRESETS,
   type ThemeMode,
 } from "@/lib/appearance";
+import { PersonalitySettings } from "@/components/settings/PersonalitySettings";
 
 export function AppearanceSettings() {
   const {
@@ -95,6 +96,7 @@ export function AppearanceSettings() {
           </span>
         </div>
       </div>
+      <PersonalitySettings />
       <div
         className="mt-3 min-h-5 text-xs text-muted-foreground"
         aria-live="polite">

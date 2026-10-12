@@ -210,7 +210,7 @@ function NotificationsButton() {
 export function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   return (
-    <header className="sticky top-0 z-40 border-b border-border/60 bg-background/95 backdrop-blur">
+    <header className="sticky top-0 z-40 border-b border-border/60 bg-background/95 pt-[env(safe-area-inset-top)] backdrop-blur">
       <div className="mx-auto flex min-h-16 w-full max-w-7xl items-center gap-3 px-4 sm:px-6 lg:px-8">
         <button
           onClick={() => setMenuOpen(true)}
@@ -220,17 +220,11 @@ export function Header() {
           <Menu className="size-5" />
         </button>
         <div className="flex min-w-0 flex-1 items-center md:flex-none">
-          {/* Mobile: symbol only saves horizontal space */}
-          <MwezoraLogoLink
-            variant="symbol"
-            size="sm"
-            className="md:hidden"
-          />
           {/* Desktop: full horizontal logo */}
           <MwezoraLogoLink
             variant="horizontal"
             size="sm"
-            className="hidden md:inline-flex"
+            className="md:inline-flex"
           />
         </div>
         <Suspense

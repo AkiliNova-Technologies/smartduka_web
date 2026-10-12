@@ -608,6 +608,7 @@ export class MarketingService {
           },
         },
       } as const;
+    const publicShopLimit = 12;
     const inventory = await prisma.advertisingPlacementInventory.findUnique({
         where: { placement: "HOMEPAGE_FEATURED_SHOPS" },
       }),
@@ -641,7 +642,7 @@ export class MarketingService {
         },
         select: { vendor: { select: vendorSelect } },
         orderBy: featuredOrder,
-        take: 4,
+        take: publicShopLimit,
       }),
     ]);
     const paidIds = new Set(paid.map((row) => row.vendor.id));
@@ -653,6 +654,6 @@ export class MarketingService {
       ...curated
         .filter((row) => !paidIds.has(row.vendor.id))
         .map((row) => serializePublicShopListing(row.vendor)),
-    ].slice(0, 4);
+    ].slice(0, publicShopLimit);
   }
 }

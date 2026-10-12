@@ -2,12 +2,12 @@
 
 import { useTheme } from "next-themes"
 import { Toaster as Sonner, type ToasterProps } from "sonner"
-import { 
-  CircleCheckIcon, 
-  InfoIcon, 
-  TriangleAlertIcon, 
-  OctagonXIcon, 
-  Loader2Icon 
+import {
+  CircleCheckIcon,
+  InfoIcon,
+  TriangleAlertIcon,
+  OctagonXIcon,
+  Loader2Icon,
 } from "lucide-react"
 
 const Toaster = ({ ...props }: ToasterProps) => {
@@ -19,44 +19,47 @@ const Toaster = ({ ...props }: ToasterProps) => {
       className="toaster group"
       icons={{
         success: (
-          <CircleCheckIcon className="size-4" />
+          <CircleCheckIcon aria-hidden="true" className="size-4 text-primary" />
         ),
         info: (
-          <InfoIcon className="size-4" />
+          <InfoIcon aria-hidden="true" className="size-4 text-primary" />
         ),
         warning: (
-          <TriangleAlertIcon className="size-4" />
+          <TriangleAlertIcon aria-hidden="true" className="size-4 text-muted-foreground" />
         ),
         error: (
-          <OctagonXIcon className="size-4" />
+          <OctagonXIcon aria-hidden="true" className="size-4 text-destructive" />
         ),
         loading: (
-          <Loader2Icon className="size-4 animate-spin" />
+          <Loader2Icon aria-hidden="true" className="size-4 animate-spin text-muted-foreground motion-reduce:animate-none" />
         ),
       }}
       style={
         {
-          "--normal-bg": "var(--popover)",
-          "--normal-text": "var(--popover-foreground)",
+          "--normal-bg": "var(--card)",
+          "--normal-text": "var(--card-foreground)",
           "--normal-border": "var(--border)",
-          "--border-radius": "var(--radius)",
+          "--border-radius": "calc(var(--radius) * 1.4)",
         } as React.CSSProperties
       }
       toastOptions={{
+        closeButtonAriaLabel: "Dismiss notification",
         classNames: {
-          toast: "group-[.toaster]:bg-card group-[.toaster]:text-foreground group-[.toaster]:border-border/60 group-[.toaster]:shadow-lg group-[.toaster]:rounded-2xl group-[.toaster]:p-4",
-          title: "group-[.toaster]:text-sm group-[.toaster]:font-medium group-[.toaster]:text-foreground",
-          description: "group-[.toaster]:text-xs group-[.toaster]:text-muted-foreground group-[.toaster]:mt-1",
-          actionButton: "group-[.toast]:bg-primary group-[.toast]:text-primary-foreground group-[.toast]:rounded-full group-[.toast]:px-3 group-[.toast]:py-1 group-[.toast]:text-xs group-[.toast]:font-medium",
-          cancelButton: "group-[.toast]:bg-muted group-[.toast]:text-muted-foreground group-[.toast]:rounded-full group-[.toast]:px-3 group-[.toast]:py-1 group-[.toast]:text-xs group-[.toast]:font-medium",
-          closeButton: "group-[.toaster]:bg-muted/50 group-[.toaster]:hover:bg-muted group-[.toaster]:rounded-lg group-[.toaster]:p-1",
-          icon: "group-[.toaster]:[&_svg]:size-4",
+          toast: "border-border/70 bg-card text-card-foreground rounded-2xl px-4 py-3.5 shadow-sm",
+          title: "text-sm font-semibold leading-5 text-foreground",
+          description: "mt-0.5 text-xs leading-5 text-muted-foreground",
+          actionButton: "rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-[var(--primary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none",
+          cancelButton: "rounded-full bg-muted px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none",
+          closeButton: "rounded-full border-border/60 bg-card text-muted-foreground shadow-none hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          icon: "mt-0.5 self-start [&_svg]:size-4",
         },
       }}
       closeButton
-      richColors
       duration={4000}
       visibleToasts={4}
+      gap={10}
+      offset={{ top: "calc(env(safe-area-inset-top) + 16px)", right: "max(env(safe-area-inset-right), 16px)", bottom: "calc(env(safe-area-inset-bottom) + 16px)", left: "max(env(safe-area-inset-left), 16px)" }}
+      mobileOffset={{ top: "calc(env(safe-area-inset-top) + 12px)", right: "max(env(safe-area-inset-right), 12px)", bottom: "calc(env(safe-area-inset-bottom) + 12px)", left: "max(env(safe-area-inset-left), 12px)" }}
       position="bottom-right"
       {...props}
     />

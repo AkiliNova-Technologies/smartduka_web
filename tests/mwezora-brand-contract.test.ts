@@ -56,6 +56,9 @@ describe("Mwezora customer-facing brand", () => {
     expect(source("src/app/layout.tsx")).toContain("openGraph");
     expect(source("src/app/layout.tsx")).toContain("twitter");
     expect(manifest().short_name).toBe("Mwezora");
+    expect(manifest().name).toBe("Mwezora");
+    expect(manifest().background_color).toBe("#FAF7F2");
+    expect(manifest().icons?.some((icon) => icon.purpose === "maskable" && icon.sizes === "512x512")).toBe(true);
     expect(manifest().icons?.every((icon) => existsSync(resolve(process.cwd(), "public", icon.src.slice(1))))).toBe(true);
   });
 

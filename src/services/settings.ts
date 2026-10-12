@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma/client";
-import { isAccentPreset, isThemeMode, type AccentPreset, type ThemeMode } from "@/lib/appearance";
+import { isAccentPreset, isPlatformPersonality, isThemeMode, type AccentPreset, type PlatformPersonality, type ThemeMode } from "@/lib/appearance";
 
 // ==========================================
 // TYPES
@@ -22,6 +22,7 @@ export interface UserSettingsPayload {
   buyerProtectionEnabled?: boolean;
   themeMode?: ThemeMode;
   accentColor?: AccentPreset;
+  personality?: PlatformPersonality;
 }
 
 const SETTINGS_STRING_FIELDS = new Set<keyof UserSettingsPayload>([
@@ -54,6 +55,11 @@ export function sanitizeUserSettingsPayload(input: unknown): UserSettingsPayload
       if (settingsKey === "accentColor") {
         if (!isAccentPreset(value)) throw new UserSettingsPayloadError("Unsupported accent colour.");
         payload.accentColor = value;
+        continue;
+      }
+      if (settingsKey === "personality") {
+        if (!isPlatformPersonality(value)) throw new UserSettingsPayloadError("Unsupported platform personality.");
+        payload.personality = value;
         continue;
       }
       throw new UserSettingsPayloadError("Unsupported settings field: " + key);
@@ -100,6 +106,7 @@ export class SettingsService {
           buyerProtectionEnabled: true,
           themeMode: "system",
           accentColor: "classic",
+          personality: "LOVELY",
         },
       });
     }
@@ -136,6 +143,7 @@ export class SettingsService {
         buyerProtectionEnabled: safeData.buyerProtectionEnabled ?? true,
         themeMode: safeData.themeMode ?? "system",
         accentColor: safeData.accentColor ?? "classic",
+        personality: safeData.personality ?? "LOVELY",
       },
     });
   }

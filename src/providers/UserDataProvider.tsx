@@ -14,6 +14,8 @@ import { toast } from "sonner";
 import { trackProductViewAction } from "@/actions/recently-viewed";
 import { getRecentlyViewedAction } from "@/actions/recently-viewed";
 import type { MarketplaceProduct } from "@/components/marketplace/product-card";
+import { useAppearance } from "@/providers/AppearanceProvider";
+import { getPersonalityToastMessage } from "@/lib/personality-messages";
 
 export interface UserSettings {
   id: string;
@@ -34,6 +36,7 @@ export interface UserSettings {
   buyerProtectionEnabled: boolean;
   themeMode: "system" | "light" | "dark";
   accentColor: "classic" | "rose" | "berry" | "plum" | "violet" | "emerald" | "teal" | "coral";
+  personality: "LOVELY" | "ELEGANT" | "PLAYFUL" | "CLASSIC";
 }
 
 export interface CartItem {
@@ -161,6 +164,7 @@ const defaultSettings: UserSettings = {
   buyerProtectionEnabled: true,
   themeMode: "system",
   accentColor: "classic",
+  personality: "LOVELY",
 };
 
 function loadFromStorage<T>(key: string, fallback: T): T {
@@ -186,6 +190,7 @@ const UserDataContext = createContext<UserDataContextType | undefined>(undefined
 
 export function UserDataProvider({ children }: { children: React.ReactNode }) {
   const { uid, isAuthenticated, loading: authLoading } = useAuth();
+  const { personality } = useAppearance();
 
   const [settings, setSettings] = useState<UserSettings>(defaultSettings);
   const [settingsLoading, setSettingsLoading] = useState(true);
@@ -221,7 +226,8 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
           body: JSON.stringify(updates),
         });
         setSettings(data);
-        toast.success("Settings saved.");
+        const profileUpdate = Object.keys(updates).some((key) => ["fullName", "phoneNumber", "avatarUrl"].includes(key));
+        toast.success(getPersonalityToastMessage(profileUpdate ? "toast.profile.updated" : "toast.preferences.updated", personality));
       } catch {
         setSettings(previous);
         toast.error("Failed to save settings.");
@@ -229,7 +235,7 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
         setSettingsSaving(false);
       }
     },
-    [uid, settings],
+    [uid, settings, personality],
   );
 
   // Keep server and first client renders identical; load browser storage after hydration.
@@ -263,14 +269,17 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
         }
         return [...prev, { ...item, quantity: item.quantity || 1 }];
       });
-      toast.success("Added to cart");
+      toast.success(getPersonalityToastMessage("toast.cart.added", personality));
     },
-    [],
+    [personality],
   );
 
   const removeFromCart = useCallback((productId: string, variantId?: string | null) => {
+    const exists = cart.some((item) => item.productId === productId && (item.variantId ?? null) === (variantId ?? null));
+    if (!exists) return;
     setCart((prev) => prev.filter((i) => i.productId !== productId || (i.variantId ?? null) !== (variantId ?? null)));
-  }, []);
+    toast.success(getPersonalityToastMessage("toast.cart.removed", personality));
+  }, [cart, personality]);
 
   const updateCartQuantity = useCallback(
     (productId: string, quantity: number, variantId?: string | null) => {
@@ -319,32 +328,31 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
       const exists = wishlist.some((i) => i.productId === item.productId);
       if (exists) {
         setWishlist((prev) => prev.filter((i) => i.productId !== item.productId));
-        toast.success("Removed from wishlist");
       } else {
         setWishlist((prev) => [...prev, { ...item, addedAt: new Date().toISOString() }]);
-        toast.success("Added to wishlist");
       }
       try {
         const response = await fetch("/api/wishlist", {
-          method: "POST",
+          method: exists ? "DELETE" : "POST",
           headers: authHeaders(),
           body: JSON.stringify({ productId: item.productId }),
         });
         if (!response.ok) {
           await fetchWishlist();
           toast.error("Failed to update wishlist");
+          return;
         }
+        toast.success(getPersonalityToastMessage(exists ? "toast.wishlist.removed" : "toast.wishlist.added", personality));
       } catch {
         await fetchWishlist();
       }
     },
-    [wishlist, fetchWishlist],
+    [wishlist, fetchWishlist, personality],
   );
 
   const removeFromWishlist = useCallback(
     async (productId: string) => {
       setWishlist((prev) => prev.filter((i) => i.productId !== productId));
-      toast.success("Removed from wishlist");
       try {
         const response = await fetch("/api/wishlist", {
           method: "DELETE",
@@ -353,12 +361,16 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
         });
         if (response.ok) {
           await fetchWishlist();
+          toast.success(getPersonalityToastMessage("toast.wishlist.removed", personality));
+        } else {
+          await fetchWishlist();
+          toast.error("Failed to update wishlist");
         }
       } catch {
         await fetchWishlist();
       }
     },
-    [fetchWishlist],
+    [fetchWishlist, personality],
   );
 
   const [orders, setOrders] = useState<UserOrder[]>([]);

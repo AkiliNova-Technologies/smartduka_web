@@ -11,6 +11,7 @@ import {
   type FulfillmentMethod,
 } from "@/lib/fulfillment";
 import { toVendorProfileDto } from "@/lib/vendor-profile-dto";
+import { vendorDeliveryFeeSchema } from "@/lib/vendor-delivery-fee";
 import { parsePrivateDocumentReference } from "@/lib/private-document-storage";
 import { KYC_MIME_TYPES, STORAGE_UPLOAD_RULES } from "@/lib/supabase/storage-contract";
 
@@ -39,6 +40,7 @@ export async function updateStoreProfile(input: UpdateStoreProfileInput) {
       ...(input.city !== undefined && { city: input.city }),
       ...(input.country !== undefined && { country: input.country }),
     },
+    select: { id: true, storeName: true, description: true, email: true, phone: true, website: true, address: true, city: true, country: true },
   });
 
   updateTag(cacheTags.marketplace.shops);
@@ -52,7 +54,7 @@ export async function updateStoreProfile(input: UpdateStoreProfileInput) {
 
 const fulfillmentSettingsSchema = z.object({
   methods: z.array(FulfillmentMethodSchema).min(1, "Choose at least one fulfilment method."),
-  deliveryFee: z.coerce.number().finite("Enter a valid delivery fee.").nonnegative("Enter a valid delivery fee.").optional(),
+  deliveryFee: vendorDeliveryFeeSchema.optional(),
   deliveryEstimate: z.string().optional(),
   pickupLocation: z.string().optional(),
   pickupDirections: z.string().optional(),
@@ -89,15 +91,14 @@ export async function updateFulfillmentSettings(input: unknown) {
   if (!parsed.success) return { success: false, fieldErrors: fieldErrors(parsed.error) };
   const methods = [...new Set(parsed.data.methods)] as FulfillmentMethod[];
   const errors: SettingsFieldErrors = {};
-  const deliveryFee = parsed.data.deliveryFee ?? 0;
-  if (methods.includes("DELIVERY") && (!Number.isFinite(deliveryFee) || deliveryFee < 0)) errors.deliveryFee = "Enter a valid delivery fee.";
+  const deliveryFee = parsed.data.deliveryFee ?? "0";
   if (methods.includes("PICKUP") && !parsed.data.pickupLocation?.trim()) errors.pickupLocation = "Enter a pickup location.";
   if (Object.keys(errors).length) return { success: false, fieldErrors: errors };
   await prisma.vendorProfile.update({
     where: { id: context.vendorId },
     data: {
       fulfillmentMethods: methods,
-      deliveryFee: methods.includes("DELIVERY") ? deliveryFee : 0,
+      deliveryFee: methods.includes("DELIVERY") ? deliveryFee : "0",
       deliveryEstimate: parsed.data.deliveryEstimate?.trim() || null,
       pickupLocation: parsed.data.pickupLocation?.trim() || null,
       pickupDirections: parsed.data.pickupDirections?.trim() || null,
@@ -141,6 +142,7 @@ export async function updateStoreLogo(logoUrl: string) {
   const updated = await prisma.vendorProfile.update({
     where: { id: context.vendorId },
     data: { logoUrl },
+    select: { id: true, logoUrl: true },
   });
 
   updateTag(cacheTags.marketplace.shops);
@@ -157,6 +159,7 @@ export async function updateStoreBanner(bannerUrl: string) {
   const updated = await prisma.vendorProfile.update({
     where: { id: context.vendorId },
     data: { bannerUrl },
+    select: { id: true, bannerUrl: true },
   });
 
   updateTag(cacheTags.marketplace.shops);

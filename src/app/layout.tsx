@@ -1,4 +1,5 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
+import { Suspense } from "react";
 import "./globals.css";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
@@ -8,6 +9,7 @@ import { UserDataProvider } from "@/providers/UserDataProvider";
 import { WorkspaceAccessProvider } from "@/providers/WorkspaceAccessProvider";
 import { AppearanceProvider } from "@/providers/AppearanceProvider";
 import { brand } from "@/config/brand";
+import { PwaManager } from "@/components/pwa/PwaManager";
 
 const configuredProductionUrl = process.env.NEXT_PUBLIC_APP_URL ?? process.env.VERCEL_PROJECT_PRODUCTION_URL;
 const canonicalProductionUrl = configuredProductionUrl
@@ -28,7 +30,12 @@ export const metadata: Metadata = {
       { url: brand.logo.symbol, type: "image/svg+xml" },
       { url: brand.appIcons.classic, type: "image/png", sizes: "1024x1024" },
     ],
-    apple: [{ url: brand.appIcons.light, type: "image/png", sizes: "1024x1024" }],
+    apple: [{ url: "/apple-touch-icon.png", type: "image/png", sizes: "180x180" }],
+  },
+  appleWebApp: {
+    capable: true,
+    title: brand.name,
+    statusBarStyle: "default",
   },
   openGraph: {
     type: "website",
@@ -43,6 +50,16 @@ export const metadata: Metadata = {
     description: brand.description,
     images: canonicalProductionUrl ? [brand.appIcons.classic] : undefined,
   },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#FAF7F2" },
+    { media: "(prefers-color-scheme: dark)", color: "#18181B" },
+  ],
 };
 
 export default function RootLayout({
@@ -61,6 +78,7 @@ export default function RootLayout({
           <UserDataProvider>
             <PublicCatalogProvider>
               <TooltipProvider delayDuration={200}>{children}</TooltipProvider>
+              <Suspense fallback={null}><PwaManager /></Suspense>
               <Toaster position="top-right" closeButton={false} />
             </PublicCatalogProvider>
           </UserDataProvider>

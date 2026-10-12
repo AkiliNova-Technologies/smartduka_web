@@ -4,9 +4,10 @@ import { sanitizeUserSettingsPayload, UserSettingsPayloadError } from "@/service
 
 describe("appearance preferences", () => {
   it("accepts only the curated theme and accent identifiers", () => {
-    expect(sanitizeUserSettingsPayload({ themeMode: "dark", accentColor: "coral" })).toEqual({ themeMode: "dark", accentColor: "coral" });
+    expect(sanitizeUserSettingsPayload({ themeMode: "dark", accentColor: "coral", personality: "ELEGANT" })).toEqual({ themeMode: "dark", accentColor: "coral", personality: "ELEGANT" });
     expect(() => sanitizeUserSettingsPayload({ accentColor: "#ff00ff" })).toThrow(UserSettingsPayloadError);
     expect(() => sanitizeUserSettingsPayload({ themeMode: "sepia" })).toThrow(UserSettingsPayloadError);
+    expect(() => sanitizeUserSettingsPayload({ personality: "INFERRED" })).toThrow(UserSettingsPayloadError);
   });
 
   it("keeps partial preference updates partial", () => {
@@ -17,6 +18,6 @@ describe("appearance preferences", () => {
   it("falls back safely for malformed or legacy saved values", () => {
     expect(normalizeAppearance(null)).toEqual(DEFAULT_APPEARANCE);
     expect(normalizeAppearance({ themeMode: "solar", accentColor: "unknown" })).toEqual(DEFAULT_APPEARANCE);
-    expect(normalizeAppearance({ themeMode: "light", accentColor: "teal" })).toEqual({ themeMode: "light", accentColor: "teal" });
+    expect(normalizeAppearance({ themeMode: "light", accentColor: "teal", personality: "PLAYFUL" })).toEqual({ themeMode: "light", accentColor: "teal", personality: "PLAYFUL" });
   });
 });

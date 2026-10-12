@@ -6,7 +6,7 @@ import { PageContainer } from "@/components/marketplace/page-container";
 import { PageHeader } from "@/components/marketplace/page-header";
 import { PaginatedProductGrid, ProductGridSkeleton } from "@/components/marketplace/product-grid";
 import { FilterToolbar } from "@/components/marketplace/filter-toolbar";
-import { IllustratedEmptyState } from "@/components/marketplace/illustrated-empty-state";
+import { PersonalityProductEmpty } from "@/components/marketplace/personality-product-empty";
 import { PromotionSection } from "@/components/marketing/promotion-section";
 import { CatalogFilters } from "@/components/marketplace/catalog-filters";
 import { CategoryService } from "@/services/category";
@@ -59,30 +59,7 @@ async function ProductsRuntime({ searchParams }: ProductsPageProps) {
             {products.length > 0 ? (
               <Suspense fallback={<ProductGridSkeleton />}><PaginatedProductGrid products={products} page={currentPage} /></Suspense>
             ) : (
-              <IllustratedEmptyState
-                illustration={
-                  search
-                    ? "/illustrations/empty-search.svg"
-                    : "/illustrations/empty-products.svg"
-                }
-                title={
-                  search ? "No products found" : "No products available yet"
-                }
-                description={
-                  search
-                    ? `We couldn’t find anything matching “${search}”. Try another search or browse a category.`
-                    : "Products from Mwezora shops will appear here."
-                }
-                action={{
-                  label: search ? "Clear search" : "Browse shops",
-                  href: search ? "/products" : "/shops",
-                }}
-                secondaryAction={
-                  search
-                    ? { label: "Browse categories", href: "/categories" }
-                    : undefined
-                }
-              />
+              <PersonalityProductEmpty search={search} />
             )}
     </div>
   );

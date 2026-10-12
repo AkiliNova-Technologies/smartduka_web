@@ -9,7 +9,7 @@ export async function GET() {
   try {
     const settings = await SettingsService.getSettings(await requireActiveUserId());
     return v1Data(
-      normalizeAppearance({ themeMode: settings.themeMode, accentColor: settings.accentColor }),
+      normalizeAppearance({ themeMode: settings.themeMode, accentColor: settings.accentColor, personality: settings.personality }),
       200,
       privateHeaders,
     );
@@ -22,18 +22,19 @@ export async function GET() {
 export async function PATCH(request: Request) {
   try {
     const body = await request.json();
-    if (!body || typeof body !== "object" || Array.isArray(body) || Object.keys(body).some((key) => key !== "themeMode" && key !== "accentColor")) {
+    if (!body || typeof body !== "object" || Array.isArray(body) || Object.keys(body).some((key) => key !== "themeMode" && key !== "accentColor" && key !== "personality")) {
       return v1Error("VALIDATION_ERROR", "Only appearance preferences can be updated here.", 400);
     }
     const input = sanitizeUserSettingsPayload(body);
     const updates = {
       ...(input.themeMode ? { themeMode: input.themeMode } : {}),
       ...(input.accentColor ? { accentColor: input.accentColor } : {}),
+      ...(input.personality ? { personality: input.personality } : {}),
     };
     if (!Object.keys(updates).length) return v1Error("VALIDATION_ERROR", "An appearance preference is required.", 400);
     const settings = await SettingsService.updateSettings(await requireActiveUserId(), updates);
     return v1Data(
-      normalizeAppearance({ themeMode: settings.themeMode, accentColor: settings.accentColor }),
+      normalizeAppearance({ themeMode: settings.themeMode, accentColor: settings.accentColor, personality: settings.personality }),
       200,
       privateHeaders,
     );

@@ -1,0 +1,2 @@
+ALTER TABLE "UserSettings"
+ADD COLUMN "personality" TEXT NOT NULL DEFAULT 'LOVELY';

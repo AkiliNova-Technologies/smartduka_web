@@ -14,6 +14,7 @@ type MediaImageProps = Omit<ImageProps, "src" | "onError"> & {
 export function MediaImage({
   src,
   fallback,
+  alt,
   className,
   fallbackClassName,
   ...props
@@ -27,7 +28,7 @@ export function MediaImage({
     <Image
       {...props}
       src={currentSource}
-      alt=""
+      alt={alt}
       className={cn(className, usingFallback && fallbackClassName)}
       onError={() => {
         if (!usingFallback) setFailedSource(preferredSource);

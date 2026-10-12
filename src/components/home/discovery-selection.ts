@@ -6,5 +6,5 @@ export function selectHomepageCategories(categories: HomepageCategory[]) {
 }
 
 export function selectFeaturedShops(shops: FeaturedShopDto[]) {
-  return shops.slice(0, 4);
+  return shops;
 }

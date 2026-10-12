@@ -8,8 +8,11 @@ import { useUserData } from "@/providers/UserDataProvider";
 import { PriceDisplay } from "@/components/marketplace/price-display";
 import { IllustratedEmptyState } from "@/components/marketplace/illustrated-empty-state";
 import { Button } from "@/components/ui/button";
+import { useAppearance } from "@/providers/AppearanceProvider";
+import { getPersonalityMessage } from "@/lib/personality-messages";
 
 export default function CartPage() {
+  const { personality } = useAppearance();
   const {
     cart,
     cartCount,
@@ -31,8 +34,8 @@ export default function CartPage() {
       <main className="mx-auto max-w-7xl px-4 py-10 pb-24 sm:px-6">
         <IllustratedEmptyState
           illustration="/illustrations/empty-cart.svg"
-          title="Your cart is empty"
-          description="Browse products from local shops."
+          title={getPersonalityMessage("cart.empty.title", personality)}
+          description={getPersonalityMessage("cart.empty.description", personality)}
           action={{ label: "Continue shopping", href: "/products" }}
           size="prominent"
         />

@@ -27,15 +27,15 @@ describe("homepage discovery data contracts", () => {
   it("returns only active, non-deleted, explicitly featured shops in priority order", () => {
     expect(marketing).toContain("vendor: { status: VendorStatus.ACTIVE, deletedAt: null }");
     expect(marketing).toContain("orderBy: featuredOrder");
-    expect(marketing).toContain("take: 4");
+    expect(marketing).toContain("take: publicShopLimit");
   });
 
   it("keeps featured-shop cards linked to their public storefronts", () => {
     expect(vendorCard).toContain("href={`/shops/${vendor.slug}`}");
   });
 
-  it("uses balanced responsive category and featured-shop grids", () => {
+  it("uses balanced category discovery and a responsive featured-shop carousel", () => {
     expect(discovery).toContain("grid-cols-2 gap-3 sm:grid-cols-5 lg:grid-cols-5");
-    expect(featured).toContain("sm:grid-cols-2 lg:grid-cols-4");
+    expect(featured).toContain("<FeaturedShopsCarousel shops={shops}");
   });
 });

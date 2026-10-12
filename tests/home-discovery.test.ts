@@ -21,6 +21,6 @@ describe("homepage discovery selection", () => {
 
   it("hides an empty featured-shop selection and preserves the admin-defined order", () => {
     expect(selectFeaturedShops([])).toEqual([]);
-    expect(selectFeaturedShops(["a", "b", "c", "d", "e"].map(shop)).map((item) => item.id)).toEqual(["a", "b", "c", "d"]);
+    expect(selectFeaturedShops(["a", "b", "c", "d", "e"].map(shop)).map((item) => item.id)).toEqual(["a", "b", "c", "d", "e"]);
   });
 });

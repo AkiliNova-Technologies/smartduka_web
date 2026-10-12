@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   ChevronRight,
   Check,
+  ChevronsUpDown,
   Info,
   Plus,
   X,
@@ -26,7 +27,6 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -49,6 +49,19 @@ import {
 } from "@/components/vendor/ProductSpecificationsEditor";
 import { Button } from "@/components/ui/button";
 import { FieldError } from "@/components/ui/field-error";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   validateProductStep,
   type ProductFormErrors,
@@ -99,6 +112,10 @@ export default function VendorProductFormPage() {
   );
   const [fieldErrors, setFieldErrors] = React.useState<ProductFormErrors>({});
   const [hasValidated, setHasValidated] = React.useState(false);
+  const [categorySelectOpen, setCategorySelectOpen] = React.useState(false);
+  const [categoryQuery, setCategoryQuery] = React.useState("");
+  const [subCategorySelectOpen, setSubCategorySelectOpen] = React.useState(false);
+  const [subCategoryQuery, setSubCategoryQuery] = React.useState("");
   // Retained only for the legacy block below while the shared editor owns the live UI.
   const [useVariants, setUseVariants] = React.useState(false);
   const [variants, setVariants] = React.useState<EditableProductVariant[]>([]);
@@ -131,6 +148,21 @@ export default function VendorProductFormPage() {
     weight: "",
     outsole: "",
   });
+  const categoryOptions = categories as CategoryTree[];
+  const selectedCategory = categoryOptions.find(
+    (category) => category.id === formData.categoryId,
+  );
+  const filteredCategories = categoryOptions.filter((category) =>
+    category.name.toLocaleLowerCase().includes(categoryQuery.trim().toLocaleLowerCase()),
+  );
+  const selectedSubCategory = availableSubCategories.find(
+    (subCategory) => subCategory.id === formData.subCategoryId,
+  );
+  const filteredSubCategories = availableSubCategories.filter((subCategory) =>
+    subCategory.name
+      .toLocaleLowerCase()
+      .includes(subCategoryQuery.trim().toLocaleLowerCase()),
+  );
   const previewInventory = productType === "variants"
     ? variants
         .filter((variant) => variant.isActive && variant.inventoryCount >= 0)
@@ -511,31 +543,78 @@ export default function VendorProductFormPage() {
                   <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                     Main Category *
                   </Label>
-                  <Select
-                    value={formData.categoryId}
-                    onValueChange={handleCategoryChange}>
-                    <SelectTrigger
-                      data-product-field="categoryId"
-                      aria-invalid={Boolean(fieldErrors.categoryId)}
-                      aria-describedby={
-                        fieldErrors.categoryId ? "category-error" : undefined
-                      }
-                      className="w-full min-h-10 rounded-full font-semibold border-border/60 bg-background">
-                      <SelectValue placeholder="Select Main Category" />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-xl border-border/60 p-1">
-                      <SelectGroup>
-                        {(categories as CategoryTree[]).map((cat) => (
-                          <SelectItem
-                            key={cat.id}
-                            value={cat.id}
-                            className="rounded-lg text-xs font-medium py-2">
-                            {cat.name}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
+                  <Popover
+                    open={categorySelectOpen}
+                    onOpenChange={(open) => {
+                      setCategorySelectOpen(open);
+                      if (open) setCategoryQuery("");
+                    }}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={categorySelectOpen}
+                        data-product-field="categoryId"
+                        aria-invalid={Boolean(fieldErrors.categoryId)}
+                        aria-describedby={
+                          fieldErrors.categoryId ? "category-error" : undefined
+                        }
+                        className="min-h-10 w-full justify-between rounded-full border-border/60 bg-background px-3 font-semibold">
+                        <span
+                          className={cn(
+                            "truncate",
+                            !selectedCategory && "text-muted-foreground",
+                          )}>
+                          {selectedCategory?.name ?? "Select Main Category"}
+                        </span>
+                        <ChevronsUpDown className="size-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      className="rounded-xl border-border/60 p-2"
+                      onOpenAutoFocus={(event) => event.preventDefault()}>
+                      <Command>
+                        <CommandInput
+                          autoFocus
+                          value={categoryQuery}
+                          onChange={(event) =>
+                            setCategoryQuery(event.target.value)
+                          }
+                          placeholder="Search categories..."
+                          aria-label="Search categories"
+                        />
+                        <CommandList className="mt-2">
+                          {filteredCategories.length > 0 ? (
+                            <CommandGroup>
+                              {filteredCategories.map((category) => (
+                                <CommandItem
+                                  key={category.id}
+                                  role="option"
+                                  aria-selected={
+                                    category.id === formData.categoryId
+                                  }
+                                  onClick={() => {
+                                    handleCategoryChange(category.id);
+                                    setCategorySelectOpen(false);
+                                  }}
+                                  className="rounded-lg text-xs font-medium">
+                                  <span className="flex-1 truncate">
+                                    {category.name}
+                                  </span>
+                                  {category.id === formData.categoryId && (
+                                    <Check className="size-4 shrink-0" />
+                                  )}
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          ) : (
+                            <CommandEmpty>No categories found.</CommandEmpty>
+                          )}
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                   <FieldError id="category-error">
                     {fieldErrors.categoryId}
                   </FieldError>
@@ -546,32 +625,79 @@ export default function VendorProductFormPage() {
                   <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                     Subcategory *
                   </Label>
-                  <Select
-                    value={formData.subCategoryId}
-                    onValueChange={(val) => updateField("subCategoryId", val)}>
-                    <SelectTrigger className="w-full min-h-10 rounded-full font-semibold border-border/60 bg-background">
-                      <SelectValue placeholder="Select Subcategory" />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-xl border-border/60 p-1">
-                      <SelectGroup>
-                        {availableSubCategories.map((sub) => (
-                          <SelectItem
-                            key={sub.id}
-                            value={sub.id}
-                            className="rounded-lg text-xs font-medium py-2">
-                            <div className="flex items-center justify-between w-full">
-                              <span>{sub.name}</span>
-                              {sub.productCount && sub.productCount > 0 && (
-                                <span className="text-[10px] text-muted-foreground">
-                                  {sub.productCount} products
-                                </span>
-                              )}
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
+                  <Popover
+                    open={subCategorySelectOpen}
+                    onOpenChange={(open) => {
+                      setSubCategorySelectOpen(open);
+                      if (open) setSubCategoryQuery("");
+                    }}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={subCategorySelectOpen}
+                        className="min-h-10 w-full justify-between rounded-full border-border/60 bg-background px-3 font-semibold">
+                        <span
+                          className={cn(
+                            "truncate",
+                            !selectedSubCategory && "text-muted-foreground",
+                          )}>
+                          {selectedSubCategory?.name ?? "Select Subcategory"}
+                        </span>
+                        <ChevronsUpDown className="size-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      className="rounded-xl border-border/60 p-2"
+                      onOpenAutoFocus={(event) => event.preventDefault()}>
+                      <Command>
+                        <CommandInput
+                          autoFocus
+                          value={subCategoryQuery}
+                          onChange={(event) =>
+                            setSubCategoryQuery(event.target.value)
+                          }
+                          placeholder="Search subcategories..."
+                          aria-label="Search subcategories"
+                        />
+                        <CommandList className="mt-2">
+                          {filteredSubCategories.length > 0 ? (
+                            <CommandGroup>
+                              {filteredSubCategories.map((subCategory) => (
+                                <CommandItem
+                                  key={subCategory.id}
+                                  role="option"
+                                  aria-selected={
+                                    subCategory.id === formData.subCategoryId
+                                  }
+                                  onClick={() => {
+                                    updateField("subCategoryId", subCategory.id);
+                                    setSubCategorySelectOpen(false);
+                                  }}
+                                  className="rounded-lg text-xs font-medium">
+                                  <span className="flex-1 truncate">
+                                    {subCategory.name}
+                                  </span>
+                                  {subCategory.productCount !== undefined &&
+                                    subCategory.productCount > 0 && (
+                                      <span className="mr-2 text-[10px] text-muted-foreground">
+                                        {subCategory.productCount} products
+                                      </span>
+                                    )}
+                                  {subCategory.id === formData.subCategoryId && (
+                                    <Check className="size-4 shrink-0" />
+                                  )}
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          ) : (
+                            <CommandEmpty>No subcategories found.</CommandEmpty>
+                          )}
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                   <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-muted/50 border border-border/40 rounded-full">
                       <FolderTree className="w-3 h-3" />

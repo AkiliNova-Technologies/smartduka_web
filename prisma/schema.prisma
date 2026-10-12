@@ -806,6 +806,7 @@ model UserSettings {
 
   themeMode   String @default("system")
   accentColor String @default("classic")
+  personality String @default("LOVELY")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

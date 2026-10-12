@@ -40,5 +40,9 @@ export const brand = {
     dark: "/mwezora-app-dark-1024.png",
     /** Light-mode icon */
     light: "/mwezora-app-light-1024.png",
+    icon192: "/mwezora-app-192.png",
+    icon512: "/mwezora-app-512.png",
+    maskable192: "/mwezora-app-maskable-192.png",
+    maskable512: "/mwezora-app-maskable-512.png",
   },
 } as const;

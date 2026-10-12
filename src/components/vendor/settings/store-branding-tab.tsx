@@ -4,10 +4,10 @@ import { useState, useTransition } from "react";
 import { ImageUpload } from "@/components/image-upload";
 import { toast } from "sonner";
 import { updateStoreLogo, updateStoreBanner } from "@/actions/vendor-settings";
-import type { VendorProfile } from "@prisma/client";
+import type { VendorProfileDto } from "@/lib/vendor-profile-dto";
 import type { VendorSettingsDocument } from "./documents-tab";
 
-type FullVendorProfile = VendorProfile & {
+type FullVendorProfile = VendorProfileDto & {
   documents: VendorSettingsDocument[];
   _count: { products: number; subOrders: number };
 };

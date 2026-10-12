@@ -7,10 +7,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { updateStoreProfile } from "@/actions/vendor-settings";
-import type { VendorProfile } from "@prisma/client";
+import type { VendorProfileDto } from "@/lib/vendor-profile-dto";
 import type { VendorSettingsDocument } from "./documents-tab";
 
-type FullVendorProfile = VendorProfile & {
+type FullVendorProfile = VendorProfileDto & {
   documents: VendorSettingsDocument[];
   _count: { products: number; subOrders: number };
 };

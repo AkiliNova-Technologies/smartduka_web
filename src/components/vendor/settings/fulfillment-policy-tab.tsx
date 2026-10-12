@@ -16,7 +16,7 @@ import { toast } from "sonner";
 
 export interface FulfillmentPolicyProfile {
   fulfillmentMethods: FulfillmentMethod[];
-  deliveryFee: { toString(): string } | number | null;
+  deliveryFee: string | null;
   deliveryEstimate: string | null;
   pickupLocation: string | null;
   pickupDirections: string | null;
@@ -67,7 +67,7 @@ export function FulfillmentPolicyTab({ profile }: { profile: FulfillmentPolicyPr
       setErrors({});
       const result = await updateFulfillmentSettings({
         methods,
-        deliveryFee: Number(fee),
+        deliveryFee: fee,
         deliveryEstimate: estimate,
         pickupLocation: location,
         pickupDirections: directions,
