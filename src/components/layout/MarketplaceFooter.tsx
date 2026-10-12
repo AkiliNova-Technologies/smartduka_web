@@ -24,7 +24,8 @@ const groups = [
       { label: "Account settings", href: "/settings" },
     ],
   },
-  { title: "Help", links: [{ label: "Help center", href: "/help" }, { label: "Privacy Policy", href: "/privacy-policy" }, { label: "Cookie Policy", href: "/cookie-policy" }] },
+  { title: "Support", links: [{ label: "Help & Support", href: "/help" }, { label: "Report a Problem", href: "/account/reports" }] },
+  { title: "Legal", links: [{ label: "Terms & Conditions", href: "/terms" }, { label: "Privacy Policy", href: "/privacy-policy" }, { label: "Cookie Policy", href: "/cookie-policy" }] },
   {
     title: `Sell on ${brand.name}`,
     links: [{ label: "Become a seller", href: "/become-seller" }],
@@ -40,8 +41,8 @@ export function MarketplaceFooter() {
   return (
     <footer className="border-t border-border/70 bg-muted/30 pb-20 pt-9 text-card-foreground md:pb-7 md:pt-10">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.7fr)_repeat(4,minmax(0,1fr))] lg:gap-7">
-          <section className="max-w-sm" aria-labelledby="footer-brand">
+        <div className="grid grid-cols-2 gap-x-5 gap-y-8 sm:grid-cols-3 lg:grid-cols-[minmax(0,1.7fr)_repeat(5,minmax(0,1fr))] lg:gap-7">
+          <section className="col-span-2 max-w-sm sm:col-span-3 lg:col-span-1" aria-labelledby="footer-brand">
             {/* MwezoraLogoLink provides the two-tone live accent. */}
             <MwezoraLogoLink
               id="footer-brand"
@@ -51,10 +52,10 @@ export function MarketplaceFooter() {
               linkClassName="text-foreground"
             />
             <p className="mt-3 text-sm font-medium leading-6 text-foreground">
-              Shop from local businesses in one place.
+              Discover something wonderful.
             </p>
             <p className="mt-1 text-sm leading-6 text-muted-foreground">
-              Discover products, explore categories, and support local sellers.
+              Explore products and support independent local sellers.
             </p>
             <Link
               href="/products"

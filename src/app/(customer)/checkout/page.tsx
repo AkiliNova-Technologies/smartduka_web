@@ -307,6 +307,7 @@ export default function CheckoutPage() {
               className="h-12 w-full rounded-full">
               {isSubmitting ? "Creating order…" : "Place order"}
             </Button>
+            <p className="mt-3 text-center text-xs leading-5 text-muted-foreground">By placing this order, you acknowledge the <Link href="/terms" className="text-primary hover:underline">Terms</Link> and the seller’s delivery and returns information.</p>
           </div>
         </aside>
       </div>

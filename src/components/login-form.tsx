@@ -16,6 +16,13 @@ import { useAuth } from "@/hooks/use-auth";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
+type AuthOperation = "credentials" | "google" | null;
+
+function redirectAfterAuthentication() {
+  const callbackUrl = new URLSearchParams(window.location.search).get("callbackUrl");
+  return callbackUrl?.startsWith("/") && !callbackUrl.startsWith("//") ? callbackUrl : "/";
+}
+
 const getFriendlyErrorMessage = (errorString: string): string => {
   if (errorString.includes("auth/popup-closed-by-user")) {
     return "Sign-in window was closed before completion. Please try again.";
@@ -46,35 +53,45 @@ export function LoginForm({
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [formError, setFormError] = useState("");
+  const [authOperation, setAuthOperation] = useState<AuthOperation>(null);
+  const busy = authOperation !== null || actionLoading;
 
   useEffect(() => {
     if (isAuthenticated) {
-      router.push("/");
+      router.replace(redirectAfterAuthentication());
     }
   }, [isAuthenticated, router]);
 
   const handleLogin = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (busy) return;
     setFormError("");
     if (!email.trim() || !/^\S+@\S+\.\S+$/.test(email)) { setFormError("Enter a valid email address."); return; }
     if (!password) { setFormError("Enter your password."); return; }
     try {
+      setAuthOperation("credentials");
       await loginWithEmail(email.trim(), password);
       toast.success("Welcome back to Mwezora!");
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "";
       setFormError(getFriendlyErrorMessage(message));
+    } finally {
+      setAuthOperation(null);
     }
   };
 
   const handleGoogleSignIn = async () => {
+    if (busy) return;
     setFormError("");
     try {
+      setAuthOperation("google");
       await loginWithGoogle();
       toast.success("Logged in successfully!");
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "";
       setFormError(getFriendlyErrorMessage(message));
+    } finally {
+      setAuthOperation(null);
     }
   };
 
@@ -101,7 +118,7 @@ export function LoginForm({
                 id="email" 
                 type="email" 
                 required 
-                disabled={actionLoading}
+                disabled={busy}
                 placeholder="you@example.com" autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -119,7 +136,7 @@ export function LoginForm({
                 id="password" 
                 type={showPassword ? "text" : "password"} 
                 required 
-                disabled={actionLoading}
+                disabled={busy}
                 placeholder="••••••••" autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -140,11 +157,11 @@ export function LoginForm({
           <Field className="pt-1">
             <Button 
               type="submit" 
-              disabled={actionLoading} 
+              disabled={busy}
               className="w-full h-11 rounded-full text-xs font-semibold uppercase tracking-wider gap-2 bg-primary hover:bg-emerald-600 cursor-pointer text-white"
             >
-              {actionLoading ? "Authenticating..." : "Continue"}
-              {!actionLoading && <ArrowRight className="w-3.5 h-3.5" />}
+              {authOperation === "credentials" ? "Authenticating..." : "Continue"}
+              {authOperation !== "credentials" && <ArrowRight className="w-3.5 h-3.5" />}
             </Button>
           </Field>
         </FieldGroup>
@@ -160,7 +177,7 @@ export function LoginForm({
             variant="outline" 
             type="button" 
             onClick={handleGoogleSignIn}
-            disabled={actionLoading}
+            disabled={busy}
             className="w-full h-11 rounded-full text-xs font-medium gap-2 border-border/65 hover:bg-muted/60 cursor-pointer"
           >
             <svg className="size-4 shrink-0" viewBox="0 0 24 24">
@@ -169,7 +186,7 @@ export function LoginForm({
               <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/>
               <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
             </svg>
-            <span>{actionLoading ? "Connecting..." : "Continue with Google"}</span>
+            <span>{authOperation === "google" ? "Connecting..." : "Continue with Google"}</span>
           </Button>
         </Field>
       </div>

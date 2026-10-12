@@ -11,6 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AppearanceSettings } from "@/components/settings/AppearanceSettings";
+import Link from "next/link";
 
 type SettingsTab = "profile" | "appearance" | "notifications";
 const SETTINGS_TABS: { id: SettingsTab; label: string; icon: LucideIcon }[] = [
@@ -135,6 +136,7 @@ export default function SettingsContent() {
             </div>
           </section>
           <section className="mt-8 border-t pt-6">
+            <div className="mb-4 flex flex-wrap gap-x-4 gap-y-2 text-xs"><Link href="/terms" className="text-primary hover:underline">Terms & Conditions</Link><Link href="/privacy-policy" className="text-primary hover:underline">Privacy Policy</Link><Link href="/cookie-policy" className="text-primary hover:underline">Cookie Policy</Link></div>
             <button onClick={async () => { await logout(); router.replace("/"); }} disabled={actionLoading} className="inline-flex h-11 items-center gap-2 rounded-full px-4 text-sm font-medium text-muted-foreground hover:bg-muted"><LogOut className="size-4" />{actionLoading ? "Signing out…" : "Sign out"}</button>
           </section>
           </section>}
