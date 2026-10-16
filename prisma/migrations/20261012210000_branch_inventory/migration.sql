@@ -1,0 +1,17 @@
+CREATE TYPE "InventoryMovementType" AS ENUM ('INITIAL_ALLOCATION','RESTOCK','SALE','ADJUSTMENT','CANCELLATION_RESTORE');
+ALTER TABLE "VendorProfile" ADD COLUMN "branchInventoryEnabled" BOOLEAN NOT NULL DEFAULT false;
+CREATE TABLE "BranchInventory" ("id" TEXT NOT NULL,"branchId" TEXT NOT NULL,"shopId" TEXT NOT NULL,"productId" TEXT NOT NULL,"variantId" TEXT,"onHandQuantity" INTEGER NOT NULL DEFAULT 0,"reservedQuantity" INTEGER NOT NULL DEFAULT 0,"createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,"updatedAt" TIMESTAMP(3) NOT NULL,CONSTRAINT "BranchInventory_pkey" PRIMARY KEY ("id"),CONSTRAINT "BranchInventory_nonnegative" CHECK ("onHandQuantity" >= 0 AND "reservedQuantity" >= 0 AND "reservedQuantity" <= "onHandQuantity"));
+CREATE TABLE "InventoryMovement" ("id" TEXT NOT NULL,"inventoryId" TEXT NOT NULL,"branchId" TEXT NOT NULL,"shopId" TEXT NOT NULL,"productId" TEXT NOT NULL,"variantId" TEXT,"movementType" "InventoryMovementType" NOT NULL,"quantity" INTEGER NOT NULL,"referenceType" TEXT,"referenceId" TEXT,"reason" TEXT,"createdById" TEXT,"createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,CONSTRAINT "InventoryMovement_pkey" PRIMARY KEY ("id"),CONSTRAINT "InventoryMovement_nonzero" CHECK ("quantity" <> 0));
+CREATE UNIQUE INDEX "BranchInventory_simple_key" ON "BranchInventory"("branchId","productId") WHERE "variantId" IS NULL;
+CREATE UNIQUE INDEX "BranchInventory_variant_key" ON "BranchInventory"("branchId","productId","variantId") WHERE "variantId" IS NOT NULL;
+CREATE INDEX "BranchInventory_shopId_productId_variantId_idx" ON "BranchInventory"("shopId","productId","variantId");
+CREATE INDEX "BranchInventory_branchId_idx" ON "BranchInventory"("branchId");
+CREATE INDEX "InventoryMovement_inventoryId_createdAt_idx" ON "InventoryMovement"("inventoryId","createdAt");
+CREATE INDEX "InventoryMovement_referenceType_referenceId_idx" ON "InventoryMovement"("referenceType","referenceId");
+ALTER TABLE "BranchInventory" ADD CONSTRAINT "BranchInventory_branchId_fkey" FOREIGN KEY ("branchId") REFERENCES "ShopBranch"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "BranchInventory" ADD CONSTRAINT "BranchInventory_shopId_fkey" FOREIGN KEY ("shopId") REFERENCES "VendorProfile"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "BranchInventory" ADD CONSTRAINT "BranchInventory_productId_fkey" FOREIGN KEY ("productId") REFERENCES "Product"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "BranchInventory" ADD CONSTRAINT "BranchInventory_variantId_fkey" FOREIGN KEY ("variantId") REFERENCES "ProductVariant"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "InventoryMovement" ADD CONSTRAINT "InventoryMovement_inventoryId_fkey" FOREIGN KEY ("inventoryId") REFERENCES "BranchInventory"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "InventoryMovement" ADD CONSTRAINT "InventoryMovement_branchId_fkey" FOREIGN KEY ("branchId") REFERENCES "ShopBranch"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "InventoryMovement" ADD CONSTRAINT "InventoryMovement_shopId_fkey" FOREIGN KEY ("shopId") REFERENCES "VendorProfile"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

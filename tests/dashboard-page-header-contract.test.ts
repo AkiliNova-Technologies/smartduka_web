@@ -6,19 +6,32 @@ const read = (file: string) => readFileSync(join(process.cwd(), file), "utf8");
 
 describe("dashboard page header contract", () => {
   it("provides an accessible, responsive, theme-aware back header", () => {
-    const header = read("src/components/dashboard-page-header.tsx");
-    expect(header).toContain("backHref: string");
+    const header = read("src/components/detail-page-header.tsx");
+    const dashboardHeader = read("src/components/dashboard-page-header.tsx");
+    expect(header).toContain("backHref?: string");
     expect(header).toContain("title: ReactNode");
     expect(header).toContain("description?: ReactNode");
-    expect(header).toContain("trailing?: ReactNode");
+    expect(header).toContain("children?: ReactNode");
     expect(header).toContain("className?: string");
-    expect(header).toContain('aria-label="Go back"');
+    expect(header).toContain("aria-label={backLabel}");
     expect(header).toContain('href={backHref}');
     expect(header).toContain("rounded-full");
     expect(header).toContain("border-b");
     expect(header).toContain("min-w-0");
     expect(header).toContain("TooltipContent");
     expect(header).toContain("Go back");
+    expect(dashboardHeader).toContain("DetailPageHeader");
+    expect(dashboardHeader).toContain("trailing?: ReactNode");
+  });
+
+  it("uses the detail header for legal documents and help", () => {
+    const legalPage = read("src/components/legal/legal-page.tsx");
+    const helpPage = read("src/app/(customer)/help/page.tsx");
+    expect(legalPage).toContain("DetailPageHeader");
+    expect(legalPage).toContain('backHref="/"');
+    expect(legalPage).toContain("Document status");
+    expect(helpPage).toContain("DetailPageHeader");
+    expect(helpPage).toContain('description="Find answers and get the help you need."');
   });
 
   it.each([

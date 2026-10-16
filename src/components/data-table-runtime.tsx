@@ -106,6 +106,7 @@ export interface DataTableProps<TData, TValue> {
   className?: string;
   containerClassName?: string;
   isLoading?: boolean;
+  renderSubRow?: (row: TData) => React.ReactNode;
 }
 
 function DragHandle({ id }: { id: string }) {
@@ -172,6 +173,7 @@ export function DataTableRuntime<TData, TValue>({
   className,
   containerClassName,
   isLoading = false, // Add default value
+  renderSubRow,
 }: DataTableProps<TData, TValue>) {
   const enabled = {
     pagination: features?.pagination ?? true,
@@ -448,9 +450,23 @@ export function DataTableRuntime<TData, TValue>({
                   <SortableContext
                     items={dataIds}
                     strategy={verticalListSortingStrategy}>
-                    {table.getRowModel().rows.map((row) => (
-                      <DraggableRow key={row.id} row={row} />
-                    ))}
+                    {table.getRowModel().rows.map((row) => {
+                      const subRow = renderSubRow?.(row.original);
+                      return (
+                        <React.Fragment key={row.id}>
+                          <DraggableRow row={row} />
+                          {subRow != null && (
+                            <TableRow className="bg-muted/20 hover:bg-muted/20">
+                              <TableCell
+                                colSpan={finalColumns.length}
+                                className="p-0">
+                                {subRow}
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
                   </SortableContext>
                 ) : enabled.emptyState ? (
                   <TableRow className="hover:bg-transparent">

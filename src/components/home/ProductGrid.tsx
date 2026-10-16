@@ -8,8 +8,21 @@ import { useUserData } from "@/providers/UserDataProvider";
 import { ProductCardGrid } from "@/components/marketplace/product-grid";
 import type { MarketplaceProduct } from "@/components/marketplace/product-card";
 import { SectionHeader } from "@/components/marketplace/section-header";
+import { useAuth } from "@/hooks/use-auth";
 
 type ProductItem = MarketplaceProduct;
+type RecommendationResult = Awaited<ReturnType<typeof getRecommendationsAction>>;
+const recommendationRequests = new Map<string, { expiresAt: number; promise: Promise<RecommendationResult> }>();
+
+function getRecommendationsOnce(key: string, input: Parameters<typeof getRecommendationsAction>[0]) {
+  const now = Date.now();
+  const existing = recommendationRequests.get(key);
+  if (existing && existing.expiresAt > now) return existing.promise;
+  const promise = getRecommendationsAction(input);
+  recommendationRequests.set(key, { expiresAt: now + 10_000, promise });
+  return promise;
+}
+
 export function ProductGrid({
   deals,
   newArrivals,
@@ -17,24 +30,29 @@ export function ProductGrid({
   deals: ProductItem[];
   newArrivals: ProductItem[];
 }) {
-  const { recentlyViewedIds, cart } = useUserData();
+  const { recentlyViewedIds, cart, cartLoading } = useUserData();
+  const { uid, sessionRevision } = useAuth();
   const [recommendations, setRecommendations] = useState<ProductItem[]>([]);
   const [recommendationsPersonalized, setRecommendationsPersonalized] = useState(false);
   const cartProductIds = useMemo(() => cart.map((item) => item.productId), [cart]);
   useEffect(() => {
+    if (cartLoading) return;
     let current = true;
-    getRecommendationsAction({
+    setRecommendations([]);
+    const input = {
       recentProductIds: recentlyViewedIds,
       cartProductIds,
       limit: 8,
-    }).then((result) => {
+    };
+    const key = JSON.stringify([uid, sessionRevision, recentlyViewedIds, cartProductIds]);
+    getRecommendationsOnce(key, input).then((result) => {
       if (current && result.success && result.data) {
         setRecommendations(result.data.products as ProductItem[]);
         setRecommendationsPersonalized(result.data.personalized);
       }
     }).catch(() => {});
     return () => { current = false; };
-  }, [recentlyViewedIds, cartProductIds]);
+  }, [uid, sessionRevision, recentlyViewedIds, cartProductIds, cartLoading]);
   const section = (
     title: string,
     description: string,

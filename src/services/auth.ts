@@ -9,6 +9,8 @@ import {
 } from "firebase/auth";
 import { getErrorMessage } from "@/lib/api-utils";
 
+const sessionSyncs = new Map<string, Promise<Record<string, unknown>>>();
+
 // ==========================================
 // TYPES
 // ==========================================
@@ -30,24 +32,31 @@ export class AuthService {
   static async syncSessionWithBackend(
     user: FirebaseUser
   ): Promise<Record<string, unknown>> {
-    const idToken = await user.getIdToken();
+    const existing = sessionSyncs.get(user.uid);
+    if (existing) return existing;
+    const sync = (async () => {
+      const idToken = await user.getIdToken();
 
-    const response = await fetch("/api/auth", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${idToken}`,
-      },
-    });
+      const response = await fetch("/api/auth", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+      });
 
-    if (!response.ok) {
-      const body = await response.json().catch(() => ({}));
-      throw new Error(
-        body.error || "Failed to synchronize session with Mwezora server."
-      );
-    }
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(
+          body.error || "Failed to synchronize session with Mwezora server."
+        );
+      }
 
-    return response.json();
+      return response.json();
+    })();
+    sessionSyncs.set(user.uid, sync);
+    void sync.finally(() => sessionSyncs.delete(user.uid)).catch(() => {});
+    return sync;
   }
 
   /**
@@ -103,7 +112,6 @@ export class AuthService {
   static async loginWithGoogle(): Promise<AuthResult> {
     try {
       const result = await signInWithPopup(auth, googleProvider);
-      await this.syncUserProfile(result.user);
       const sessionData = await this.syncSessionWithBackend(result.user);
       return { success: true, user: result.user, serverSession: sessionData };
     } catch (error: unknown) {
@@ -121,7 +129,6 @@ export class AuthService {
   ): Promise<AuthResult> {
     try {
       const result = await signInWithEmailAndPassword(auth, email, pass);
-      await this.syncUserProfile(result.user);
       const sessionData = await this.syncSessionWithBackend(result.user);
       return { success: true, user: result.user, serverSession: sessionData };
     } catch (error: unknown) {
@@ -141,7 +148,6 @@ export class AuthService {
     try {
       const result = await createUserWithEmailAndPassword(auth, email, pass);
       await this.updateFirebaseProfile(result.user, displayName);
-      await this.syncUserProfile(result.user, displayName);
       const sessionData = await this.syncSessionWithBackend(result.user);
       return { success: true, user: result.user, serverSession: sessionData };
     } catch (error: unknown) {

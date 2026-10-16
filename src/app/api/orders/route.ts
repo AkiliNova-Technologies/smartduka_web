@@ -53,10 +53,13 @@ export async function POST(req: NextRequest) {
       shippingAddress: body.shippingAddress,
       shippingPhone: body.shippingPhone,
       shippingEmail: body.shippingEmail,
+      deliveryDistrict: body.deliveryDistrict,
       fulfillmentSelections: Array.isArray(body.fulfillmentSelections)
-        ? body.fulfillmentSelections.map((selection: { vendorId?: string; method?: string }) => ({
+        ? body.fulfillmentSelections.map((selection: { vendorId?: string; method?: string; branchId?: string; pickupContact?: string }) => ({
             vendorId: selection?.vendorId || "",
             method: selection?.method as FulfillmentMethod,
+            branchId: selection?.branchId,
+            pickupContact: selection?.pickupContact,
           }))
         : undefined,
       paymentGateway: body.paymentGateway,

@@ -8,4 +8,12 @@ Implemented transport adapters: public catalogue (`/categories`, `/products`, `/
 
 Retries: GET requests are safe; checkout is idempotent using `Idempotency-Key` or `checkoutRequestId`. Product creation is explicitly non-idempotent until a durable request-key store is introduced, so clients must not auto-retry it. Payment initialization and report submission must not be retried without client-held idempotency state.
 
+`GET /api/v1/shops/{idOrSlug}/fulfillment-options` returns the public fulfilment methods for an active shop. Branch-configured shops include active eligible branch IDs, names, public address fields, opening hours, pickup instructions, delivery areas, fees, and estimates. Private contact details are never returned. An empty `fulfillmentMethods` array means checkout is unavailable. Legacy shops return their shop-level settings with `configurationMode: "LEGACY"`.
+
+`POST /api/v1/shops/{idOrSlug}/fulfillment-options` accepts `{ items: [{ productId, variantId?, quantity }], method?, district? }` (maximum 100 lines) and returns only `AVAILABLE`, `INSUFFICIENT_STOCK`, `UNAVAILABLE`, or `INACTIVE` plus stable reason codes per branch. Method capability and delivery-area coverage are evaluated when supplied. It never returns exact quantities and is private/no-store. Checkout still submits a branch because the order transaction performs the authoritative decrement.
+
+`GET /api/v1/vendor/branch-inventory` returns the authorized vendor's branch overview and recent append-only movements. `POST` requires a UUID `requestId`; operations are `ALLOCATE`, `RESTOCK`, and signed `ADJUST` (which requires a reason). Retrying the same request ID replays its result without applying stock twice.
+
+V1 checkout accepts `fulfillmentSelections[]` containing `vendorId`, `method`, optional `branchId`, and optional `pickupContact`. `shippingAddress` may be omitted for pickup-only checkout; any delivery selection still requires it server-side.
+
 Vendor operations: dashboard reports completed-and-delivered sales, actionable orders, and items at or below the low-stock threshold. Analytics accepts `TODAY`, `7D`, or `30D`. Inventory lists bounded stock rows and accepts intent-based `INCREMENT`, `DECREMENT`, or `SET` adjustments; stock never goes negative. Product creation/update uses strict request schemas and never accepts tenant IDs or platform-owned fields. Upload first via `POST /uploads`, then submit its returned `storage://` asset reference in the matching product/shop mutation; foreign paths and external URLs are rejected.

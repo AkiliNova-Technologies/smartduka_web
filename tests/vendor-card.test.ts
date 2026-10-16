@@ -24,7 +24,10 @@ describe("VendorCard presentation helpers", () => {
     expect(source).toContain("MapPin");
     expect(source).not.toContain("Visit Shop");
     expect(source).not.toContain("ArrowRight");
-    expect(source).not.toContain("Package aria-hidden");
-    expect(source).not.toContain("Truck aria-hidden");
+    expect(source).toContain("line-clamp-2");
+    expect(source).toContain("min-h-10");
+    expect(source).toContain("mt-auto");
+    expect(source).toContain('includes("DELIVERY")');
+    expect(source).toContain('includes("PICKUP")');
   });
 });

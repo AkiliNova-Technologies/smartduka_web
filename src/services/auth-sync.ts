@@ -129,5 +129,43 @@ export function getAuthSyncErrorResponse(error: unknown) {
   if (error instanceof AuthIdentityConflictError) {
     return { message: IDENTITY_CONFLICT_MESSAGE, status: 409, code: "IDENTITY_CONFLICT" };
   }
-  return { message: "We couldn't finish signing you in. Please try again.", status: 401, code: "AUTH_SYNC_FAILED" };
+  const prismaCode = typeof error === "object" && error !== null && "code" in error
+    ? String(error.code)
+    : null;
+  const errorName = error instanceof Error ? error.name : "";
+  if (
+    errorName === "PrismaClientInitializationError" ||
+    errorName === "PrismaClientRustPanicError" ||
+    prismaCode === "P2024" ||
+    (prismaCode !== null && /^P10\d\d$/.test(prismaCode))
+  ) {
+    return { message: "Sign-in is temporarily unavailable. Please try again.", status: 503, code: "AUTH_DEPENDENCY_UNAVAILABLE" };
+  }
+  if (prismaCode === "P2002") {
+    return { message: IDENTITY_CONFLICT_MESSAGE, status: 409, code: "IDENTITY_CONFLICT" };
+  }
+  if (errorName === "PrismaClientKnownRequestError" || errorName === "PrismaClientUnknownRequestError" || prismaCode?.startsWith("P")) {
+    return { message: "We couldn't finish signing you in. Please try again.", status: 500, code: "AUTH_SYNC_FAILED" };
+  }
+  const authCode = typeof error === "object" && error !== null && "code" in error
+    ? String(error.code)
+    : "";
+  if (authCode.startsWith("auth/") || authCode.startsWith("app/")) {
+    return { message: "Your authentication session is invalid or expired.", status: 401, code: "INVALID_AUTHENTICATION" };
+  }
+  return { message: "We couldn't finish signing you in. Please try again.", status: 500, code: "AUTH_SYNC_FAILED" };
+}
+
+export function authSyncDiagnostic(error: unknown) {
+  const response = getAuthSyncErrorResponse(error);
+  const prismaCode = typeof error === "object" && error !== null && "code" in error
+    ? String(error.code)
+    : undefined;
+  return {
+    event: "auth_sync_failed",
+    errorType: error instanceof Error ? error.name : "UnknownError",
+    ...(prismaCode ? { dependencyCode: prismaCode } : {}),
+    responseCode: response.code,
+    status: response.status,
+  };
 }

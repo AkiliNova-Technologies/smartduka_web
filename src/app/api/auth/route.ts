@@ -4,7 +4,7 @@ import { PlatformRole } from "@prisma/client";
 import { cookies } from "next/headers";
 import { createToken, SESSION_MAX_AGE_SECONDS } from "@/lib/auth/jwt";
 import { successResponse, errorResponse, getErrorMessage } from "@/lib/api-utils";
-import { getAuthSyncErrorResponse, synchronizeFirebaseIdentity } from "@/services/auth-sync";
+import { authSyncDiagnostic, getAuthSyncErrorResponse, synchronizeFirebaseIdentity } from "@/services/auth-sync";
 import { getCurrentWorkspaceAccess } from "@/lib/auth/workspaces";
 
 export async function GET() {
@@ -12,6 +12,7 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const startedAt = performance.now();
   try {
     const authHeader = req.headers.get("Authorization");
     let idToken = authHeader?.startsWith("Bearer ") ? authHeader.split(" ")[1] : null;
@@ -70,7 +71,10 @@ export async function POST(req: NextRequest) {
       name: user.name,
     });
   } catch (error: unknown) {
-    console.error("[Auth API]", error instanceof Error ? error.name : "Unknown auth error");
+    console.error("[Auth API]", {
+      ...authSyncDiagnostic(error),
+      durationMs: Math.round(performance.now() - startedAt),
+    });
     const response = getAuthSyncErrorResponse(error);
     return errorResponse(response.message, response.status, response.code);
   }

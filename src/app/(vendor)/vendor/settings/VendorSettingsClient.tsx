@@ -17,11 +17,13 @@ import { PaymentSettingsTab } from "@/components/vendor/settings/payment-setting
 import type { VendorProfileDto } from "@/lib/vendor-profile-dto";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AppearanceSettings } from "@/components/settings/AppearanceSettings";
+import { LocationsFulfillmentTab } from "@/components/vendor/settings/locations-fulfillment-tab";
 
 type TabID =
   | "branding"
   | "information"
   | "fulfillment"
+  | "locations"
   | "documents"
   | "payments"
   | "appearance"
@@ -36,6 +38,7 @@ type FullVendorProfile = VendorProfileDto & {
 const TABS = [
   { id: "branding" as const, label: "Store Branding", icon: ImageIcon },
   { id: "information" as const, label: "Store Information", icon: Store },
+  { id: "locations" as const, label: "Locations & Fulfilment", icon: PackageCheck },
   {
     id: "fulfillment" as const,
     label: "Fulfilment & Returns",
@@ -137,6 +140,7 @@ export default function VendorSettingsPage() {
           {activeTab === "fulfillment" && (
             <FulfillmentPolicyTab profile={profile} />
           )}
+          {activeTab === "locations" && <LocationsFulfillmentTab />}
           {activeTab === "documents" && (
             <DocumentsTab
               vendorId={profile.id}

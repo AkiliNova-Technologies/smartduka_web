@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({ transaction: vi.fn() }));
 vi.mock("@/lib/prisma/client", () => ({ prisma: { $transaction: mocks.transaction } }));
 vi.mock("@prisma/client", () => ({ PlatformRole: { CUSTOMER: "CUSTOMER" }, UserStatus: { ACTIVE: "ACTIVE" } }));
 
-import { AuthIdentityConflictError, synchronizeFirebaseIdentity } from "@/services/auth-sync";
+import { AuthIdentityConflictError, getAuthSyncErrorResponse, synchronizeFirebaseIdentity } from "@/services/auth-sync";
 
 function makeTx() {
   return {
@@ -91,5 +91,19 @@ describe("Firebase identity synchronization", () => {
     });
     const user = await synchronizeFirebaseIdentity(identity());
     expect(user.id).toBe("firebase-uid"); expect(users).toHaveLength(1);
+  });
+});
+
+describe("auth sync error translation", () => {
+  it("does not misreport database failures as invalid authentication", () => {
+    const unavailable = Object.assign(new Error("connection pool timeout"), { name: "PrismaClientKnownRequestError", code: "P2024" });
+    expect(getAuthSyncErrorResponse(unavailable)).toMatchObject({ status: 503, code: "AUTH_DEPENDENCY_UNAVAILABLE" });
+
+    const unexpected = Object.assign(new Error("query failed"), { name: "PrismaClientKnownRequestError", code: "P2025" });
+    expect(getAuthSyncErrorResponse(unexpected)).toMatchObject({ status: 500, code: "AUTH_SYNC_FAILED" });
+  });
+
+  it("keeps genuine identity conflicts separate", () => {
+    expect(getAuthSyncErrorResponse(new AuthIdentityConflictError())).toMatchObject({ status: 409, code: "IDENTITY_CONFLICT" });
   });
 });

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { MapPin } from "lucide-react";
+import { MapPin, Package, Truck } from "lucide-react";
 import { MediaImage } from "@/components/marketplace/media-image";
 import { SHOP_BANNER_FALLBACK, SHOP_LOGO_FALLBACK } from "@/lib/media";
 import type { PublicShopListing } from "@/lib/public-shop-dto";
@@ -25,15 +25,13 @@ export function formatFulfilmentSummary(methods: readonly ("DELIVERY" | "PICKUP"
 
 export function VendorCard({ vendor, priority = false }: { vendor: MarketplaceVendor; priority?: boolean }) {
   const location = [vendor.city, vendor.country].filter(Boolean).join(", ");
-  const fulfilment = formatFulfilmentSummary(vendor.fulfillmentMethods);
-
   return (
     <article className="h-full overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm transition-[border-color,box-shadow] duration-200 motion-reduce:transition-none hover:border-primary/40 hover:shadow-md">
       <Link href={`/shops/${vendor.slug}`} aria-label={`Visit ${vendor.storeName}`} className="group block h-full overflow-hidden rounded-[inherit] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
         <div className="relative aspect-[16/7] overflow-hidden bg-muted">
           <MediaImage src={vendor.bannerUrl} fallback={SHOP_BANNER_FALLBACK} alt={vendor.bannerUrl ? `${vendor.storeName} storefront` : ""} fill priority={priority} sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 380px" className="object-cover transition-transform duration-300 motion-reduce:transition-none group-hover:scale-[1.02]" />
         </div>
-        <div className="relative flex min-h-[168px] flex-col px-4 pb-4 pt-10">
+        <div className="relative flex min-h-[196px] flex-col px-4 pb-4 pt-10">
           <div className="absolute -top-8 left-4 grid size-16 place-items-center overflow-hidden rounded-full border-4 border-card bg-muted text-base font-semibold tracking-tight text-primary shadow-sm">
             {vendor.logoUrl ? <MediaImage src={vendor.logoUrl} fallback={SHOP_LOGO_FALLBACK} alt={`${vendor.storeName} logo`} fill sizes="64px" className="object-cover" fallbackClassName="object-cover" /> : <span aria-label={`${vendor.storeName} initials`}>{getShopInitials(vendor.storeName)}</span>}
           </div>
@@ -42,10 +40,14 @@ export function VendorCard({ vendor, priority = false }: { vendor: MarketplaceVe
             {vendor.isVerified ? <ShopVerificationBadge compact className="mt-0.5 shrink-0 px-1.5" /> : null}
           </div>
           {location ? <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground"><MapPin aria-hidden="true" className="size-3.5 shrink-0" /><span className="line-clamp-1">{location}</span></p> : null}
-          {vendor.description ? <p className="mt-3 line-clamp-2 text-sm leading-5 text-muted-foreground">{vendor.description}</p> : null}
-          <p className="mt-auto border-t border-border/70 pt-3 text-xs text-muted-foreground">
-            {vendor.productCount ? `${vendor.productCount} ${vendor.productCount === 1 ? "product" : "products"}` : "No products yet"}{fulfilment ? ` · ${fulfilment}` : ""}
-          </p>
+          <div className="mt-3 min-h-10">
+            {vendor.description ? <p className="line-clamp-2 text-sm leading-5 text-muted-foreground">{vendor.description}</p> : null}
+          </div>
+          <div className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-border/70 pt-3 text-xs text-muted-foreground">
+            <span className="inline-flex items-center gap-1.5"><Package aria-hidden="true" className="size-3.5" />{vendor.productCount ? `${vendor.productCount} ${vendor.productCount === 1 ? "product" : "products"}` : "No products yet"}</span>
+            {vendor.fulfillmentMethods.includes("DELIVERY") ? <span className="inline-flex items-center gap-1.5"><Truck aria-hidden="true" className="size-3.5" />Delivery</span> : null}
+            {vendor.fulfillmentMethods.includes("PICKUP") ? <span className="inline-flex items-center gap-1.5"><MapPin aria-hidden="true" className="size-3.5" />Pickup</span> : null}
+          </div>
         </div>
       </Link>
     </article>

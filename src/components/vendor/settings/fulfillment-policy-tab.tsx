@@ -102,6 +102,7 @@ export function FulfillmentPolicyTab({ profile }: { profile: FulfillmentPolicyPr
           </p>
         </div>
         <div className="space-y-5 p-6 text-sm">
+          <div><h4 className="font-semibold">Available fulfilment methods</h4><p className="mt-1 text-xs text-muted-foreground">Select delivery, customer pickup, or both.</p></div>
           <div className="grid gap-3 sm:grid-cols-2">
             {(
               FULFILLMENT_METHODS
@@ -117,7 +118,7 @@ export function FulfillmentPolicyTab({ profile }: { profile: FulfillmentPolicyPr
                 />
                 <span>
                   <span className="block font-semibold">
-                    {method === "DELIVERY" ? "Delivery" : "Store pickup"}
+                    {method === "DELIVERY" ? "Delivery" : "Customer pickup"}
                   </span>
                   <span className="mt-1 block text-xs text-muted-foreground">
                     {method === "DELIVERY"

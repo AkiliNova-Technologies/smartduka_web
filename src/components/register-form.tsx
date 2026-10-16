@@ -20,12 +20,13 @@ import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { authorizedRedirectPath } from "@/lib/auth/redirect-destination";
 
 type AuthOperation = "credentials" | "google" | null;
 
-function redirectAfterAuthentication() {
+function redirectAfterAuthentication(platformRole: string | null) {
   const callbackUrl = new URLSearchParams(window.location.search).get("callbackUrl");
-  return callbackUrl?.startsWith("/") && !callbackUrl.startsWith("//") ? callbackUrl : "/";
+  return authorizedRedirectPath(callbackUrl, { platformRole }) ?? "/";
 }
 
 const getFriendlyErrorMessage = (errorString: string): string => {
@@ -52,7 +53,7 @@ export function RegisterForm({
   ...props
 }: React.ComponentProps<"form">) {
   const router = useRouter();
-  const { registerWithEmail, loginWithGoogle, isAuthenticated, actionLoading } =
+  const { registerWithEmail, loginWithGoogle, isAuthenticated, sessionReady, userRole, actionLoading } =
     useAuth();
 
   const [step, setStep] = useState(1);
@@ -67,10 +68,10 @@ export function RegisterForm({
   const busy = authOperation !== null || actionLoading;
 
   useEffect(() => {
-    if (isAuthenticated) {
-      router.replace(redirectAfterAuthentication());
+    if (isAuthenticated && sessionReady) {
+      router.replace(redirectAfterAuthentication(userRole));
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, sessionReady, userRole, router]);
 
   const canProceedToStep2 = firstName.trim() && email.trim();
 

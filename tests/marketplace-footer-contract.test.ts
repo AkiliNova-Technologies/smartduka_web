@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 const source = readFileSync(resolve(process.cwd(), "src/components/layout/MarketplaceFooter.tsx"), "utf8");
 describe("UI-11A marketplace footer", () => {
   it("provides a branded marketplace block and intentional real-route groups", () => {
-    for (const value of ["Shop from local businesses in one place.", "Shop", "Account", "Help", "Sell on ${brand.name}", "/products", "/categories", "/shops", "/orders", "/wishlist", "/settings", "/help", "/become-seller"]) expect(source).toContain(value);
+    for (const value of ["Discover something wonderful.", "Explore products and support independent local sellers.", "Shop", "Account", "Support", "Sell on ${brand.name}", "/products", "/categories", "/shops", "/orders", "/wishlist", "/settings", "/help", "/become-seller"]) expect(source).toContain(value);
   });
   it("keeps the footer compact, accessible, and includes a restrained bottom bar", () => {
     expect(source).toContain("All Rights Reserved");

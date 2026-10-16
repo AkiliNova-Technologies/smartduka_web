@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 
 const mocks = vi.hoisted(() => ({
   transaction: vi.fn(),
+  executeRaw: vi.fn(),
   findExistingOrder: vi.fn(),
   findMany: vi.fn(),
   updateProductStock: vi.fn(),
@@ -43,6 +44,7 @@ const p2002 = (target: string[] | string) => new Prisma.PrismaClientKnownRequest
 
 function setupSuccessfulTransaction() {
   mocks.transaction.mockImplementation((callback) => callback({
+    $executeRaw: mocks.executeRaw,
     product: { findMany: mocks.findMany, updateMany: mocks.updateProductStock },
     productVariant: { updateMany: mocks.updateVariantStock },
     order: { create: mocks.createOrder }, subOrder: { create: mocks.createSubOrder },

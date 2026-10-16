@@ -8,6 +8,7 @@ import { cacheLife, cacheTag } from "next/cache";
 import { cacheProfiles, cacheTags } from "@/lib/cache-policy";
 import { VendorEntitlementService } from "@/services/vendor-entitlement";
 import { publicProductWhere } from "@/lib/marketplace-eligibility";
+import { assertCanonicalCoversAllocations } from "@/services/inventory-integrity";
 
 // ==========================================
 // INPUT TYPES
@@ -885,6 +886,7 @@ export class ProductService {
     }
     const variants = input.variants === undefined ? undefined : validateVariants(input.variants);
     return prisma.$transaction(async (tx) => {
+      const inventoryOwner = await tx.product.findUniqueOrThrow({ where: { id: input.id }, select: { vendorId: true, variants: { select: { id: true } } } });
       if (variants !== undefined) {
         const existing = await tx.productVariant.findMany({ where: { productId: input.id }, include: { _count: { select: { orderItems: true } } } });
         const existingById = new Map(existing.map((variant) => [variant.id, variant]));
@@ -893,6 +895,7 @@ export class ProductService {
         }
         const retained = new Set(variants.flatMap((variant) => variant.id ? [variant.id] : []));
         for (const old of existing.filter((variant) => !retained.has(variant.id))) {
+          await assertCanonicalCoversAllocations(tx as unknown as Prisma.TransactionClient, { shopId: inventoryOwner.vendorId, productId: input.id, variantId: old.id, canonical: 0 });
           if (old._count.orderItems) await tx.productVariant.update({ where: { id: old.id }, data: { isActive: false } });
           else await tx.productVariant.delete({ where: { id: old.id } });
         }
@@ -900,6 +903,7 @@ export class ProductService {
           const data = { name: variant.name, price: variant.price, inventoryCount: variant.inventoryCount, options: variant.options as Prisma.InputJsonValue, optionKey: variant.optionKey, isActive: variant.isActive };
           if (variant.id) {
             const current = existingById.get(variant.id)!;
+            await assertCanonicalCoversAllocations(tx as unknown as Prisma.TransactionClient, { shopId: inventoryOwner.vendorId, productId: input.id, variantId: variant.id, canonical: variant.inventoryCount });
             await tx.productVariant.update({ where: { id: variant.id }, data: { ...data, sku: variant.sku?.trim() || current.sku } });
           } else await createVariantWithSku(tx, { productId: input.id, ...data, sku: variant.sku });
         }
@@ -908,6 +912,7 @@ export class ProductService {
       const sizes = variants ? [...new Set(active.map((variant) => variant.options.Size ?? variant.options.size).filter((value): value is string => Boolean(value)))] : input.sizes;
       const colors = variants ? [...new Set(active.map((variant) => variant.options.Colour ?? variant.options.Color ?? variant.options.colour ?? variant.options.color).filter((value): value is string => Boolean(value)))] : input.colors;
       const inventoryCount = variants ? active.reduce((sum, variant) => sum + variant.inventoryCount, 0) : input.inventoryCount;
+      if (variants === undefined && inventoryOwner.variants.length === 0 && inventoryCount !== undefined) await assertCanonicalCoversAllocations(tx as unknown as Prisma.TransactionClient, { shopId: inventoryOwner.vendorId, productId: input.id, canonical: inventoryCount });
       if (input.images !== undefined) {
         await tx.productImage.deleteMany({ where: { productId: input.id } });
         await tx.productImage.createMany({ data: input.images.map((image, index) => ({ productId: input.id, url: image.url, isFeatured: image.isFeatured ?? index === 0, sortOrder: image.sortOrder ?? index })) });

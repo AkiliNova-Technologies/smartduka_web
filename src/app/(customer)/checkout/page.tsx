@@ -18,7 +18,8 @@ import { authHeaders } from "@/lib/providers/useProviderFetch";
 import { PriceDisplay } from "@/components/marketplace/price-display";
 
 const subscribeAfterHydration = () => () => {};
-type ShopFulfillment = { id: string; storeName: string; fulfillmentMethods: ("DELIVERY" | "PICKUP")[]; deliveryFee: number; deliveryEstimate: string | null; pickupLocation: string | null; pickupDirections: string | null; pickupInstructions: string | null; returnWindowDays: number; returnPolicy: string | null; acceptsExchanges: boolean; exchangePolicy: string | null };
+type BranchOption = { id: string; name: string; isPrimary: boolean; pickupEnabled: boolean; deliveryEnabled: boolean; addressLine: string | null; district: string | null; city: string | null; pickupInstructions: string | null; deliveryFee: number | null; deliveryEstimate: string | null };
+type ShopFulfillment = { id: string; storeName: string; configurationMode: "BRANCH" | "LEGACY"; fulfillmentMethods: ("DELIVERY" | "PICKUP")[]; deliveryFee: number; deliveryEstimate: string | null; pickupLocation: string | null; pickupDirections: string | null; pickupInstructions: string | null; returnWindowDays: number; returnPolicy: string | null; acceptsExchanges: boolean; exchangePolicy: string | null; branches: BranchOption[] };
 
 function useHydrated() {
   return useSyncExternalStore(subscribeAfterHydration, () => true, () => false);
@@ -46,6 +47,8 @@ export default function CheckoutPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [shops, setShops] = useState<ShopFulfillment[]>([]);
   const [fulfillment, setFulfillment] = useState<Record<string, "DELIVERY" | "PICKUP">>({});
+  const [selectedBranches, setSelectedBranches] = useState<Record<string, string>>({});
+  const [branchAvailability, setBranchAvailability] = useState<Record<string, "AVAILABLE" | "INSUFFICIENT_STOCK" | "UNAVAILABLE" | "INACTIVE">>({});
   const fullNameRef = useRef<HTMLInputElement>(null);
   const phoneRef = useRef<HTMLInputElement>(null);
   const addressRef = useRef<HTMLTextAreaElement>(null);
@@ -58,6 +61,7 @@ export default function CheckoutPage() {
   const filledDistrict = district ?? settings.deliveryDistrict ?? "";
   const vendorIds = [...new Set(cart.map((item) => item.vendorId))];
   const vendorIdKey = vendorIds.join(",");
+  const basketAvailabilityKey = JSON.stringify(cart.map(({ vendorId, productId, variantId, quantity }) => ({ vendorId, productId, variantId: variantId ?? null, quantity })));
   const hasDelivery = Object.values(fulfillment).includes("DELIVERY");
 
   useEffect(() => {
@@ -74,9 +78,34 @@ export default function CheckoutPage() {
     fetch(`/api/checkout/fulfillment?${params}`, { headers: authHeaders() }).then((response) => response.json()).then((body) => {
       const next = (body?.data?.shops ?? []) as ShopFulfillment[];
       setShops(next);
-      setFulfillment((current) => Object.fromEntries(next.map((shop) => [shop.id, current[shop.id] && shop.fulfillmentMethods.includes(current[shop.id]) ? current[shop.id] : (shop.fulfillmentMethods.includes("DELIVERY") ? "DELIVERY" : "PICKUP")])) as Record<string, "DELIVERY" | "PICKUP">);
+      setFulfillment((current) => Object.fromEntries(next.flatMap((shop) => { const method = current[shop.id] && shop.fulfillmentMethods.includes(current[shop.id]) ? current[shop.id] : shop.fulfillmentMethods.includes("DELIVERY") ? "DELIVERY" : shop.fulfillmentMethods.includes("PICKUP") ? "PICKUP" : null; return method ? [[shop.id, method]] : []; })) as Record<string, "DELIVERY" | "PICKUP">);
+      setSelectedBranches((current) => Object.fromEntries(next.map((shop) => {
+        const method = shop.fulfillmentMethods.includes("DELIVERY") ? "DELIVERY" : "PICKUP";
+        const eligible = shop.branches.filter((branch) => method === "DELIVERY" ? branch.deliveryEnabled : branch.pickupEnabled);
+        return [shop.id, eligible.some((branch) => branch.id === current[shop.id]) ? current[shop.id] : (eligible.find((branch) => branch.isPrimary) ?? eligible[0])?.id ?? ""];
+      })));
     }).catch(() => setShops([]));
   }, [vendorIdKey]);
+
+  useEffect(() => {
+    if (!cart.length) return;
+    const controller = new AbortController();
+    const grouped = [...new Set(cart.map((item) => item.vendorId))].map((vendorId) => ({ vendorId, method: fulfillment[vendorId], district: filledDistrict || undefined, items: cart.filter((item) => item.vendorId === vendorId).map(({ productId, variantId, quantity }) => ({ productId, variantId: variantId ?? null, quantity })) }));
+    fetch("/api/checkout/fulfillment", { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify({ shops: grouped }), signal: controller.signal })
+      .then((response) => response.json()).then((body) => {
+        const statuses = Object.fromEntries((body?.data?.shops ?? []).flatMap((shop: { branches: Array<{ id: string; status: "AVAILABLE" | "INSUFFICIENT_STOCK" | "UNAVAILABLE" | "INACTIVE" }> }) => shop.branches.map((branch) => [branch.id, branch.status])));
+        setBranchAvailability(statuses);
+        setSelectedBranches((current) => Object.fromEntries(Object.entries(current).map(([vendorId, branchId]) => {
+          if (statuses[branchId] === "AVAILABLE") return [vendorId, branchId];
+          const replacement = shops.find((shop) => shop.id === vendorId)?.branches.find((branch) => statuses[branch.id] === "AVAILABLE");
+          return [vendorId, replacement?.id ?? ""];
+        })));
+      }).catch((error) => { if (error instanceof Error && error.name !== "AbortError") setBranchAvailability({}); });
+    return () => controller.abort();
+  // The serialized basket intentionally drives revalidation after any item or quantity change.
+  // cart is represented by basketAvailabilityKey so equivalent provider array identities do not refetch.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [basketAvailabilityKey, shops, fulfillment, filledDistrict]);
 
   const startPayment = async () => {
     const checkoutId = checkoutRequestId.current;
@@ -86,6 +115,8 @@ export default function CheckoutPage() {
     if (!filledPhoneNumber.trim()) nextErrors.phoneNumber = "Enter a phone number.";
     if (hasDelivery && !address.trim()) nextErrors.address = "Enter a delivery address.";
     if (shops.length !== vendorIds.length) nextErrors.fulfillment = "Fulfilment options are still loading. Please try again.";
+    if (shops.some((shop) => shop.fulfillmentMethods.length === 0)) nextErrors.fulfillment = "A shop in your cart has no active fulfilment location. Remove its items or contact the seller.";
+    if (shops.some((shop) => shop.configurationMode === "BRANCH" && !selectedBranches[shop.id])) nextErrors.fulfillment = "No branch can currently fulfil every item from one location.";
     if (Object.keys(nextErrors).length) {
       setErrors(nextErrors);
       (nextErrors.fullName
@@ -114,10 +145,11 @@ export default function CheckoutPage() {
       checkoutRequestId: checkoutId,
       shippingAddress,
       shippingPhone: filledPhoneNumber.trim(),
+      deliveryDistrict: hasDelivery ? filledDistrict.trim() : undefined,
       // Checkout creates the order first. Seller-specific MTN payment setup
       // is selected afterwards on the order, never as one global cart rail.
       paymentGateway: "MTN_MOMO",
-      fulfillmentSelections: Object.entries(fulfillment).map(([vendorId, method]) => ({ vendorId, method })),
+      fulfillmentSelections: Object.entries(fulfillment).map(([vendorId, method]) => ({ vendorId, method, branchId: selectedBranches[vendorId] || undefined, pickupContact: method === "PICKUP" ? filledPhoneNumber.trim() : undefined })),
       notes: notes.trim() || undefined,
     });
     if (!result.success || !result.orderId) {
@@ -172,7 +204,7 @@ export default function CheckoutPage() {
             className="mt-6 rounded-2xl border bg-card p-5 sm:p-6"
             aria-labelledby="delivery-details">
             <h2 id="delivery-details" className="text-lg font-semibold">
-              Delivery information
+              Contact information
             </h2>
             <div className="grid gap-4 lg:grid-cols-2">
               <Field
@@ -199,15 +231,15 @@ export default function CheckoutPage() {
                 inputRef={phoneRef}
                 error={errors.phoneNumber}
               />
-              <Field
+              {hasDelivery && <Field
                 label="District / area"
                 id="delivery-district"
                 value={filledDistrict}
                 onChange={setDistrict}
                 placeholder="e.g. Nakawa"
-              />
+              />}
             </div>
-            <div className="mt-4 space-y-2">
+            {hasDelivery && <div className="mt-4 space-y-2">
               <Label htmlFor="delivery-address">Delivery address</Label>
               <Textarea
                 ref={addressRef}
@@ -228,7 +260,7 @@ export default function CheckoutPage() {
               <FieldError id="delivery-address-error">
                 {errors.address}
               </FieldError>
-            </div>
+            </div>}
             <div className="mt-4 space-y-2">
               <Label htmlFor="delivery-notes">
                 Delivery notes{" "}
@@ -245,7 +277,7 @@ export default function CheckoutPage() {
           </section>
           <section className="mt-5 rounded-2xl border bg-card p-5 sm:p-6" aria-labelledby="fulfilment-options">
             <h2 id="fulfilment-options" className="text-lg font-semibold">How you’ll receive each order</h2>
-            <div className="mt-4 space-y-3">{shops.map((shop) => <div key={shop.id} className="min-w-0 rounded-xl border p-4"><div className="flex items-start justify-between gap-3"><p className="min-w-0 break-words font-medium">{shop.storeName}</p><span className="shrink-0 text-xs text-muted-foreground">{fulfillment[shop.id] === "PICKUP" ? "No delivery fee" : `UGX ${shop.deliveryFee.toLocaleString()}`}</span></div><div className="mt-3 flex flex-wrap gap-2">{shop.fulfillmentMethods.map((method) => <Button key={method} type="button" size="sm" variant={fulfillment[shop.id] === method ? "default" : "outline"} className="min-h-11 rounded-full" onClick={() => setFulfillment((current) => ({ ...current, [shop.id]: method }))}>{method === "DELIVERY" ? <Truck className="mr-1.5 size-3.5" /> : <MapPin className="mr-1.5 size-3.5" />}{method === "DELIVERY" ? "Delivery" : "Pickup"}</Button>)}</div>{fulfillment[shop.id] === "PICKUP" && <p className="mt-3 break-words text-xs text-muted-foreground"><span className="font-medium text-foreground">Collect from:</span> {shop.pickupLocation}{shop.pickupDirections ? ` · ${shop.pickupDirections}` : ""}{shop.pickupInstructions ? ` · ${shop.pickupInstructions}` : ""}</p>}{fulfillment[shop.id] === "DELIVERY" && shop.deliveryEstimate && <p className="mt-3 break-words text-xs text-muted-foreground">Estimated delivery: {shop.deliveryEstimate}</p>}{shop.returnPolicy && <p className="mt-3 break-words text-xs text-muted-foreground">Returns: {shop.returnWindowDays} days · {shop.acceptsExchanges ? "Exchanges available" : "Refund/return policy applies"}</p>}</div>)}</div>
+            <div className="mt-4 space-y-3">{shops.map((shop) => { const method = fulfillment[shop.id]; const eligibleBranches = shop.branches.filter((branch) => (method === "DELIVERY" ? branch.deliveryEnabled : branch.pickupEnabled) && branchAvailability[branch.id] !== "INACTIVE"); const branch = eligibleBranches.find((item) => item.id === selectedBranches[shop.id]) ?? eligibleBranches.find((item) => branchAvailability[item.id] === "AVAILABLE"); const fee = method === "PICKUP" ? 0 : branch?.deliveryFee ?? shop.deliveryFee; return <div key={shop.id} className="min-w-0 rounded-xl border p-4"><div className="flex items-start justify-between gap-3"><p className="min-w-0 break-words font-medium">{shop.storeName}</p><span className="shrink-0 text-xs text-muted-foreground">{method === "PICKUP" ? "No delivery fee" : `UGX ${fee.toLocaleString()}`}</span></div><div className="mt-3 flex flex-wrap gap-2">{shop.fulfillmentMethods.map((option) => <Button key={option} type="button" size="sm" variant={method === option ? "default" : "outline"} className="min-h-11 rounded-full" onClick={() => { setFulfillment((current) => ({ ...current, [shop.id]: option })); const eligible = shop.branches.filter((item) => (option === "DELIVERY" ? item.deliveryEnabled : item.pickupEnabled) && branchAvailability[item.id] === "AVAILABLE"); setSelectedBranches((current) => ({ ...current, [shop.id]: (eligible.find((item) => item.isPrimary) ?? eligible[0])?.id ?? "" })); }}>{option === "DELIVERY" ? <Truck className="mr-1.5 size-3.5" /> : <MapPin className="mr-1.5 size-3.5" />}{option === "DELIVERY" ? "Delivery" : "Pickup"}</Button>)}</div>{eligibleBranches.length > 0 && <div className="mt-3"><Label htmlFor={`branch-${shop.id}`}>{method === "PICKUP" ? "Pickup location" : "Dispatch location"}</Label><select id={`branch-${shop.id}`} className="mt-1 h-11 w-full rounded-xl border bg-background px-3 text-sm" value={selectedBranches[shop.id] ?? ""} onChange={(event) => setSelectedBranches((current) => ({ ...current, [shop.id]: event.target.value }))}><option value="">Select a location</option>{eligibleBranches.map((item) => <option key={item.id} value={item.id} disabled={branchAvailability[item.id] !== "AVAILABLE"}>{item.name}{branchAvailability[item.id] !== "AVAILABLE" ? " — unavailable for this basket" : ""}</option>)}</select></div>}{shop.configurationMode === "BRANCH" && !branch && <p className="mt-3 text-xs text-destructive">No single location has every item in your basket.</p>}{method === "PICKUP" && branch && <p className="mt-3 break-words text-xs text-muted-foreground"><span className="font-medium text-foreground">Collect from:</span> {branch.addressLine ?? shop.pickupLocation}{branch.pickupInstructions ? ` · ${branch.pickupInstructions}` : shop.pickupInstructions ? ` · ${shop.pickupInstructions}` : ""}</p>}{method === "DELIVERY" && (branch?.deliveryEstimate ?? shop.deliveryEstimate) && <p className="mt-3 break-words text-xs text-muted-foreground">Estimated delivery: {branch?.deliveryEstimate ?? shop.deliveryEstimate}</p>}{shop.returnPolicy && <p className="mt-3 break-words text-xs text-muted-foreground">Returns: {shop.returnWindowDays} days · {shop.acceptsExchanges ? "Exchanges available" : "Refund/return policy applies"}</p>}</div>})}</div>
             {errors.fulfillment && <FieldError id="fulfilment-error">{errors.fulfillment}</FieldError>}
           </section>
           <section className="mt-5 rounded-2xl border bg-card p-5" aria-labelledby="payment-method">

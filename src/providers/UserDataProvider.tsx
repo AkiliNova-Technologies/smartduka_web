@@ -71,7 +71,7 @@ export interface UserOrder {
   totalShipping: number;
   createdAt: string;
   items: { id: string; productId: string; subOrderId: string; name: string; variantName: string | null; quantity: number; price: number; image: string | null; vendorName: string; canReview: boolean; review: { id: string; rating: number; title: string | null; comment: string | null; imageUrls: string[] } | null }[];
-  subOrders: { id: string; status: string; subOrderNumber: string; vendorName: string; total: number; paymentOptions: ("MTN_MOMO" | "AIRTEL_MONEY")[]; paymentIntents: { id: string; provider: "MTN_MOMO" | "AIRTEL_MONEY" | "PESAPAL"; status: string; amount: number; currency: string; providerReference: string | null; updatedAt: string }[]; canReview: boolean; review: { id: string; rating: number; comment: string | null } | null }[];
+  subOrders: { id: string; status: string; fulfillmentStatus: string; subOrderNumber: string; vendorName: string; total: number; fulfillmentMethod: "DELIVERY" | "PICKUP"; fulfillmentFee: number; branchName: string | null; deliveryAddress: string | null; fulfillmentContact: string; pickupLocation: string | null; pickupDirections: string | null; pickupInstructions: string | null; paymentOptions: ("MTN_MOMO" | "AIRTEL_MONEY")[]; paymentIntents: { id: string; provider: "MTN_MOMO" | "AIRTEL_MONEY" | "PESAPAL"; status: string; amount: number; currency: string; providerReference: string | null; updatedAt: string }[]; canReview: boolean; review: { id: string; rating: number; comment: string | null } | null }[];
 }
 
 export interface UserNotification {
@@ -126,9 +126,10 @@ interface UserDataContextType {
   refreshOrders: () => Promise<void>;
   placeOrder: (input: {
     items: { productId: string; variantId?: string | null; quantity: number }[];
-    shippingAddress: string;
+    shippingAddress?: string;
     shippingPhone: string;
-    fulfillmentSelections?: { vendorId: string; method: "DELIVERY" | "PICKUP" }[];
+    deliveryDistrict?: string;
+    fulfillmentSelections?: { vendorId: string; method: "DELIVERY" | "PICKUP"; branchId?: string; pickupContact?: string }[];
     paymentGateway: "MTN_MOMO" | "AIRTEL_MONEY";
     checkoutRequestId: string;
     notes?: string;
@@ -392,9 +393,10 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
   const placeOrder = useCallback(
     async (input: {
       items: { productId: string; variantId?: string | null; quantity: number }[];
-      shippingAddress: string;
+      shippingAddress?: string;
       shippingPhone: string;
-      fulfillmentSelections?: { vendorId: string; method: "DELIVERY" | "PICKUP" }[];
+      deliveryDistrict?: string;
+      fulfillmentSelections?: { vendorId: string; method: "DELIVERY" | "PICKUP"; branchId?: string; pickupContact?: string }[];
       paymentGateway: "MTN_MOMO" | "AIRTEL_MONEY";
       checkoutRequestId: string;
       notes?: string;
@@ -464,21 +466,26 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
   // RECENTLY VIEWED
   // ==========================================
 
-  const [recentlyViewedIds, setRecentlyViewedIds] = useState<string[]>(() =>
-    loadFromStorage<string[]>("smartduka-recently-viewed", []),
-  );
-  const [recentlyViewedTimestamps, setRecentlyViewedTimestamps] = useState<Record<string, string>>(() =>
-    loadFromStorage<Record<string, string>>("smartduka-recently-viewed-timestamps", {}),
-  );
+  const [recentlyViewedIds, setRecentlyViewedIds] = useState<string[]>([]);
+  const [recentlyViewedTimestamps, setRecentlyViewedTimestamps] = useState<Record<string, string>>({});
   const [recentlyViewedProducts, setRecentlyViewedProducts] = useState<RecentlyViewedProduct[]>([]);
   const [recentlyViewedLoading, setRecentlyViewedLoading] = useState(false);
+  const [recentlyViewedHydrated, setRecentlyViewedHydrated] = useState(false);
 
   useEffect(() => {
-    saveToStorage("smartduka-recently-viewed", recentlyViewedIds);
-  }, [recentlyViewedIds]);
+    queueMicrotask(() => {
+      setRecentlyViewedIds(loadFromStorage<string[]>("smartduka-recently-viewed", []));
+      setRecentlyViewedTimestamps(loadFromStorage<Record<string, string>>("smartduka-recently-viewed-timestamps", {}));
+      setRecentlyViewedHydrated(true);
+    });
+  }, []);
+
   useEffect(() => {
-    saveToStorage("smartduka-recently-viewed-timestamps", recentlyViewedTimestamps);
-  }, [recentlyViewedTimestamps]);
+    if (recentlyViewedHydrated) saveToStorage("smartduka-recently-viewed", recentlyViewedIds);
+  }, [recentlyViewedHydrated, recentlyViewedIds]);
+  useEffect(() => {
+    if (recentlyViewedHydrated) saveToStorage("smartduka-recently-viewed-timestamps", recentlyViewedTimestamps);
+  }, [recentlyViewedHydrated, recentlyViewedTimestamps]);
 
   const trackProductView = useCallback(
     (productId: string) => {
@@ -531,22 +538,16 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
     };
   }, [uid, recentlyViewedIds]);
 
-  const mergeRanRef = useRef(false);
-  const prevUidRef = useRef(uid);
+  const mergedIdentityRef = useRef<string | null>(null);
 
   useEffect(() => {
-    const wasLoggedIn = !!prevUidRef.current;
-    const isNowLoggedIn = !!uid;
-    prevUidRef.current = uid;
-
-    if (isNowLoggedIn && recentlyViewedIds.length > 0 && !mergeRanRef.current) {
-      mergeRanRef.current = true;
+    if (uid && recentlyViewedIds.length > 0 && mergedIdentityRef.current !== uid) {
+      mergedIdentityRef.current = uid;
       mergeRecentlyViewedRef.current();
     }
-
-    if (!isNowLoggedIn && wasLoggedIn) {
-      mergeRanRef.current = false;
-      setRecentlyViewedProducts([]);
+    if (!uid) {
+      mergedIdentityRef.current = null;
+      queueMicrotask(() => setRecentlyViewedProducts([]));
     }
   }, [uid, recentlyViewedIds.length]);
 

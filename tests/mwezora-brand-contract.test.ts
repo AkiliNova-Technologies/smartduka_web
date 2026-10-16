@@ -48,8 +48,8 @@ describe("Mwezora customer-facing brand", () => {
   });
 
   it("brands authentication, account appearance, metadata, and the PWA", () => {
-    expect(source("src/app/login/page.tsx")).toContain("<BrandLink");
-    expect(source("src/app/register/page.tsx")).toContain("<BrandLink");
+    expect(source("src/app/login/page.tsx")).toContain("<MwezoraLogoLink");
+    expect(source("src/app/register/page.tsx")).toContain("<MwezoraLogoLink");
     expect(source("src/components/login-form.tsx")).toContain("Mwezora");
     expect(source("src/components/register-form.tsx")).toContain("Mwezora");
     expect(source("src/app/(customer)/settings/settings-content.tsx")).toContain("Mwezora");

@@ -78,6 +78,29 @@ enum FulfillmentMethod {
   PICKUP
 }
 
+enum ShopBranchType {
+  STORE
+  WAREHOUSE
+  PICKUP_POINT
+}
+
+enum FulfillmentStatus {
+  PENDING
+  PREPARING
+  READY_FOR_PICKUP
+  OUT_FOR_DELIVERY
+  COMPLETED
+  CANCELLED
+}
+
+enum InventoryMovementType {
+  INITIAL_ALLOCATION
+  RESTOCK
+  SALE
+  ADJUSTMENT
+  CANCELLATION_RESTORE
+}
+
 enum PaymentStatus {
   PENDING
   AUTHORIZED
@@ -933,6 +956,7 @@ model VendorProfile {
   bankName          String?
 
   fulfillmentMethods FulfillmentMethod[] @default([DELIVERY])
+  branchInventoryEnabled Boolean          @default(false)
   deliveryFee        Decimal             @default(3500.00) @db.Decimal(18, 2)
   deliveryEstimate   String?
   pickupLocation     String?
@@ -980,9 +1004,90 @@ model VendorProfile {
   reviewReplies            ReviewReply[]                 @relation("VendorReviewReplies")
   marketplaceReports       MarketplaceReport[]
   verificationApplications ShopVerificationApplication[]
+  branches                 ShopBranch[]
+  branchInventories        BranchInventory[]
+  inventoryMovements       InventoryMovement[]
 
   @@index([status])
   @@index([createdAt])
+}
+
+model ShopBranch {
+  id                 String            @id @default(uuid())
+  shopId             String
+  shop               VendorProfile     @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  name               String
+  slug               String
+  branchType         ShopBranchType    @default(STORE)
+  isPrimary          Boolean           @default(false)
+  isActive           Boolean           @default(true)
+  pickupEnabled      Boolean           @default(false)
+  deliveryEnabled    Boolean           @default(false)
+  addressLine        String?
+  city               String?
+  district           String?
+  country            String?
+  latitude           Decimal?          @db.Decimal(10, 7)
+  longitude          Decimal?          @db.Decimal(10, 7)
+  contactPhone       String?
+  openingHours       Json?
+  pickupInstructions String?           @db.Text
+  deliveryAreas      String[]          @default([])
+  deliveryFee        Decimal?           @db.Decimal(18, 2)
+  deliveryEstimate   String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  subOrders          SubOrder[]
+  inventories        BranchInventory[]
+  inventoryMovements InventoryMovement[]
+
+  @@unique([shopId, name])
+  @@unique([shopId, slug])
+  @@index([shopId, isActive])
+}
+
+model BranchInventory {
+  id               String         @id @default(uuid())
+  branchId         String
+  branch           ShopBranch     @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  shopId           String
+  shop             VendorProfile  @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  productId        String
+  product          Product        @relation(fields: [productId], references: [id], onDelete: Restrict)
+  variantId        String?
+  variant          ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Restrict)
+  onHandQuantity   Int            @default(0)
+  reservedQuantity Int            @default(0)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  movements        InventoryMovement[]
+
+  @@index([shopId, productId, variantId])
+  @@index([branchId])
+}
+
+model InventoryMovement {
+  id          String                @id @default(uuid())
+  inventoryId String
+  inventory   BranchInventory       @relation(fields: [inventoryId], references: [id], onDelete: Restrict)
+  branchId    String
+  branch      ShopBranch            @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  shopId      String
+  shop        VendorProfile         @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  productId   String
+  variantId   String?
+  movementType InventoryMovementType
+  quantity    Int
+  referenceType String?
+  referenceId String?
+  reason      String?
+  createdById String?
+  requestId   String?
+  createdAt   DateTime              @default(now())
+
+  @@unique([shopId, requestId])
+  @@index([inventoryId, createdAt])
+  @@index([referenceType, referenceId])
 }
 
 model ShopVerificationApplication {
@@ -1127,6 +1232,7 @@ model Product {
 
   images             ProductImage[]
   variants           ProductVariant[]
+  branchInventories  BranchInventory[]
   orderItems         OrderItem[]
   reviews            ProductReview[]
   wishlistItems      WishlistItem[]
@@ -1321,6 +1427,7 @@ model ProductVariant {
 
   orderItems OrderItem[]
   reviews    ProductReview[]
+  branchInventories BranchInventory[]
 
   @@unique([productId, optionKey])
   @@index([productId])
@@ -1560,6 +1667,8 @@ model SubOrder {
   order    Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
   vendorId String
   vendor   VendorProfile @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  branchId String?
+  branch   ShopBranch?    @relation(fields: [branchId], references: [id], onDelete: Restrict)
 
   subOrderNumber       String            @unique
   vendorSubTotal       Decimal           @db.Decimal(18, 2)
@@ -1578,6 +1687,7 @@ model SubOrder {
   deliveryConfirmationSource DeliveryConfirmationSource?
   notes                      String?
   fulfillmentMethod          FulfillmentMethod           @default(DELIVERY)
+  fulfillmentStatus          FulfillmentStatus           @default(PENDING)
   fulfillmentSnapshot        Json?
   refundPolicySnapshot       Json?
 
@@ -1593,6 +1703,7 @@ model SubOrder {
 
   @@index([orderId])
   @@index([vendorId])
+  @@index([branchId])
   @@index([status])
 }
 

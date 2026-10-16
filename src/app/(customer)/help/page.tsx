@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { CreditCard, HelpCircle, Package, Search, ShieldCheck, Store, Truck } from "lucide-react";
 import { PageContainer } from "@/components/marketplace/page-container";
-import { PageHeader } from "@/components/marketplace/page-header";
+import { DetailPageHeader } from "@/components/detail-page-header";
 import { Input } from "@/components/ui/input";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
@@ -20,7 +20,7 @@ export default function HelpCenterPage() {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("all");
   const faqs = useMemo(() => topics.flatMap((topic) => topic.items.map(([question, answer], index) => ({ id: `${topic.id}-${index}`, category: topic.id, question, answer }))).filter((faq) => (category === "all" || faq.category === category) && `${faq.question} ${faq.answer}`.toLowerCase().includes(search.trim().toLowerCase())), [category, search]);
-  return <PageContainer className="max-w-5xl py-6 pb-24 sm:py-10"><PageHeader title="Help & Support" description="Practical guidance for shopping, payments, delivery, returns and seller issues." />
+  return <PageContainer className="max-w-5xl py-6 pb-24 sm:py-10"><DetailPageHeader title="Help & Support" description="Find answers and get the help you need." backHref="/" backLabel="Back to Mwezora" />
     <div className="relative mt-7"><Search className="absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><Input aria-label="Search help topics" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search help topics" className="h-12 rounded-full pl-11" /></div>
     <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6"><button onClick={() => setCategory("all")} aria-pressed={category === "all"} className={`min-h-20 rounded-xl border p-3 text-left ${category === "all" ? "border-primary bg-primary/5 text-primary" : "bg-card hover:bg-muted"}`}><HelpCircle className="size-4" /><span className="mt-3 block text-sm font-medium">All topics</span></button>{topics.map((topic) => { const Icon = topic.icon; return <button key={topic.id} onClick={() => setCategory(topic.id)} aria-pressed={category === topic.id} className={`min-h-20 rounded-xl border p-3 text-left ${category === topic.id ? "border-primary bg-primary/5 text-primary" : "bg-card hover:bg-muted"}`}><Icon className="size-4" /><span className="mt-3 block text-sm font-medium">{topic.label}</span></button>; })}</div>
     <section className="mt-7 rounded-xl border bg-card"><div className="border-b px-5 py-4"><h2 className="font-semibold">Help topics</h2></div>{faqs.length ? <Accordion type="single" collapsible className="px-5">{faqs.map((faq) => <AccordionItem key={faq.id} value={faq.id}><AccordionTrigger className="text-left text-sm font-medium hover:text-primary hover:no-underline">{faq.question}</AccordionTrigger><AccordionContent className="text-sm leading-6 text-muted-foreground">{faq.answer}</AccordionContent></AccordionItem>)}</Accordion> : <p className="px-5 py-10 text-center text-sm text-muted-foreground">No matching topics. Try a broader search.</p>}</section>

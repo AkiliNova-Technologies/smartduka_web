@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { MarketplaceJWTPayload, verifyToken } from "@/lib/auth/jwt";
+import { authorizedRedirectPath } from "@/lib/auth/redirect-destination";
 
 const AUTH_ROUTES = ["/login", "/register", "/forgot-password"];
 const ADMIN_PREFIX = "/admin";
@@ -115,15 +116,11 @@ export async function proxy(request: NextRequest) {
   // 5. Handle Redirection for authenticated users on auth routes
   if (isAuthRoute) {
     if (session) {
-      // FIXED: session.role → session.platformRole
-      if (
-        session.platformRole === "ADMIN" ||
-        session.platformRole === "SUPER_ADMIN"
-      )
-        return NextResponse.redirect(new URL(ADMIN_PREFIX, origin));
-      if (session.platformRole === "VENDOR")
-        return NextResponse.redirect(new URL(VENDOR_PREFIX, origin));
-      return NextResponse.redirect(new URL("/", origin));
+      const destination = authorizedRedirectPath(
+        request.nextUrl.searchParams.get("callbackUrl"),
+        session,
+      );
+      return NextResponse.redirect(new URL(destination ?? "/", origin));
     }
     return NextResponse.next({ request: { headers: getSanitizedRequestHeaders(request) } });
   }
@@ -148,7 +145,7 @@ export async function proxy(request: NextRequest) {
     }
 
     const loginUrl = new URL("/login", origin);
-    loginUrl.searchParams.set("callbackUrl", pathname);
+    loginUrl.searchParams.set("callbackUrl", `${pathname}${request.nextUrl.search}`);
     return NextResponse.redirect(loginUrl);
   }
 
@@ -160,14 +157,14 @@ export async function proxy(request: NextRequest) {
       session.platformRole !== "ADMIN" &&
       session.platformRole !== "SUPER_ADMIN"
     ) {
-      return handleUnauthorizedRedirect(request, session, origin);
+      return handleUnauthorizedRedirect(request, origin);
     }
 
     if (
       pathname.startsWith(VENDOR_PREFIX) &&
       session.platformRole !== "VENDOR"
     ) {
-      return handleUnauthorizedRedirect(request, session, origin);
+      return handleUnauthorizedRedirect(request, origin);
     }
   }
 
@@ -182,7 +179,6 @@ export async function proxy(request: NextRequest) {
 
 function handleUnauthorizedRedirect(
   request: NextRequest,
-  session: MarketplaceJWTPayload,
   origin: string,
 ) {
   if (request.nextUrl.pathname.startsWith("/api/")) {
@@ -191,14 +187,7 @@ function handleUnauthorizedRedirect(
       { status: 403 },
     );
   }
-  // FIXED: session.role → session.platformRole
-  if (
-    session.platformRole === "ADMIN" ||
-    session.platformRole === "SUPER_ADMIN"
-  )
-    return NextResponse.redirect(new URL(ADMIN_PREFIX, origin));
-  if (session.platformRole === "VENDOR")
-    return NextResponse.redirect(new URL(VENDOR_PREFIX, origin));
+  // An authorization failure must not become implicit privileged navigation.
   return NextResponse.redirect(new URL("/", origin));
 }
 

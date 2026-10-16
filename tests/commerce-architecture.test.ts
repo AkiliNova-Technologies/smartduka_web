@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Decimal } from "@prisma/client/runtime/client";
 
 const mocks = vi.hoisted(() => ({
-  transaction: vi.fn(), findMany: vi.fn(), findExistingOrder: vi.fn(), updateProductStock: vi.fn(), updateVariantStock: vi.fn(), createOrder: vi.fn(), createSubOrder: vi.fn(), createMany: vi.fn(), notification: vi.fn(),
+  transaction: vi.fn(), executeRaw: vi.fn(), findMany: vi.fn(), findExistingOrder: vi.fn(), updateProductStock: vi.fn(), updateVariantStock: vi.fn(), createOrder: vi.fn(), createSubOrder: vi.fn(), createMany: vi.fn(), notification: vi.fn(),
 }));
 vi.mock("@/lib/prisma/client", () => ({ prisma: {
   $transaction: mocks.transaction,
@@ -23,7 +23,7 @@ const input = { userId: "customer-a", checkoutRequestId: "checkout-request-0001"
 
 describe("canonical commerce architecture", () => {
   beforeEach(() => {
-    mocks.transaction.mockImplementation((callback) => callback({ product: { findMany: mocks.findMany, updateMany: mocks.updateProductStock }, productVariant: { updateMany: mocks.updateVariantStock }, order: { create: mocks.createOrder }, subOrder: { create: mocks.createSubOrder }, orderItem: { createMany: mocks.createMany }, notification: { create: mocks.notification } }));
+    mocks.transaction.mockImplementation((callback) => callback({ $executeRaw: mocks.executeRaw, product: { findMany: mocks.findMany, updateMany: mocks.updateProductStock }, productVariant: { updateMany: mocks.updateVariantStock }, order: { create: mocks.createOrder }, subOrder: { create: mocks.createSubOrder }, orderItem: { createMany: mocks.createMany }, notification: { create: mocks.notification } }));
     vi.clearAllMocks();
     mocks.findExistingOrder.mockResolvedValue(null);
     mocks.createOrder.mockResolvedValue({ id: "order-a", paymentStatus: "PENDING" });
@@ -70,7 +70,7 @@ describe("canonical commerce architecture", () => {
 describe("atomic inventory decrements", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.transaction.mockImplementation((callback) => callback({ product: { findMany: mocks.findMany, updateMany: mocks.updateProductStock }, productVariant: { updateMany: mocks.updateVariantStock }, order: { create: mocks.createOrder }, subOrder: { create: mocks.createSubOrder }, orderItem: { createMany: mocks.createMany }, notification: { create: mocks.notification } }));
+    mocks.transaction.mockImplementation((callback) => callback({ $executeRaw: mocks.executeRaw, product: { findMany: mocks.findMany, updateMany: mocks.updateProductStock }, productVariant: { updateMany: mocks.updateVariantStock }, order: { create: mocks.createOrder }, subOrder: { create: mocks.createSubOrder }, orderItem: { createMany: mocks.createMany }, notification: { create: mocks.notification } }));
     mocks.createOrder.mockResolvedValue({ id: "order-a", paymentStatus: "PENDING" });
     mocks.createSubOrder.mockResolvedValue({ id: "suborder-a" });
     mocks.createMany.mockResolvedValue({ count: 1 }); mocks.notification.mockResolvedValue({});
@@ -115,5 +115,20 @@ describe("authoritative checkout calculations", () => {
 
   it("rejects a negative authoritative price before an order can be persisted", () => {
     expect(() => calculateCheckoutTotals([{ productId: "a", variantId: null, vendorId: "vendor-a", quantity: 1, unitPrice: new Decimal("-1"), commissionRate: new Decimal("10") }])).toThrow(CheckoutError);
+  });
+
+  it("prices mixed-vendor delivery and pickup independently", () => {
+    const lines = [
+      { productId: "a", variantId: null, vendorId: "vendor-a", quantity: 1, unitPrice: new Decimal("10000"), commissionRate: new Decimal("0"), fulfillmentMethods: ["DELIVERY", "PICKUP"] as ("DELIVERY" | "PICKUP")[], deliveryFee: new Decimal("3500"), pickupLocation: "Shop A" },
+      { productId: "b", variantId: null, vendorId: "vendor-b", quantity: 1, unitPrice: new Decimal("20000"), commissionRate: new Decimal("0"), fulfillmentMethods: ["DELIVERY"] as ("DELIVERY" | "PICKUP")[], deliveryFee: new Decimal("3500") },
+    ];
+    const totals = calculateCheckoutTotals(lines, new Map([["vendor-a", "PICKUP"], ["vendor-b", "DELIVERY"]]));
+    expect(totals.vendorGroups.map((group) => Number(group.shipping))).toEqual([0, 3500]);
+    expect(Number(totals.shipping)).toBe(3500);
+  });
+
+  it("rejects a forged fulfilment method", () => {
+    const line = { productId: "a", variantId: null, vendorId: "vendor-a", quantity: 1, unitPrice: new Decimal("10000"), commissionRate: new Decimal("0"), fulfillmentMethods: ["DELIVERY"] as ("DELIVERY" | "PICKUP")[], deliveryFee: new Decimal("3500") };
+    expect(() => calculateCheckoutTotals([line], new Map([["vendor-a", "PICKUP"]]))).toThrow("no longer offers");
   });
 });

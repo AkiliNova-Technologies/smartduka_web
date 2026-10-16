@@ -2,6 +2,7 @@ import type { PromotionPlacement } from "@prisma/client";
 import { HeroSection } from "@/components/home/HeroSection";
 import { HeroCarousel, PromotionCarousel, type HeroSlide } from "@/components/marketing/promotion-carousel";
 import { MarketingService } from "@/services/marketing";
+import { measureServerOperation } from "@/lib/server/performance";
 
 const placementFallbacks: Partial<Record<PromotionPlacement, HeroSlide>> = {
   PRODUCTS: { id: "products-discovery", eyebrow: "Discover your next favourite", title: "Explore amazing products from trusted vendors.", description: "Fashion, electronics, home essentials and more — all in one place.", ctaLabel: "Explore Products", href: "/products", desktopImage: "/images/promotions/products-banner.webp", imageAlt: "Curated fashion and lifestyle products", imagePosition: "68% center", textScrim: true },
@@ -9,7 +10,7 @@ const placementFallbacks: Partial<Record<PromotionPlacement, HeroSlide>> = {
 };
 
 export async function PromotionSection({ placement, compact = false }: { placement: PromotionPlacement; compact?: boolean }) {
-  const data = await MarketingService.publicPromotions(placement).catch(() => []);
+  const data = await measureServerOperation(`homepage.promotions.${placement.toLowerCase()}`, () => MarketingService.publicPromotions(placement)).catch(() => []);
   const fallback = placementFallbacks[placement];
   if (data.length) return <PromotionCarousel promotions={data} size={compact ? "compact" : "hero"} />;
   if (fallback) return <HeroCarousel slides={[fallback]} size={compact ? "compact" : "hero"} />;

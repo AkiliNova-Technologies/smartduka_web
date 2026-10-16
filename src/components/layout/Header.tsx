@@ -220,11 +220,11 @@ export function Header() {
           <Menu className="size-5" />
         </button>
         <div className="flex min-w-0 flex-1 items-center md:flex-none">
-          {/* Desktop: full horizontal logo */}
+          <MwezoraLogoLink variant="horizontal" size="sm" className="md:hidden" />
           <MwezoraLogoLink
             variant="horizontal"
             size="sm"
-            className="md:inline-flex"
+            className="hidden md:inline-flex"
           />
         </div>
         <Suspense

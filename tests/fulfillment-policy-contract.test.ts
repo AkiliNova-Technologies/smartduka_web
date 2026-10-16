@@ -24,6 +24,25 @@ describe("fulfilment and exchange-policy contract", () => {
     expect(action).not.toContain("Object.values(FulfillmentMethod)");
   });
 
+  it("allows delivery, pickup, or both through independent controls", () => {
+    const form = source("src/components/vendor/settings/fulfillment-policy-tab.tsx");
+    const action = source("src/actions/vendor-settings.ts");
+    expect(form).toContain("<Checkbox");
+    expect(form).toContain("Customer pickup");
+    expect(form).toContain("Select delivery, customer pickup, or both.");
+    expect(action).toContain('.min(1, "Choose at least one fulfilment method.")');
+    expect(action).toContain('methods.includes("PICKUP")');
+  });
+
+  it("exposes persisted fulfilment snapshots to vendor and mobile order clients", () => {
+    const vendorOrders = source("src/services/vendor-orders.ts");
+    const customerOrders = source("src/services/order.ts");
+    expect(vendorOrders).toContain("fulfillmentMethod");
+    expect(vendorOrders).toContain("pickupInstructions");
+    expect(customerOrders).toContain("fulfillmentSnapshot: true");
+    expect(source("src/app/api/v1/orders/route.ts")).toContain("OrderService.getUserOrders");
+  });
+
   it("shows and validates an exchange policy only when exchanges are enabled", () => {
     const form = source("src/components/vendor/settings/fulfillment-policy-tab.tsx");
     const action = source("src/actions/vendor-settings.ts");

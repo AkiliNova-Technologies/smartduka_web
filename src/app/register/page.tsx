@@ -25,7 +25,7 @@ export default function RegisterPage() {
       {/* RIGHT SIDEBAR PANEL: EDITORIAL LIFESTYLE IMAGE CANVAS */}
       <div className="relative hidden bg-zinc-950 lg:block border-l border-border/40 overflow-hidden">
         <Image
-          src="/images/branding/auth/auth-fashion-editorial.webp"
+          src="/images/branding/auth/auth-fashion-editorial-v2.webp"
           alt=""
           fill
           sizes="50vw"

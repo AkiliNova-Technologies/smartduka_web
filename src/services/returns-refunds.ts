@@ -48,8 +48,15 @@ export class ReturnsRefundsService {
       for (const item of sub.items) {
         if (item.variantId) await tx.productVariant.update({ where: { id: item.variantId }, data: { inventoryCount: { increment: item.quantity } } });
         else await tx.product.update({ where: { id: item.productId }, data: { inventoryCount: { increment: item.quantity } } });
+        if (sub.branchId) {
+          const inventory = await tx.branchInventory.findFirst({ where: { branchId: sub.branchId, productId: item.productId, variantId: item.variantId } });
+          if (inventory) {
+            await tx.branchInventory.update({ where: { id: inventory.id }, data: { onHandQuantity: { increment: item.quantity } } });
+            await tx.inventoryMovement.create({ data: { inventoryId: inventory.id, branchId: sub.branchId, shopId: sub.vendorId, productId: item.productId, variantId: item.variantId, movementType: "CANCELLATION_RESTORE", quantity: item.quantity, referenceType: "SUB_ORDER", referenceId: sub.id, reason: "Order cancellation", createdById: actor.userId } });
+          }
+        }
       }
-      const updated = await tx.subOrder.update({ where: { id: sub.id }, data: { status: SubOrderStatus.CANCELLED } });
+      const updated = await tx.subOrder.update({ where: { id: sub.id }, data: { status: SubOrderStatus.CANCELLED, fulfillmentStatus: "CANCELLED" } });
       if (sub.order.paymentStatus === PaymentStatus.COMPLETED) {
         const attempt = await tx.paymentAttempt.findFirst({ where: { orderId: sub.orderId, status: "COMPLETED" }, select: { id: true } });
         await tx.refund.create({ data: { orderId: sub.orderId, subOrderId: sub.id, paymentAttemptId: attempt?.id, requestedByUserId: actor.userId, amount: sub.vendorSubTotal, currency: sub.order.currency, reason: "Cancellation", status: RefundStatus.REQUESTED } });

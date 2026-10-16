@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Eye, Package, Search } from "lucide-react";
+import { Eye, MapPin, Package, Search, Truck } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -74,7 +74,7 @@ export default function VendorOrdersPage({ initialData }: { initialData: VendorO
   ) => {
     if (
       action.status === "DELIVERED" &&
-      !window.confirm("Mark this order as delivered?")
+      !window.confirm(order.fulfillmentMethod === "PICKUP" ? "Confirm that this order was collected?" : "Mark this order as delivered?")
     )
       return;
     setUpdating(order.id);
@@ -83,7 +83,7 @@ export default function VendorOrdersPage({ initialData }: { initialData: VendorO
       toast.success(`Order ${label(confirmed).toLowerCase()}.`);
       setSelected((current) =>
         current?.id === order.id
-          ? { ...current, status: confirmed, allowedActions: [] }
+          ? { ...current, status: confirmed, fulfillmentStatus: action.status === "DELIVERED" ? "COMPLETED" : action.status === "SHIPPED" ? "OUT_FOR_DELIVERY" : action.status, allowedActions: [] }
           : current,
       );
       setOrders((current) => current.map((item) => item.id === order.id ? { ...item, status: confirmed, allowedActions: [] } : item));
@@ -151,8 +151,9 @@ export default function VendorOrdersPage({ initialData }: { initialData: VendorO
                 </div>
                 <div>
                   <p className="text-sm font-bold">{order.customerName}</p>
-                  <p className="line-clamp-1 text-xs text-muted-foreground">
-                    {order.deliveryAddress}
+                  <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+                    {order.fulfillmentMethod === "DELIVERY" ? <Truck aria-hidden="true" className="size-3.5" /> : <MapPin aria-hidden="true" className="size-3.5" />}
+                    <span className="line-clamp-1">{order.fulfillmentMethod === "DELIVERY" ? order.deliveryAddress : order.pickupLocation}</span>
                   </p>
                   <p className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground">
                     <Package className="size-3" />
@@ -258,6 +259,9 @@ export default function VendorOrdersPage({ initialData }: { initialData: VendorO
                     }
                   />
                   <Detail label="Order status" value={label(selected.status)} />
+                  <Detail label="Fulfilment" value={selected.fulfillmentMethod === "DELIVERY" ? "Delivery" : "Customer pickup"} />
+                  <Detail label="Fulfilment status" value={label(selected.fulfillmentStatus)} />
+                  <Detail label="Fulfilment fee" value={money(selected.fulfillmentFee)} />
                   <Detail
                     label="Your total"
                     value={money(selected.vendorTotal)}
@@ -285,13 +289,11 @@ export default function VendorOrdersPage({ initialData }: { initialData: VendorO
                 </div>
               </section>
               <section>
-                <h2 className="font-semibold">Customer & delivery</h2>
+                <h2 className="font-semibold">{selected.fulfillmentMethod === "DELIVERY" ? "Customer & delivery" : "Customer & pickup"}</h2>
                 <div className="mt-3 space-y-2 rounded-xl border p-3">
                   <p>{selected.customerName}</p>
                   <p>{selected.customerPhone}</p>
-                  <p className="text-muted-foreground">
-                    {selected.deliveryAddress}
-                  </p>
+                  {selected.fulfillmentMethod === "DELIVERY" ? <p className="text-muted-foreground">Deliver to: {selected.deliveryAddress}</p> : <><p className="font-medium">{selected.branchName ?? "Pickup branch"}</p><p className="text-muted-foreground">Collect from: {selected.pickupLocation}</p>{selected.pickupDirections && <p className="text-muted-foreground">Directions: {selected.pickupDirections}</p>}{selected.pickupInstructions && <p className="text-muted-foreground">Instructions: {selected.pickupInstructions}</p>}</>}
                   {selected.notes && (
                     <p className="border-t pt-2 text-muted-foreground">
                       Note: {selected.notes}

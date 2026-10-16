@@ -15,6 +15,8 @@ import { MarketplaceEconomicsService } from "@/services/marketplace-economics";
 import { deriveParentPaymentProgress } from "@/services/payment-progress";
 import { canFulfillSubOrder } from "@/services/payment-fulfillment";
 import { publicProductWhere } from "@/lib/marketplace-eligibility";
+import { branchSupportsMethod, deliveryAreaSupported } from "@/services/fulfillment-options";
+import { lockInventoryIdentity } from "@/services/inventory-integrity";
 
 export interface CheckoutIntent {
   items: Array<{
@@ -22,10 +24,11 @@ export interface CheckoutIntent {
     variantId?: string | null;
     quantity: number;
   }>;
-  shippingAddress: string;
+  shippingAddress?: string;
   shippingPhone: string;
   shippingEmail?: string;
-  fulfillmentSelections?: Array<{ vendorId: string; method: FulfillmentMethod }>;
+  deliveryDistrict?: string;
+  fulfillmentSelections?: Array<{ vendorId: string; method: FulfillmentMethod; branchId?: string; pickupContact?: string }>;
   paymentGateway: PaymentGateway;
   checkoutRequestId: string;
   notes?: string;
@@ -52,7 +55,7 @@ export class CheckoutError extends Error {
 export const SUB_ORDER_ALLOWED_TRANSITIONS: Partial<Record<SubOrderStatus, SubOrderStatus[]>> = {
   PENDING: [SubOrderStatus.PROCESSING, SubOrderStatus.CANCELLED],
   PROCESSING: [SubOrderStatus.READY_FOR_PICKUP, SubOrderStatus.SHIPPED, SubOrderStatus.CANCELLED],
-  READY_FOR_PICKUP: [SubOrderStatus.SHIPPED, SubOrderStatus.CANCELLED],
+  READY_FOR_PICKUP: [SubOrderStatus.DELIVERED, SubOrderStatus.CANCELLED],
   SHIPPED: [SubOrderStatus.DELIVERED, SubOrderStatus.CANCELLED],
 };
 
@@ -73,6 +76,12 @@ export interface ResolvedCheckoutLine {
   pickupLocation?: string | null;
   pickupDirections?: string | null;
   pickupInstructions?: string | null;
+  branchId?: string | null;
+  branchName?: string | null;
+  branchAddress?: string | null;
+  branchContactPhone?: string | null;
+  openingHours?: Prisma.InputJsonValue | null;
+  deliveryAreas?: string[];
   returnWindowDays?: number;
   returnPolicy?: string | null;
   returnInstructions?: string | null;
@@ -158,13 +167,14 @@ export function checkoutRequestHash(input: CheckoutIntent) {
           `${b.productId}:${b.variantId ?? ""}`,
         ),
       ),
-    shippingAddress: input.shippingAddress.trim(),
+    shippingAddress: input.shippingAddress?.trim() ?? "",
     shippingPhone: input.shippingPhone.trim(),
     shippingEmail: input.shippingEmail?.trim() ?? "",
     paymentGateway: input.paymentGateway,
     fulfillmentSelections: [...(input.fulfillmentSelections ?? [])]
-      .map(({ vendorId, method }) => ({ vendorId, method }))
+      .map(({ vendorId, method, branchId, pickupContact }) => ({ vendorId, method, branchId: branchId ?? null, pickupContact: pickupContact?.trim() ?? "" }))
       .sort((a, b) => a.vendorId.localeCompare(b.vendorId)),
+    deliveryDistrict: input.deliveryDistrict?.trim() ?? "",
     notes: input.notes?.trim() ?? "",
   };
   return createHash("sha256").update(JSON.stringify(intent)).digest("hex");
@@ -300,6 +310,7 @@ export class OrderService {
         vendor: {
               include: {
                 paymentAccounts: { where: { status: "VERIFIED", suspendedAt: null }, select: { id: true, provider: true, isDefault: true }, orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }] },
+                branches: { orderBy: [{ isPrimary: "desc" }, { name: "asc" }] },
               },
             },
           },
@@ -359,7 +370,7 @@ export class OrderService {
         });
         const stockRequirements = new Map<
           string,
-          { id: string; variant: boolean; quantity: number }
+          { id: string; productId: string; variantId: string | null; vendorId: string; variant: boolean; quantity: number }
         >();
         for (const line of lines) {
           const key = line.variantId
@@ -367,6 +378,9 @@ export class OrderService {
             : `product:${line.productId}`;
           const requirement = stockRequirements.get(key) ?? {
             id: line.variantId ?? line.productId,
+            productId: line.productId,
+            variantId: line.variantId,
+            vendorId: line.vendorId,
             variant: Boolean(line.variantId),
             quantity: 0,
           };
@@ -374,6 +388,7 @@ export class OrderService {
           stockRequirements.set(key, requirement);
         }
         for (const requirement of stockRequirements.values()) {
+          await lockInventoryIdentity(tx as unknown as Prisma.TransactionClient, requirement.vendorId, requirement.productId, requirement.variantId);
           const result = requirement.variant
             ? await tx.productVariant.updateMany({
                 where: {
@@ -396,10 +411,52 @@ export class OrderService {
             );
         }
         const selections = new Map<string, FulfillmentMethod>();
+        const selectionDetails = new Map<string, NonNullable<CreateOrderInput["fulfillmentSelections"]>[number]>();
+        const branchSales: Array<{ vendorId: string; inventoryId: string; branchId: string; productId: string; variantId: string | null; quantity: number }> = [];
         for (const selection of input.fulfillmentSelections ?? []) {
           if (!selection?.vendorId || !isFulfillmentMethod(selection.method) || selections.has(selection.vendorId))
             throw new CheckoutError("Choose a valid fulfilment option for each shop.", "INVALID_CHECKOUT");
           selections.set(selection.vendorId, selection.method);
+          selectionDetails.set(selection.vendorId, selection);
+        }
+        for (const vendorId of new Set(lines.map((line) => line.vendorId))) {
+          const vendor = products.find((product) => product.vendorId === vendorId)?.vendor;
+          const selection = selectionDetails.get(vendorId);
+          if (!vendor) throw new CheckoutError("A shop in your cart is unavailable.", "INVALID_CHECKOUT");
+          const branches = vendor.branches ?? [];
+          if (branches.length) {
+            const activeBranches = branches.filter((branch) => branch.isActive);
+            const configuredMethods: FulfillmentMethod[] = [activeBranches.some((branch) => branch.deliveryEnabled) ? "DELIVERY" : null, activeBranches.some((branch) => branch.pickupEnabled) ? "PICKUP" : null].filter(Boolean) as FulfillmentMethod[];
+            if (!configuredMethods.length) throw new CheckoutError("This shop has no active fulfilment location.", "INVALID_CHECKOUT");
+            const selectedMethod = selection?.method ?? (configuredMethods.includes("DELIVERY") ? "DELIVERY" : "PICKUP");
+            selections.set(vendorId, selectedMethod);
+            const eligible = activeBranches.filter((branch) => branchSupportsMethod(branch, selectedMethod));
+            const branch = selection?.branchId ? eligible.find((candidate) => candidate.id === selection.branchId) : eligible.length === 1 ? eligible[0] : eligible.find((candidate) => candidate.isPrimary);
+            if (!branch) throw new CheckoutError("Choose an active location that supports this fulfilment method.", "INVALID_CHECKOUT");
+            if (selectedMethod === "DELIVERY" && !deliveryAreaSupported(branch.deliveryAreas, input.deliveryDistrict)) throw new CheckoutError("The selected location does not deliver to this area.", "INVALID_CHECKOUT");
+            for (const line of lines.filter((candidate) => candidate.vendorId === vendorId)) Object.assign(line, {
+              fulfillmentMethods: [branch.deliveryEnabled ? "DELIVERY" : null, branch.pickupEnabled ? "PICKUP" : null].filter(Boolean) as FulfillmentMethod[],
+              deliveryFee: branch.deliveryFee ?? vendor.deliveryFee,
+              deliveryEstimate: branch.deliveryEstimate ?? vendor.deliveryEstimate,
+              pickupLocation: branch.addressLine,
+              pickupInstructions: branch.pickupInstructions,
+              branchId: branch.id,
+              branchName: branch.name,
+              branchAddress: [branch.addressLine, branch.district, branch.city, branch.country].filter(Boolean).join(", "),
+              branchContactPhone: branch.contactPhone,
+              openingHours: branch.openingHours as Prisma.InputJsonValue | null,
+              deliveryAreas: branch.deliveryAreas,
+            });
+            if (vendor.branchInventoryEnabled) {
+              for (const line of lines.filter((candidate) => candidate.vendorId === vendorId)) {
+                const inventory = await tx.branchInventory.findFirst({ where: { branchId: branch.id, productId: line.productId, variantId: line.variantId } });
+                if (!inventory) throw new CheckoutError("The selected branch has not been allocated stock for every item.", "INSUFFICIENT_STOCK");
+                const changed = await tx.branchInventory.updateMany({ where: { id: inventory.id, onHandQuantity: { gte: line.quantity } }, data: { onHandQuantity: { decrement: line.quantity } } });
+                if (!changed.count) throw new CheckoutError("The selected branch does not have enough stock for this basket.", "INSUFFICIENT_STOCK");
+                branchSales.push({ vendorId, inventoryId: inventory.id, branchId: branch.id, productId: line.productId, variantId: line.variantId, quantity: line.quantity });
+              }
+            }
+          }
         }
         const calculation = calculateCheckoutTotals(lines, selections);
         // A paid marketplace order is only created for shops with a verified,
@@ -428,7 +485,7 @@ export class OrderService {
             checkoutRequestId: input.checkoutRequestId,
             currency: PLATFORM_CURRENCY,
             checkoutRequestHash: requestHash,
-            shippingAddress: input.shippingAddress.trim(),
+            shippingAddress: input.shippingAddress?.trim() ?? "",
             shippingPhone: input.shippingPhone.trim(),
             shippingEmail: input.shippingEmail?.trim() || "",
             notes: input.notes?.trim() || null,
@@ -450,14 +507,24 @@ export class OrderService {
               vendorNetEntitlement: group.total,
               paymentProcessingFee: ZERO,
               status: SubOrderStatus.PENDING,
+              branchId: group.items[0].branchId ?? null,
               fulfillmentMethod: group.fulfillmentMethod,
               fulfillmentSnapshot: {
                 method: group.fulfillmentMethod,
+                branchId: group.items[0].branchId ?? null,
+                branchName: group.items[0].branchName ?? null,
+                branchAddress: group.items[0].branchAddress ?? null,
+                branchContactPhone: group.items[0].branchContactPhone ?? null,
+                openingHours: group.items[0].openingHours ?? null,
                 deliveryFee: group.shipping.toString(),
                 deliveryEstimate: group.items[0].deliveryEstimate ?? null,
+                deliveryAddress: group.fulfillmentMethod === "DELIVERY" ? input.shippingAddress?.trim() ?? "" : null,
+                deliveryDistrict: group.fulfillmentMethod === "DELIVERY" ? input.deliveryDistrict?.trim() ?? null : null,
+                deliveryContact: group.fulfillmentMethod === "DELIVERY" ? input.shippingPhone.trim() : null,
                 pickupLocation: group.items[0].pickupLocation ?? null,
                 pickupDirections: group.items[0].pickupDirections ?? null,
                 pickupInstructions: group.items[0].pickupInstructions ?? null,
+                pickupContact: group.fulfillmentMethod === "PICKUP" ? selectionDetails.get(group.vendorId)?.pickupContact?.trim() || input.shippingPhone.trim() : null,
               },
               refundPolicySnapshot: {
                 returnWindowDays: group.items[0].returnWindowDays ?? 7,
@@ -483,6 +550,8 @@ export class OrderService {
               variantOptionsSnapshot: item.variantOptionsSnapshot ?? undefined,
             })),
           });
+          const sales = branchSales.filter((sale) => sale.vendorId === group.vendorId);
+          if (sales.length) await tx.inventoryMovement.createMany({ data: sales.map((sale) => ({ inventoryId: sale.inventoryId, branchId: sale.branchId, shopId: sale.vendorId, productId: sale.productId, variantId: sale.variantId, movementType: "SALE", quantity: -sale.quantity, referenceType: "SUB_ORDER", referenceId: suborder.id, reason: "Checkout sale" })) });
           await tx.notification.create({
             data: {
               vendorId: group.vendorId,
@@ -543,6 +612,9 @@ export class OrderService {
             status: true,
             subOrderNumber: true,
             vendorTotal: true,
+            fulfillmentMethod: true,
+            fulfillmentStatus: true,
+            fulfillmentSnapshot: true,
             vendor: { select: { storeName: true, paymentAccounts: { where: { status: "VERIFIED", suspendedAt: null }, select: { provider: true } } } },
             shopReview: { select: { id: true, rating: true, comment: true } },
             paymentIntents: { select: { id: true, provider: true, status: true, amount: true, currency: true, providerReference: true, updatedAt: true }, orderBy: { createdAt: "desc" } },
@@ -575,17 +647,28 @@ export class OrderService {
         canReview: order.paymentStatus === "COMPLETED" && order.status !== "REFUNDED" && order.status !== "FAILED" && order.subOrders.find((subOrder) => subOrder.id === item.subOrderId)?.status === "DELIVERED",
         review: item.productReview,
       })),
-      subOrders: order.subOrders.map((so) => ({
+      subOrders: order.subOrders.map((so) => {
+        const snapshot = so.fulfillmentSnapshot && typeof so.fulfillmentSnapshot === "object" && !Array.isArray(so.fulfillmentSnapshot) ? so.fulfillmentSnapshot as Record<string, unknown> : {};
+        return {
         id: so.id,
         status: so.status,
         subOrderNumber: so.subOrderNumber,
         vendorName: so.vendor.storeName,
         total: Number(so.vendorTotal),
+        fulfillmentMethod: so.fulfillmentMethod,
+        fulfillmentStatus: so.fulfillmentStatus,
+        fulfillmentFee: typeof snapshot.deliveryFee === "string" ? Number(snapshot.deliveryFee) : 0,
+        branchName: typeof snapshot.branchName === "string" ? snapshot.branchName : null,
+        deliveryAddress: so.fulfillmentMethod === "DELIVERY" ? (typeof snapshot.deliveryAddress === "string" ? snapshot.deliveryAddress : order.shippingAddress) : null,
+        fulfillmentContact: typeof snapshot.deliveryContact === "string" ? snapshot.deliveryContact : typeof snapshot.pickupContact === "string" ? snapshot.pickupContact : order.shippingPhone,
+        pickupLocation: typeof snapshot.pickupLocation === "string" ? snapshot.pickupLocation : null,
+        pickupDirections: typeof snapshot.pickupDirections === "string" ? snapshot.pickupDirections : null,
+        pickupInstructions: typeof snapshot.pickupInstructions === "string" ? snapshot.pickupInstructions : null,
         paymentOptions: [...new Set(so.vendor.paymentAccounts.map((account) => account.provider).filter((provider) => PaymentProviderRegistry.isEnabled(provider)))],
         paymentIntents: so.paymentIntents.map((intent) => ({ id: intent.id, provider: intent.provider, status: intent.status, amount: Number(intent.amount), currency: intent.currency, providerReference: intent.providerReference, updatedAt: intent.updatedAt.toISOString() })),
         canReview: order.paymentStatus === "COMPLETED" && order.status !== "REFUNDED" && so.status === "DELIVERED",
         review: so.shopReview,
-      })),
+      };}),
     }));
   }
 
@@ -599,6 +682,7 @@ export class OrderService {
       select: {
         id: true,
         status: true,
+        fulfillmentMethod: true,
         order: { select: { paymentGateway: true } },
         paymentIntents: { select: { status: true } },
       },
@@ -607,6 +691,13 @@ export class OrderService {
     if (!existing) return null;
     if (!SUB_ORDER_ALLOWED_TRANSITIONS[existing.status]?.includes(status))
       throw new CheckoutError("Invalid SubOrder fulfillment status transition.", "INVALID_CHECKOUT");
+    const methodTransitionAllowed = status === SubOrderStatus.CANCELLED || (
+      existing.fulfillmentMethod === "PICKUP"
+        ? (existing.status === SubOrderStatus.PENDING && status === SubOrderStatus.PROCESSING) || (existing.status === SubOrderStatus.PROCESSING && status === SubOrderStatus.READY_FOR_PICKUP) || (existing.status === SubOrderStatus.READY_FOR_PICKUP && status === SubOrderStatus.DELIVERED)
+        : (existing.status === SubOrderStatus.PENDING && status === SubOrderStatus.PROCESSING) || (existing.status === SubOrderStatus.PROCESSING && status === SubOrderStatus.SHIPPED) || (existing.status === SubOrderStatus.SHIPPED && status === SubOrderStatus.DELIVERED)
+    );
+    if (!methodTransitionAllowed)
+      throw new CheckoutError("That status is not valid for this order's fulfilment method.", "INVALID_CHECKOUT");
     // This protects both vendor status APIs; UI affordances are only a
     // convenience.  Cancellation remains possible so an unpaid order can be
     // safely stopped.  A later reversal also prevents further fulfilment.
@@ -622,9 +713,10 @@ export class OrderService {
         "INVALID_CHECKOUT",
       );
 
+    const fulfillmentStatus = status === SubOrderStatus.PROCESSING ? "PREPARING" : status === SubOrderStatus.READY_FOR_PICKUP ? "READY_FOR_PICKUP" : status === SubOrderStatus.SHIPPED ? "OUT_FOR_DELIVERY" : status === SubOrderStatus.DELIVERED ? "COMPLETED" : status === SubOrderStatus.CANCELLED ? "CANCELLED" : "PENDING";
     const updated = await prisma.subOrder.update({
       where: { id: subOrderId },
-      data: { status },
+      data: { status, fulfillmentStatus },
       include: {
         order: {
           select: {
@@ -641,8 +733,8 @@ export class OrderService {
         data: {
           userId: updated.order.customerId,
           type: "SUCCESS",
-          title: "Order Delivered",
-          message: `Your order ${updated.order.orderNumber} (${updated.subOrderNumber}) has been delivered.`,
+          title: existing.fulfillmentMethod === "PICKUP" ? "Order Collected" : "Order Delivered",
+          message: `Your order ${updated.order.orderNumber} (${updated.subOrderNumber}) has been ${existing.fulfillmentMethod === "PICKUP" ? "collected" : "delivered"}.`,
         },
       });
       try {

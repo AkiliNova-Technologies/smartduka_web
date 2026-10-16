@@ -26,7 +26,7 @@ export default function BecomeSellerPage() {
       {/* LEFT SIDEBAR PANEL: SELLER ASPIRATIONAL IMAGE CANVAS */}
       <div className="relative hidden bg-zinc-950 lg:block border-r border-border/40 overflow-hidden">
         <Image
-          src="/images/branding/seller/seller-boutique-editorial.webp"
+          src="/images/branding/seller/seller-boutique-editorial-v2.webp"
           alt="East African fashion entrepreneur arranging clothing in her boutique"
           fill
           sizes="50vw"
@@ -67,7 +67,7 @@ export default function BecomeSellerPage() {
         </div>
 
         <div className="relative -mx-6 h-44 overflow-hidden sm:mx-0 sm:rounded-2xl lg:hidden">
-          <Image src="/images/branding/seller/seller-boutique-mobile.webp" alt="East African fashion entrepreneur arranging clothing in her boutique" fill sizes="100vw" priority className="object-cover object-[center_28%]" />
+          <Image src="/images/branding/seller/seller-boutique-mobile-v2.webp" alt="East African fashion entrepreneur arranging clothing in her boutique" fill sizes="100vw" priority className="object-cover object-[center_28%]" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent" />
         </div>
 

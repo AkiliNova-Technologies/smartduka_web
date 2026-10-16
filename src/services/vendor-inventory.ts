@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma/client";
 import { requireVendorContext } from "@/lib/auth/vendor-context";
+import { assertCanonicalCoversAllocations, lockInventoryIdentity, serializableInventoryTransaction } from "@/services/inventory-integrity";
 
 const lowStockThreshold = 5;
 type Adjustment = { productId: string; variantId?: string; operation: "INCREMENT" | "DECREMENT" | "SET"; quantity: number; reason: string };
@@ -20,12 +21,15 @@ export class VendorInventoryService {
 
   static async adjust(input: Adjustment) {
     const context = await requireVendorContext("vendor:manage_products");
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await serializableInventoryTransaction(async (tx) => {
       const product = await tx.product.findFirst({ where: { id: input.productId, vendorId: context.vendorId, deletedAt: null }, select: { id: true, inventoryCount: true, variants: { select: { id: true } } } });
       if (!product) return null;
       if (input.variantId) {
+        await lockInventoryIdentity(tx, context.vendorId, input.productId, input.variantId);
         const variant = await tx.productVariant.findFirst({ where: { id: input.variantId, productId: product.id }, select: { id: true, inventoryCount: true } });
         if (!variant) return "variant-not-found" as const;
+        const proposed = input.operation === "SET" ? input.quantity : variant.inventoryCount + (input.operation === "INCREMENT" ? input.quantity : -input.quantity);
+        await assertCanonicalCoversAllocations(tx, { shopId: context.vendorId, productId: product.id, variantId: variant.id, canonical: proposed });
         const data = input.operation === "INCREMENT" ? { increment: input.quantity } : input.operation === "DECREMENT" ? { decrement: input.quantity } : undefined;
         if (input.operation === "DECREMENT") {
           const changed = await tx.productVariant.updateMany({ where: { id: variant.id, inventoryCount: { gte: input.quantity } }, data: { inventoryCount: data! } });
@@ -36,6 +40,10 @@ export class VendorInventoryService {
         return { productId: product.id, variantId: variant.id, stock: updated.inventoryCount };
       }
       if (product.variants.length) return "variant-required" as const;
+      await lockInventoryIdentity(tx, context.vendorId, input.productId, null);
+      const current = await tx.product.findUniqueOrThrow({ where: { id: product.id }, select: { inventoryCount: true } });
+      const proposed = input.operation === "SET" ? input.quantity : current.inventoryCount + (input.operation === "INCREMENT" ? input.quantity : -input.quantity);
+      await assertCanonicalCoversAllocations(tx, { shopId: context.vendorId, productId: product.id, canonical: proposed });
       if (input.operation === "DECREMENT") {
         const changed = await tx.product.updateMany({ where: { id: product.id, inventoryCount: { gte: input.quantity } }, data: { inventoryCount: { decrement: input.quantity } } });
         if (!changed.count) return "insufficient" as const;

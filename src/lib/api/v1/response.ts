@@ -33,7 +33,7 @@ export function v1Exception(error: unknown) {
   if (error instanceof VendorAuthorizationError) return v1Error("VENDOR_ACCESS_DENIED", "Vendor access is required.", 403);
   const code = error && typeof error === "object" && "code" in error && typeof error.code === "string" ? error.code : "INTERNAL_ERROR";
   const isPrismaError = error instanceof Error && /^PrismaClient/.test(error.name);
-  const status = isPrismaError ? 500 : code === "NOT_FOUND" || code === "ORDER_NOT_FOUND" ? 404 : code === "IDEMPOTENCY_CONFLICT" || code === "DUPLICATE" ? 409 : code === "FORBIDDEN" || code === "VENDOR_ACCESS_DENIED" ? 403 : code === "VALIDATION_ERROR" || code === "INVALID_ASSET_REFERENCE" ? 400 : 500;
+  const status = isPrismaError ? 500 : code === "NOT_FOUND" || code === "ORDER_NOT_FOUND" ? 404 : code === "CONFLICT" || code === "IDEMPOTENCY_CONFLICT" || code === "DUPLICATE" || code === "INSUFFICIENT_STOCK" ? 409 : code === "FORBIDDEN" || code === "VENDOR_ACCESS_DENIED" ? 403 : code === "VALIDATION_ERROR" || code === "INVALID_ASSET_REFERENCE" ? 400 : 500;
   const message = error instanceof Error && !/(prisma|sql|database)/i.test(error.message) ? error.message : "Unable to complete this request.";
   return v1Error(code === "DUPLICATE" ? "CONFLICT" : code, message, status);
 }

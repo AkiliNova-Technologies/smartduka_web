@@ -108,7 +108,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       try {
-        await AuthService.syncUserProfile(firebaseUser);
         const sessionData = await AuthService.syncSessionWithBackend(firebaseUser);
         if (currentIdentity.current !== identity) return;
         setUserRole(extractRole(sessionData));
@@ -192,7 +191,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         loading,
         actionLoading,
-        isAuthenticated: !!user,
+        isAuthenticated: !!user && sessionReady,
         uid: user?.uid || null,
         email: user?.email || null,
         userRole,

@@ -1,9 +1,10 @@
 import { NextRequest } from "next/server";
 import { adminAuth } from "@/lib/firebase/admin";
 import { successResponse, errorResponse } from "@/lib/api-utils";
-import { getAuthSyncErrorResponse, synchronizeFirebaseIdentity } from "@/services/auth-sync";
+import { authSyncDiagnostic, getAuthSyncErrorResponse, synchronizeFirebaseIdentity } from "@/services/auth-sync";
 
 export async function POST(req: NextRequest) {
+  const startedAt = performance.now();
   try {
     const authHeader = req.headers.get("Authorization");
     let idToken = authHeader?.startsWith("Bearer ") ? authHeader.split(" ")[1] : null;
@@ -37,7 +38,10 @@ export async function POST(req: NextRequest) {
       platformRole: user.platformRole,
     });
   } catch (error: unknown) {
-    console.error("[Auth Sync API]", error instanceof Error ? error.name : "Unknown auth sync error");
+    console.error("[Auth Sync API]", {
+      ...authSyncDiagnostic(error),
+      durationMs: Math.round(performance.now() - startedAt),
+    });
     const response = getAuthSyncErrorResponse(error);
     return errorResponse(response.message, response.status, response.code);
   }

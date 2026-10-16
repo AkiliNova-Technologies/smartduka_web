@@ -59,12 +59,22 @@ export class RecentlyViewedService {
    * Merge guest viewing history into authenticated user's history
    */
   static async mergeGuestViews(userId: string, productIds: string[]) {
-    if (productIds.length === 0) return;
-    // Preserve the guest's recency order while avoiding unbounded request input.
-    for (const productId of [...new Set(productIds)].slice(0, RECENTLY_VIEWED_HISTORY_LIMIT).reverse()) {
-      await this.trackView(userId, productId);
-    }
-    await this.trimHistory(userId);
+    const requestedIds = [...new Set(productIds)].slice(0, RECENTLY_VIEWED_HISTORY_LIMIT);
+    if (!requestedIds.length) return;
+    const eligible = await prisma.product.findMany({ where: { id: { in: requestedIds }, ...publicProductWhere }, select: { id: true } });
+    const eligibleIds = new Set(eligible.map((product) => product.id));
+    const orderedIds = requestedIds.filter((id) => eligibleIds.has(id)).reverse();
+    if (!orderedIds.length) return;
+    const baseTime = Date.now() - orderedIds.length;
+    await prisma.$transaction(async (tx) => {
+      await Promise.all(orderedIds.map((productId, index) => tx.recentlyViewed.upsert({
+        where: { userId_productId: { userId, productId } },
+        update: { viewedAt: new Date(baseTime + index) },
+        create: { userId, productId, viewedAt: new Date(baseTime + index) },
+      })));
+      const stale = await tx.recentlyViewed.findMany({ where: { userId }, orderBy: { viewedAt: "desc" }, skip: RECENTLY_VIEWED_HISTORY_LIMIT, select: { id: true } });
+      if (stale.length) await tx.recentlyViewed.deleteMany({ where: { id: { in: stale.map((item) => item.id) } } });
+    });
   }
 
   /**

@@ -30,7 +30,7 @@ describe("fulfillment-triggered earnings release", () => {
 
   it("releases only after the vendor's own shipped SubOrder reaches DELIVERED", async () => {
     await OrderService.updateSubOrderStatus("suborder-1", "DELIVERED", "vendor-a");
-    expect(mocks.findFirst).toHaveBeenCalledWith({ where: { id: "suborder-1", vendorId: "vendor-a" }, select: { id: true, status: true, order: { select: { paymentGateway: true } }, paymentIntents: { select: { status: true } } } });
+    expect(mocks.findFirst).toHaveBeenCalledWith({ where: { id: "suborder-1", vendorId: "vendor-a" }, select: { id: true, status: true, fulfillmentMethod: true, order: { select: { paymentGateway: true } }, paymentIntents: { select: { status: true } } } });
     expect(mocks.release).toHaveBeenCalledWith("suborder-1");
   });
 
