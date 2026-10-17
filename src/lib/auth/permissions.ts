@@ -7,6 +7,7 @@ export type AppPermissionKey =
   | "platform:manage_billing"   // Monitoring mall vendor system subscriptions
   | "platform:customer_support" // Managing global order disputes and reviews
   | "platform:manage_verifications" // Shop verification review lifecycle
+  | "platform:manage_announcements" // Platform announcement authoring and publication
   | "vendor:manage_shop"        // Adjust profile, storefront layout, parameters
   | "vendor:manage_team"        // Alter role capabilities of store employees
   | "vendor:manage_legal"       // KYC/legal identity and sensitive shop records
@@ -21,7 +22,7 @@ export type AppPermissionKey =
  */
 export const PLATFORM_ROLE_PERMISSIONS: Record<PlatformRole, AppPermissionKey[]> = {
   SUPER_ADMIN: ["platform:manage"],
-  ADMIN: ["platform:view_analytics", "platform:manage_vendors", "platform:manage_billing", "platform:customer_support", "platform:manage_verifications"],
+  ADMIN: ["platform:view_analytics", "platform:manage_vendors", "platform:manage_billing", "platform:customer_support", "platform:manage_verifications", "platform:manage_announcements"],
   SUPPORT: ["platform:customer_support", "platform:manage_verifications"],
   BILLING: ["platform:view_analytics", "platform:manage_billing"],
   VENDOR: [],   // Vendors use DEFAULT_ROLE_PERMISSIONS via VendorUserRole, not platform permissions

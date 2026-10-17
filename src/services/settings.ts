@@ -18,6 +18,9 @@ export interface UserSettingsPayload {
   orderAlertsPush?: boolean;
   securityAlertsSMS?: boolean;
   marketingNewsletter?: boolean;
+  promotionalInAppNotifications?: boolean;
+  shoppingRecommendations?: boolean;
+  promotionalPushNotifications?: boolean;
   twoFactorEnabled?: boolean;
   buyerProtectionEnabled?: boolean;
   themeMode?: ThemeMode;
@@ -33,6 +36,7 @@ const SETTINGS_STRING_FIELDS = new Set<keyof UserSettingsPayload>([
 const SETTINGS_BOOLEAN_FIELDS = new Set<keyof UserSettingsPayload>([
   "orderAlertsEmail", "orderAlertsPush", "securityAlertsSMS",
   "marketingNewsletter", "twoFactorEnabled", "buyerProtectionEnabled",
+  "promotionalInAppNotifications", "shoppingRecommendations", "promotionalPushNotifications",
 ]);
 
 export class UserSettingsPayloadError extends Error {}
@@ -102,6 +106,9 @@ export class SettingsService {
           orderAlertsPush: true,
           securityAlertsSMS: true,
           marketingNewsletter: false,
+          promotionalInAppNotifications: false,
+          shoppingRecommendations: false,
+          promotionalPushNotifications: false,
           twoFactorEnabled: false,
           buyerProtectionEnabled: true,
           themeMode: "system",
@@ -139,6 +146,9 @@ export class SettingsService {
         orderAlertsPush: safeData.orderAlertsPush ?? true,
         securityAlertsSMS: safeData.securityAlertsSMS ?? true,
         marketingNewsletter: safeData.marketingNewsletter ?? false,
+        promotionalInAppNotifications: safeData.promotionalInAppNotifications ?? false,
+        shoppingRecommendations: safeData.shoppingRecommendations ?? false,
+        promotionalPushNotifications: safeData.promotionalPushNotifications ?? false,
         twoFactorEnabled: safeData.twoFactorEnabled ?? false,
         buyerProtectionEnabled: safeData.buyerProtectionEnabled ?? true,
         themeMode: safeData.themeMode ?? "system",

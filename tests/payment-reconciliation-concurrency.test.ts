@@ -44,6 +44,12 @@ const db = vi.hoisted(() => ({
   },
   auditLog: { create: vi.fn(async ({ data }: { data: EventRow }) => { fake.audits.push(data); return data; }) },
   notification: {
+    upsert: vi.fn(async ({ where, create }: { where: { idempotencyKey: string }; create: EventRow }) => {
+      const existing = fake.notifications.find((item) => item.idempotencyKey === where.idempotencyKey);
+      if (existing) return { id: existing.idempotencyKey };
+      fake.notifications.push(create);
+      return { id: create.idempotencyKey };
+    }),
     createMany: vi.fn(async ({ data }: { data: EventRow[] }) => { fake.notifications.push(...data); return { count: data.length }; }),
     create: vi.fn(async ({ data }: { data: EventRow }) => { fake.notifications.push(data); return data; }),
   },

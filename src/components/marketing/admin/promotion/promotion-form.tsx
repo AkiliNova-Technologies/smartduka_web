@@ -108,7 +108,7 @@ export function PromotionForm({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
-        className="flex min-w-lg w-full flex-col gap-0 p-0 sm:max-w-lg ">
+        className="flex w-full flex-col gap-0 p-0 sm:max-w-5xl">
         <SheetHeader className="shrink-0 px-6 pt-6 pb-4 text-left">
           <SheetTitle>
             {mode === "edit" ? "Edit promotion" : "Create promotion"}
@@ -153,7 +153,7 @@ export function PromotionForm({
             void submit();
           }}
           className="flex min-h-0 flex-1 flex-col">
-          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-5">
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">
             {error && (
               <p
                 role="alert"
@@ -161,9 +161,12 @@ export function PromotionForm({
                 {error}
               </p>
             )}
+            <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.9fr)]">
+              <div className="min-w-0 space-y-5">
             {step === 1 && (
-              <section className="space-y-5">
+              <section className="space-y-5" aria-labelledby="promotion-campaign-step">
                 <StepTitle
+                  id="promotion-campaign-step"
                   title="Campaign"
                   description="Set the message and artwork customers will see."
                 />
@@ -180,8 +183,9 @@ export function PromotionForm({
               </section>
             )}
             {step === 2 && (
-              <section className="space-y-5">
+              <section className="space-y-5" aria-labelledby="promotion-placement-step">
                 <StepTitle
+                  id="promotion-placement-step"
                   title="Placement & actions"
                   description="Choose where the promotion appears and where its buttons lead."
                 />
@@ -204,8 +208,9 @@ export function PromotionForm({
               </section>
             )}
             {step === 3 && (
-              <section className="space-y-5">
+              <section className="space-y-5" aria-labelledby="promotion-publishing-step">
                 <StepTitle
+                  id="promotion-publishing-step"
                   title="Publishing"
                   description="Control when this promotion is eligible to appear."
                 />
@@ -216,8 +221,9 @@ export function PromotionForm({
               </section>
             )}
             {step === 4 && (
-              <section className="space-y-5">
+              <section className="space-y-5" aria-labelledby="promotion-review-step">
                 <StepTitle
+                  id="promotion-review-step"
                   title="Review"
                   description="Check the promotion before saving."
                 />
@@ -238,9 +244,11 @@ export function PromotionForm({
                     {form.status} · priority {form.priority}
                   </p>
                 </div>
-                <PromotionPreview form={form} />
               </section>
             )}
+              </div>
+              <PromotionPreview form={form} />
+            </div>
           </div>
           <SheetFooter className="shrink-0 border-t px-6 py-4">
             <div className="flex w-full flex-col-reverse gap-2 sm:flex-row sm:justify-between">
@@ -269,12 +277,12 @@ export function PromotionForm({
                 {saving && <Loader2 className="animate-spin" />}
                 {step === 4 ? (
                   saving ? (
-                    initial ? (
+                    mode === "edit" ? (
                       "Saving promotion..."
                     ) : (
                       "Creating promotion..."
                     )
-                  ) : initial ? (
+                  ) : mode === "edit" ? (
                     "Save changes"
                   ) : (
                     "Create promotion"
@@ -294,15 +302,17 @@ export function PromotionForm({
   );
 }
 function StepTitle({
+  id,
   title,
   description,
 }: {
+  id?: string;
   title: string;
   description: string;
 }) {
   return (
     <div>
-      <h2 className="font-semibold">{title}</h2>
+      <h2 id={id} className="font-semibold">{title}</h2>
       <p className="mt-1 text-sm text-muted-foreground">{description}</p>
     </div>
   );

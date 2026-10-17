@@ -35,6 +35,7 @@ type Props = {
   unavailableText?: string;
   loading?: boolean;
   unavailable?: boolean;
+  onSearchQueryChange?: (query: string) => void;
 };
 
 export function MarketingEntityCombobox({
@@ -47,6 +48,7 @@ export function MarketingEntityCombobox({
   unavailableText,
   loading = false,
   unavailable = false,
+  onSearchQueryChange,
 }: Props) {
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
@@ -79,6 +81,7 @@ export function MarketingEntityCombobox({
   const handleQueryChange = (nextQuery: string) => {
     setQuery(nextQuery);
     setActiveIndex(0);
+    onSearchQueryChange?.(nextQuery);
   };
   const choose = (id: string) => {
     onValueChange(id);

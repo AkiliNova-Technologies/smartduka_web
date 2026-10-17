@@ -5,9 +5,11 @@ const mocks = vi.hoisted(() => ({
   update: vi.fn(),
   notification: vi.fn(),
   release: vi.fn(),
+  transaction: vi.fn(),
 }));
 vi.mock("@/lib/prisma/client", () => ({
   prisma: {
+    $transaction: mocks.transaction,
     subOrder: { findFirst: mocks.findFirst, update: mocks.update },
     notification: { create: mocks.notification },
   },
@@ -21,6 +23,7 @@ import { OrderService } from "@/services/order";
 describe("fulfillment-triggered earnings release", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.transaction.mockImplementation((callback) => callback({ subOrder: { update: mocks.update }, notification: { upsert: mocks.notification } }));
     mocks.findFirst.mockResolvedValue({ id: "suborder-1", status: "SHIPPED", order: { paymentGateway: "CASH_ON_DELIVERY" }, paymentIntents: [] });
     mocks.update.mockResolvedValue({
       id: "suborder-1", subOrderNumber: "SD-1-V1", status: "DELIVERED",

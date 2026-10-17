@@ -16,6 +16,7 @@ import { getRecentlyViewedAction } from "@/actions/recently-viewed";
 import type { MarketplaceProduct } from "@/components/marketplace/product-card";
 import { useAppearance } from "@/providers/AppearanceProvider";
 import { getPersonalityToastMessage } from "@/lib/personality-messages";
+import { NotificationClient } from "@/lib/notification-client";
 
 export interface UserSettings {
   id: string;
@@ -32,6 +33,9 @@ export interface UserSettings {
   orderAlertsPush: boolean;
   securityAlertsSMS: boolean;
   marketingNewsletter: boolean;
+  promotionalInAppNotifications: boolean;
+  shoppingRecommendations: boolean;
+  promotionalPushNotifications: boolean;
   twoFactorEnabled: boolean;
   buyerProtectionEnabled: boolean;
   themeMode: "system" | "light" | "dark";
@@ -69,13 +73,19 @@ export interface UserOrder {
   totalAmount: number;
   subTotal: number;
   totalShipping: number;
+  taxAmount: number;
+  discountAmount: number;
   createdAt: string;
-  items: { id: string; productId: string; subOrderId: string; name: string; variantName: string | null; quantity: number; price: number; image: string | null; vendorName: string; canReview: boolean; review: { id: string; rating: number; title: string | null; comment: string | null; imageUrls: string[] } | null }[];
-  subOrders: { id: string; status: string; fulfillmentStatus: string; subOrderNumber: string; vendorName: string; total: number; fulfillmentMethod: "DELIVERY" | "PICKUP"; fulfillmentFee: number; branchName: string | null; deliveryAddress: string | null; fulfillmentContact: string; pickupLocation: string | null; pickupDirections: string | null; pickupInstructions: string | null; paymentOptions: ("MTN_MOMO" | "AIRTEL_MONEY")[]; paymentIntents: { id: string; provider: "MTN_MOMO" | "AIRTEL_MONEY" | "PESAPAL"; status: string; amount: number; currency: string; providerReference: string | null; updatedAt: string }[]; canReview: boolean; review: { id: string; rating: number; comment: string | null } | null }[];
+  notes: string | null;
+  items: { id: string; productId: string; subOrderId: string; name: string; variantName: string | null; variantOptions: Record<string, string> | null; quantity: number; price: number; lineTotal: number; image: string | null; vendorName: string; canReview: boolean; review: { id: string; rating: number; title: string | null; comment: string | null; imageUrls: string[] } | null }[];
+  subOrders: { id: string; status: string; fulfillmentStatus: string; subOrderNumber: string; vendorName: string; subTotal: number; shipping: number; total: number; fulfillmentMethod: "DELIVERY" | "PICKUP"; fulfillmentFee: number; branchName: string | null; deliveryAddress: string | null; deliveryInstructions: string | null; estimatedDelivery: string | null; fulfillmentContact: string; pickupLocation: string | null; pickupDirections: string | null; pickupInstructions: string | null; paymentOptions: ("MTN_MOMO" | "AIRTEL_MONEY")[]; paymentIntents: { id: string; provider: "MTN_MOMO" | "AIRTEL_MONEY" | "PESAPAL"; status: string; amount: number; currency: string; providerReference: string | null; updatedAt: string }[]; canReview: boolean; review: { id: string; rating: number; comment: string | null } | null }[];
 }
 
 export interface UserNotification {
   id: string;
+  source: "PERSONAL" | "ANNOUNCEMENT" | "MARKETING";
+  category: string;
+  eventType: string | null;
   type: string;
   title: string;
   message: string;
@@ -103,7 +113,7 @@ interface UserDataContextType {
   settings: UserSettings;
   settingsLoading: boolean;
   settingsSaving: boolean;
-  updateSettings: (updates: Partial<UserSettings>) => Promise<void>;
+  updateSettings: (updates: Partial<UserSettings>) => Promise<boolean>;
   refreshSettings: () => void;
   cart: CartItem[];
   cartLoading: boolean;
@@ -137,8 +147,12 @@ interface UserDataContextType {
   notifications: UserNotification[];
   unreadCount: number;
   notificationsLoading: boolean;
-  markAsRead: (notificationId: string) => void;
-  markAllAsRead: () => void;
+  notificationsError: string | null;
+  markAsRead: (notificationId: string) => Promise<void>;
+  markAsUnread: (notificationId: string) => Promise<void>;
+  deleteNotification: (notificationId: string) => Promise<void>;
+  markAllAsRead: () => Promise<void>;
+  isNotificationMutating: (notificationId: string) => boolean;
   refreshNotifications: () => Promise<void>;
   recentlyViewedIds: string[];
   recentlyViewedProducts: RecentlyViewedProduct[];
@@ -161,6 +175,9 @@ const defaultSettings: UserSettings = {
   orderAlertsPush: true,
   securityAlertsSMS: true,
   marketingNewsletter: false,
+  promotionalInAppNotifications: false,
+  shoppingRecommendations: false,
+  promotionalPushNotifications: false,
   twoFactorEnabled: false,
   buyerProtectionEnabled: true,
   themeMode: "system",
@@ -190,7 +207,7 @@ function saveToStorage(key: string, value: unknown): void {
 const UserDataContext = createContext<UserDataContextType | undefined>(undefined);
 
 export function UserDataProvider({ children }: { children: React.ReactNode }) {
-  const { uid, isAuthenticated, loading: authLoading } = useAuth();
+  const { uid, isAuthenticated, loading: authLoading, sessionReady, sessionRevision } = useAuth();
   const { personality } = useAppearance();
 
   const [settings, setSettings] = useState<UserSettings>(defaultSettings);
@@ -216,7 +233,7 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
 
   const updateSettings = useCallback(
     async (updates: Partial<UserSettings>) => {
-      if (!uid) return;
+      if (!uid) return false;
       setSettingsSaving(true);
       const previous = { ...settings };
       setSettings((prev) => ({ ...prev, ...updates }));
@@ -229,9 +246,13 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
         setSettings(data);
         const profileUpdate = Object.keys(updates).some((key) => ["fullName", "phoneNumber", "avatarUrl"].includes(key));
         toast.success(getPersonalityToastMessage(profileUpdate ? "toast.profile.updated" : "toast.preferences.updated", personality));
-      } catch {
+        return true;
+      } catch (error) {
         setSettings(previous);
-        toast.error("Failed to save settings.");
+        toast.error(error instanceof Error ? error.message : "Failed to save settings.", {
+          description: "Your changes are still here. Please try again.",
+        });
+        return false;
       } finally {
         setSettingsSaving(false);
       }
@@ -376,18 +397,38 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
 
   const [orders, setOrders] = useState<UserOrder[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
+  const ordersIdentityRef = useRef<string | null>(null);
+  const ordersGenerationRef = useRef(0);
+  const ordersAbortRef = useRef<AbortController | null>(null);
 
   const refreshOrders = useCallback(async () => {
-    if (!uid) return;
+    if (!uid || !sessionReady || ordersIdentityRef.current !== uid) return;
+    const identity = uid;
+    const generation = ordersGenerationRef.current;
+    ordersAbortRef.current?.abort();
+    const controller = new AbortController();
+    ordersAbortRef.current = controller;
     setOrdersLoading(true);
     try {
-      const data = await fetchApi<{ orders: UserOrder[] }>("/api/orders", { headers: authHeaders() });
-      setOrders(data.orders || []);
+      const data = await fetchApi<{ orders: UserOrder[] }>("/api/orders", { headers: authHeaders(), signal: controller.signal });
+      if (ordersIdentityRef.current === identity && ordersGenerationRef.current === generation) setOrders(data.orders || []);
     } catch {
-      // Silent
+      // The paginated orders screen owns its visible error state. Keep legacy
+      // provider consumers isolated without converting a failed request to []).
     } finally {
-      setOrdersLoading(false);
+      if (ordersIdentityRef.current === identity && ordersGenerationRef.current === generation) setOrdersLoading(false);
     }
+  }, [sessionReady, uid]);
+
+  useEffect(() => {
+    ordersAbortRef.current?.abort();
+    ordersAbortRef.current = null;
+    ordersGenerationRef.current += 1;
+    ordersIdentityRef.current = uid;
+    queueMicrotask(() => {
+      setOrders([]);
+      setOrdersLoading(false);
+    });
   }, [uid]);
 
   const placeOrder = useCallback(
@@ -429,38 +470,180 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
   );
 
   const [notifications, setNotifications] = useState<UserNotification[]>([]);
+  const [notificationUnreadCount, setNotificationUnreadCount] = useState(0);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
-  const unreadCount = notifications.filter((n) => !n.readAt).length;
-
-  const markAsRead = useCallback((notificationId: string) => {
-    setNotifications((prev) =>
-      prev.map((n) =>
-        n.id === notificationId ? { ...n, readAt: new Date().toISOString() } : n,
-      ),
-    );
+  const [notificationsError, setNotificationsError] = useState<string | null>(null);
+  const notificationIdentityRef = useRef<string | null>(null);
+  const notificationRequestRef = useRef<Promise<void> | null>(null);
+  const notificationAbortRef = useRef<AbortController | null>(null);
+  const notificationGenerationRef = useRef(0);
+  const readMutationIdsRef = useRef(new Set<string>());
+  const [notificationMutationIds, setNotificationMutationIds] = useState<Set<string>>(() => new Set());
+  const markAllMutationRef = useRef(false);
+  const unreadCount = notificationUnreadCount;
+  const setNotificationMutating = useCallback((id: string, active: boolean) => {
+    if (active) readMutationIdsRef.current.add(id);
+    else readMutationIdsRef.current.delete(id);
+    setNotificationMutationIds(new Set(readMutationIdsRef.current));
   }, []);
-
-  const markAllAsRead = useCallback(() => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.readAt ? n : { ...n, readAt: new Date().toISOString() })),
-    );
-  }, []);
+  const isNotificationMutating = useCallback((id: string) => notificationMutationIds.has(id), [notificationMutationIds]);
 
   const refreshNotifications = useCallback(async () => {
-    if (!uid) return;
+    if (!uid || !sessionReady || notificationIdentityRef.current !== uid) return;
+    if (notificationRequestRef.current) return notificationRequestRef.current;
+    const identity = uid;
+    const generation = notificationGenerationRef.current;
+    const controller = new AbortController();
+    notificationAbortRef.current = controller;
     setNotificationsLoading(true);
+    setNotificationsError(null);
+    const request = NotificationClient.list(controller.signal)
+      .then(({ items, unreadCount: nextUnreadCount }) => {
+        if (notificationIdentityRef.current === identity && notificationGenerationRef.current === generation) {
+          setNotifications(items);
+          setNotificationUnreadCount(nextUnreadCount);
+        }
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted || notificationIdentityRef.current !== identity || notificationGenerationRef.current !== generation) return;
+        setNotificationsError(error instanceof Error ? error.message : "Unable to load notifications.");
+      })
+      .finally(() => {
+        if (notificationIdentityRef.current === identity && notificationGenerationRef.current === generation) {
+          notificationRequestRef.current = null;
+          notificationAbortRef.current = null;
+          setNotificationsLoading(false);
+        }
+      });
+    notificationRequestRef.current = request;
+    return request;
+  }, [sessionReady, uid]);
+
+  const markAsRead = useCallback(async (notificationId: string) => {
+    if (!uid || !sessionReady || readMutationIdsRef.current.has(notificationId)) return;
+    const identity = uid;
+    const existing = notifications.find((item) => item.id === notificationId);
+    if (!existing || existing.readAt) return;
+    setNotificationMutating(notificationId, true);
+    setNotifications((current) => current.map((item) => item.id === notificationId ? { ...item, readAt: new Date().toISOString() } : item));
+    setNotificationUnreadCount((count) => Math.max(0, count - 1));
     try {
-      const data = await fetchApi<{ notifications: UserNotification[] }>(
-        "/api/notifications",
-        { headers: authHeaders() },
-      );
-      setNotifications(data.notifications || []);
-    } catch {
-      // Silent
+      await NotificationClient.markRead(notificationId);
+      if (notificationIdentityRef.current === identity) await refreshNotifications();
+    } catch (error) {
+      if (notificationIdentityRef.current === identity) {
+        setNotifications((current) => current.map((item) => item.id === notificationId ? { ...item, readAt: existing.readAt } : item));
+        setNotificationUnreadCount((count) => count + 1);
+        const message = error instanceof Error ? error.message : "Unable to mark notification as read.";
+        setNotificationsError(message);
+        toast.error(message);
+      }
     } finally {
-      setNotificationsLoading(false);
+      setNotificationMutating(notificationId, false);
     }
-  }, [uid]);
+  }, [notifications, refreshNotifications, sessionReady, setNotificationMutating, uid]);
+
+  const markAsUnread = useCallback(async (notificationId: string) => {
+    if (!uid || !sessionReady || readMutationIdsRef.current.has(notificationId)) return;
+    const identity = uid;
+    const existing = notifications.find((item) => item.id === notificationId);
+    if (!existing || !existing.readAt) return;
+    setNotificationMutating(notificationId, true);
+    setNotifications((current) => current.map((item) => item.id === notificationId ? { ...item, readAt: null } : item));
+    setNotificationUnreadCount((count) => count + 1);
+    try {
+      await NotificationClient.markUnread(notificationId);
+      if (notificationIdentityRef.current === identity) await refreshNotifications();
+    } catch (error) {
+      if (notificationIdentityRef.current === identity) {
+        setNotifications((current) => current.map((item) => item.id === notificationId ? { ...item, readAt: existing.readAt } : item));
+        setNotificationUnreadCount((count) => Math.max(0, count - 1));
+        const message = error instanceof Error ? error.message : "Unable to mark notification as unread.";
+        setNotificationsError(message);
+        toast.error(message);
+      }
+    } finally {
+      setNotificationMutating(notificationId, false);
+    }
+  }, [notifications, refreshNotifications, sessionReady, setNotificationMutating, uid]);
+
+  const deleteNotification = useCallback(async (notificationId: string) => {
+    if (!uid || !sessionReady || readMutationIdsRef.current.has(notificationId)) return;
+    const identity = uid;
+    const index = notifications.findIndex((item) => item.id === notificationId);
+    if (index < 0) return;
+    const existing = notifications[index];
+    setNotificationMutating(notificationId, true);
+    setNotifications((current) => current.filter((item) => item.id !== notificationId));
+    if (!existing.readAt) setNotificationUnreadCount((count) => Math.max(0, count - 1));
+    try {
+      await NotificationClient.delete(notificationId);
+      if (notificationIdentityRef.current === identity) {
+        await refreshNotifications();
+        toast.success("Notification deleted.");
+      }
+    } catch (error) {
+      if (notificationIdentityRef.current === identity) {
+        setNotifications((current) => {
+          const restored = [...current];
+          restored.splice(Math.min(index, restored.length), 0, existing);
+          return restored;
+        });
+        if (!existing.readAt) setNotificationUnreadCount((count) => count + 1);
+        const message = error instanceof Error ? error.message : "Unable to delete notification.";
+        setNotificationsError(message);
+        toast.error(message);
+      }
+    } finally {
+      setNotificationMutating(notificationId, false);
+    }
+  }, [notifications, refreshNotifications, sessionReady, setNotificationMutating, uid]);
+
+  const markAllAsRead = useCallback(async () => {
+    if (!uid || !sessionReady || markAllMutationRef.current) return;
+    const identity = uid;
+    const snapshot = notifications;
+    const unreadSnapshot = notificationUnreadCount;
+    if (!snapshot.some((item) => !item.readAt)) return;
+    markAllMutationRef.current = true;
+    const now = new Date().toISOString();
+    setNotifications((current) => current.map((item) => item.readAt ? item : { ...item, readAt: now }));
+    setNotificationUnreadCount(0);
+    try {
+      await NotificationClient.markAllRead();
+      if (notificationIdentityRef.current === identity) await refreshNotifications();
+    } catch (error) {
+      if (notificationIdentityRef.current === identity) {
+        setNotifications(snapshot);
+        setNotificationUnreadCount(unreadSnapshot);
+        const message = error instanceof Error ? error.message : "Unable to mark notifications as read.";
+        setNotificationsError(message);
+        toast.error(message);
+      }
+    } finally {
+      markAllMutationRef.current = false;
+    }
+  }, [notificationUnreadCount, notifications, refreshNotifications, sessionReady, uid]);
+
+  useEffect(() => {
+    if (notificationIdentityRef.current === uid && (uid === null || sessionReady)) return;
+    notificationAbortRef.current?.abort();
+    notificationAbortRef.current = null;
+    notificationRequestRef.current = null;
+    notificationGenerationRef.current += 1;
+    readMutationIdsRef.current.clear();
+    setNotificationMutationIds(new Set());
+    markAllMutationRef.current = false;
+    notificationIdentityRef.current = uid;
+    setNotifications([]);
+    setNotificationUnreadCount(0);
+    setNotificationsError(null);
+    setNotificationsLoading(false);
+  }, [sessionReady, uid]);
+
+  useEffect(() => {
+    if (!authLoading && isAuthenticated && uid && sessionReady) void refreshNotifications();
+  }, [authLoading, isAuthenticated, refreshNotifications, sessionReady, sessionRevision, uid]);
 
   // ==========================================
   // RECENTLY VIEWED
@@ -565,7 +748,7 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
     const prev = prevAuthRef.current;
     prevAuthRef.current = { loading: authLoading, isAuth: isAuthenticated, uid };
 
-    if (!authLoading && isAuthenticated && uid) {
+    if (!authLoading && isAuthenticated && uid && sessionReady) {
       queueMicrotask(() => {
         fetchSettings();
         fetchWishlist();
@@ -578,8 +761,10 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
       setWishlist([]);
       setOrders([]);
       setNotifications([]);
+      setNotificationUnreadCount(0);
+      setNotificationsError(null);
     }
-  }, [authLoading, isAuthenticated, uid, fetchSettings, fetchWishlist, refreshOrders]);
+  }, [authLoading, isAuthenticated, uid, sessionReady, sessionRevision, fetchSettings, fetchWishlist, refreshOrders]);
 
   return (
     <UserDataContext.Provider
@@ -612,8 +797,12 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
         notifications,
         unreadCount,
         notificationsLoading,
+        notificationsError,
         markAsRead,
+        markAsUnread,
+        deleteNotification,
         markAllAsRead,
+        isNotificationMutating,
         refreshNotifications,
         recentlyViewedIds,
         recentlyViewedProducts,

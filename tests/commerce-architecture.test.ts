@@ -23,7 +23,7 @@ const input = { userId: "customer-a", checkoutRequestId: "checkout-request-0001"
 
 describe("canonical commerce architecture", () => {
   beforeEach(() => {
-    mocks.transaction.mockImplementation((callback) => callback({ $executeRaw: mocks.executeRaw, product: { findMany: mocks.findMany, updateMany: mocks.updateProductStock }, productVariant: { updateMany: mocks.updateVariantStock }, order: { create: mocks.createOrder }, subOrder: { create: mocks.createSubOrder }, orderItem: { createMany: mocks.createMany }, notification: { create: mocks.notification } }));
+    mocks.transaction.mockImplementation((callback) => callback({ $executeRaw: mocks.executeRaw, product: { findMany: mocks.findMany, updateMany: mocks.updateProductStock }, productVariant: { updateMany: mocks.updateVariantStock }, order: { create: mocks.createOrder }, subOrder: { create: mocks.createSubOrder }, orderItem: { createMany: mocks.createMany }, notification: { create: mocks.notification, upsert: mocks.notification }, user: { findMany: vi.fn().mockResolvedValue([]) } }));
     vi.clearAllMocks();
     mocks.findExistingOrder.mockResolvedValue(null);
     mocks.createOrder.mockResolvedValue({ id: "order-a", paymentStatus: "PENDING" });
@@ -70,7 +70,7 @@ describe("canonical commerce architecture", () => {
 describe("atomic inventory decrements", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.transaction.mockImplementation((callback) => callback({ $executeRaw: mocks.executeRaw, product: { findMany: mocks.findMany, updateMany: mocks.updateProductStock }, productVariant: { updateMany: mocks.updateVariantStock }, order: { create: mocks.createOrder }, subOrder: { create: mocks.createSubOrder }, orderItem: { createMany: mocks.createMany }, notification: { create: mocks.notification } }));
+    mocks.transaction.mockImplementation((callback) => callback({ $executeRaw: mocks.executeRaw, product: { findMany: mocks.findMany, updateMany: mocks.updateProductStock }, productVariant: { updateMany: mocks.updateVariantStock }, order: { create: mocks.createOrder }, subOrder: { create: mocks.createSubOrder }, orderItem: { createMany: mocks.createMany }, notification: { create: mocks.notification, upsert: mocks.notification }, user: { findMany: vi.fn().mockResolvedValue([]) } }));
     mocks.createOrder.mockResolvedValue({ id: "order-a", paymentStatus: "PENDING" });
     mocks.createSubOrder.mockResolvedValue({ id: "suborder-a" });
     mocks.createMany.mockResolvedValue({ count: 1 }); mocks.notification.mockResolvedValue({});

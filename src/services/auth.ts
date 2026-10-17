@@ -161,6 +161,10 @@ export class AuthService {
    */
   static async logout(): Promise<void> {
     try {
+      // Revoke server-side ownership before clearing the authenticated cookie.
+      // The browser subscription may remain, but it cannot deliver the prior
+      // account's private notifications after logout or account switching.
+      await fetch("/api/v1/push/subscription", { method: "DELETE", headers: { "content-type": "application/json" }, body: "{}" }).catch(() => undefined);
       await signOut(auth);
       await fetch("/api/auth", { method: "DELETE" });
     } catch (error: unknown) {

@@ -4,6 +4,7 @@ import { requireVendorContext } from "@/lib/auth/vendor-context";
 import { prisma } from "@/lib/prisma/client";
 import { cacheTags } from "@/lib/cache-policy";
 import { revalidatePath, revalidateTag } from "next/cache";
+import { NotificationService } from "@/services/notifications";
 
 export class ShopVerificationError extends Error {
   constructor(message: string, public code = "INVALID") { super(message); }
@@ -35,6 +36,15 @@ function notification(status: ShopVerificationStatus, publicId: string) {
 
 function activityFor(status: ShopVerificationStatus): ShopVerificationActivityType {
   return ({ UNDER_REVIEW: "REVIEW_STARTED", NEEDS_INFORMATION: "INFORMATION_REQUESTED", VERIFIED: "APPROVED", REJECTED: "REJECTED", SUSPENDED: "SUSPENDED", REVOKED: "REVOKED" } as Partial<Record<ShopVerificationStatus, ShopVerificationActivityType>>)[status] ?? "APPLICATION_SUBMITTED";
+}
+
+function eventFor(status: ShopVerificationStatus, previous?: ShopVerificationStatus) {
+  if (status === "UNDER_REVIEW") return "VERIFICATION_UNDER_REVIEW" as const;
+  if (status === "NEEDS_INFORMATION") return "VERIFICATION_INFORMATION_REQUIRED" as const;
+  if (status === "VERIFIED") return previous === "SUSPENDED" ? "VERIFICATION_RESTORED" as const : "VERIFICATION_APPROVED" as const;
+  if (status === "REJECTED") return "VERIFICATION_REJECTED" as const;
+  if (status === "SUSPENDED") return "VERIFICATION_SUSPENDED" as const;
+  return "VERIFICATION_REVOKED" as const;
 }
 
 export class ShopVerificationService {
@@ -110,10 +120,10 @@ export class ShopVerificationService {
       await tx.vendorProfile.update({ where: { id: vendor.id }, data: { verificationStatus: "PENDING", isVerified: false, verifiedAt: null } });
       await tx.shopVerificationActivity.create({ data: { applicationId: application.id, actorId: context.user.id, type: "APPLICATION_SUBMITTED", toValue: "PENDING" } });
       const [title, message, type] = notification("PENDING", publicId);
-      await tx.notification.create({ data: { userId: vendor.ownerId, vendorId: vendor.id, type, title, message, actionPath } });
+      await NotificationService.create({ event: "VERIFICATION_SUBMITTED", idempotencyKey: `verification:${application.id}:submitted:${vendor.ownerId}`, userId: vendor.ownerId, vendorId: vendor.id, type, title, message, actionPath }, tx);
       await tx.auditLog.create({ data: { vendorId: vendor.id, userId: context.user.id, action: "SHOP_VERIFICATION_SUBMITTED", entity: "ShopVerificationApplication", entityId: application.id, newValues: { status: "PENDING", publicId } } });
       const administrators = await tx.user.findMany({ where: { status: UserStatus.ACTIVE, platformRole: { in: adminRoles } }, select: { id: true } });
-      if (administrators.length) await tx.notification.createMany({ data: administrators.map((administrator) => ({ userId: administrator.id, type: "INFO" as const, title: "Shop verification submitted", message: `${vendor.storeName} submitted ${publicId} for review.`, actionPath: `/admin/verifications/${application.id}` })) });
+      await Promise.all(administrators.map((administrator) => NotificationService.create({ event: "VERIFICATION_SUBMITTED", idempotencyKey: `verification:${application.id}:submitted:${administrator.id}`, userId: administrator.id, type: "INFO", title: "Shop verification submitted", message: `${vendor.storeName} submitted ${publicId} for review.`, actionPath: `/admin/verifications/${application.id}` }, tx)));
       return application;
       });
     } catch (error) {
@@ -137,6 +147,7 @@ export class ShopVerificationService {
       const updated = await tx.shopVerificationApplication.update({ where: { id: application.id }, data: { status: "UNDER_REVIEW", vendorResponse: text, informationRequest: null } });
       await tx.vendorProfile.update({ where: { id: context.vendorId }, data: { verificationStatus: "UNDER_REVIEW" } });
       await tx.shopVerificationActivity.create({ data: { applicationId: application.id, actorId: context.user.id, type: "INFORMATION_PROVIDED", fromValue: "NEEDS_INFORMATION", toValue: "UNDER_REVIEW" } });
+      if (application.assignedAdminId) await NotificationService.create({ event: "VERIFICATION_INFORMATION_PROVIDED", idempotencyKey: `verification:${application.id}:information-provided:${application.assignedAdminId}`, userId: application.assignedAdminId, type: "INFO", title: "Verification information provided", message: `${application.publicId} has new information ready for review.`, actionPath: `/admin/verifications/${application.id}` }, tx);
       await tx.auditLog.create({ data: { vendorId: context.vendorId, userId: context.user.id, action: "SHOP_VERIFICATION_INFORMATION_PROVIDED", entity: "ShopVerificationApplication", entityId: application.id } });
       return updated;
     });
@@ -154,7 +165,7 @@ export class ShopVerificationService {
 
   static async getForAdmin(id: string) {
     await requireAdminContext("platform:manage_verifications");
-    const application = await prisma.shopVerificationApplication.findUnique({ where: { id }, include: { vendor: { include: { owner: { select: { name: true, email: true } }, vendorApplication: { select: { id: true, status: true } }, marketplaceReports: { where: { status: { in: ["SUBMITTED", "UNDER_REVIEW", "AWAITING_INFORMATION", "ACTION_REQUIRED"] } }, select: { severity: true } }, riskFlags: { where: { status: "OPEN" }, select: { severity: true, category: true } } } }, assignedAdmin: { select: { name: true, email: true } }, documents: { include: { document: { select: { id: true, type: true, name: true, mimeType: true, size: true, createdAt: true } }, vendorDocument: { select: { id: true, type: true, name: true, mimeType: true, size: true, createdAt: true, status: true } } }, orderBy: { submittedAt: "asc" } }, activities: { include: { actor: { select: { name: true } } }, orderBy: { createdAt: "asc" } }, notes: { include: { admin: { select: { name: true } } }, orderBy: { createdAt: "asc" } } } });
+    const application = await prisma.shopVerificationApplication.findUnique({ where: { id }, include: { vendor: { include: { owner: { select: { name: true, email: true } }, vendorApplication: { select: { id: true, status: true } }, marketplaceReports: { where: { status: { in: ["SUBMITTED", "UNDER_REVIEW", "AWAITING_INFORMATION", "ACTION_REQUIRED"] } }, select: { severity: true } }, riskFlags: { where: { status: "OPEN" }, select: { severity: true, category: true } } } }, assignedAdmin: { select: { name: true, email: true } }, decisionBy: { select: { name: true, email: true } }, documents: { include: { document: { select: { id: true, type: true, name: true, mimeType: true, size: true, createdAt: true } }, vendorDocument: { select: { id: true, type: true, name: true, mimeType: true, size: true, createdAt: true, status: true } } }, orderBy: { submittedAt: "asc" } }, activities: { include: { actor: { select: { name: true } } }, orderBy: { createdAt: "asc" } }, notes: { include: { admin: { select: { name: true } } }, orderBy: { createdAt: "asc" } } } });
     if (!application) return null;
     const severeReports = application.vendor.marketplaceReports.filter(report => report.severity === MarketplaceReportSeverity.HIGH || report.severity === MarketplaceReportSeverity.CRITICAL).length;
     const submittedDocuments = application.documents.map((submission) => {
@@ -162,13 +173,14 @@ export class ShopVerificationService {
       const source = submission.document ? "profile" : "onboarding";
       return { id: document.id, source, type: document.type, name: document.name, mimeType: document.mimeType, size: document.size, uploadedAt: document.createdAt, submittedAt: submission.submittedAt, status: "status" in document ? document.status : "AVAILABLE", viewUrl: `/api/admin/documents/${source}/${document.id}`, downloadUrl: `/api/admin/documents/${source}/${document.id}?download=1` };
     });
-    return { ...application, documents: submittedDocuments, vendorApplicationId: application.vendor.vendorApplication?.id ?? null, context: { openReports: application.vendor.marketplaceReports.length, severeReports, openRiskFlags: application.vendor.riskFlags.length } };
+    const missing = await this.eligibilityForVendor(application.vendorId);
+    return { ...application, documents: submittedDocuments, eligibility: { eligible: missing.length === 0, missing }, vendorApplicationId: application.vendor.vendorApplication?.id ?? null, context: { openReports: application.vendor.marketplaceReports.length, severeReports, openRiskFlags: application.vendor.riskFlags.length } };
   }
 
   static async assign(id: string, assignedAdminId: string) {
     const actor = await requireAdminContext("platform:manage_verifications"); const assignee = await prisma.user.findFirst({ where: { id: assignedAdminId, status: UserStatus.ACTIVE, platformRole: { in: adminRoles } }, select: { id: true } }); if (!assignee) throw new ShopVerificationError("Choose an eligible active administrator.");
     const application = await prisma.shopVerificationApplication.findUnique({ where: { id } }); if (!application) throw new ShopVerificationError("Verification application not found.", "NOT_FOUND");
-    return prisma.$transaction(async tx => { const updated = await tx.shopVerificationApplication.update({ where: { id }, data: { assignedAdminId, assignedById: actor.userId, assignedAt: new Date() } }); await tx.shopVerificationActivity.create({ data: { applicationId: id, actorId: actor.userId, type: application.assignedAdminId ? "REASSIGNED" : "ASSIGNED", fromValue: application.assignedAdminId, toValue: assignedAdminId } }); await tx.notification.create({ data: { userId: assignedAdminId, type: "WARNING", title: "Verification assigned", message: `${application.publicId} has been assigned to you.`, actionPath: `/admin/verifications/${id}` } }); await tx.auditLog.create({ data: { vendorId: application.vendorId, userId: actor.userId, action: "SHOP_VERIFICATION_ASSIGNED", entity: "ShopVerificationApplication", entityId: id, newValues: { assignedAdminId } } }); return updated; });
+    return prisma.$transaction(async tx => { const updated = await tx.shopVerificationApplication.update({ where: { id }, data: { assignedAdminId, assignedById: actor.userId, assignedAt: new Date() } }); await tx.shopVerificationActivity.create({ data: { applicationId: id, actorId: actor.userId, type: application.assignedAdminId ? "REASSIGNED" : "ASSIGNED", fromValue: application.assignedAdminId, toValue: assignedAdminId } }); await NotificationService.create({ event: "VERIFICATION_ASSIGNED", idempotencyKey: `verification:${id}:assigned:${assignedAdminId}`, userId: assignedAdminId, type: "WARNING", title: "Verification assigned", message: `${application.publicId} has been assigned to you.`, actionPath: `/admin/verifications/${id}` }, tx); await tx.auditLog.create({ data: { vendorId: application.vendorId, userId: actor.userId, action: "SHOP_VERIFICATION_ASSIGNED", entity: "ShopVerificationApplication", entityId: id, newValues: { assignedAdminId } } }); return updated; });
   }
 
   static async transition(id: string, target: ShopVerificationStatus, reason?: string) {
@@ -182,7 +194,7 @@ export class ShopVerificationService {
       const updated = await tx.shopVerificationApplication.update({ where: { id }, data: update }); const verified = target === "VERIFIED";
       await tx.vendorProfile.update({ where: { id: application.vendorId }, data: { verificationStatus: target, isVerified: verified, verifiedAt: verified ? now : null } });
       await tx.shopVerificationActivity.create({ data: { applicationId: id, actorId: actor.userId, type: target === "VERIFIED" && application.status === "SUSPENDED" ? "REINSTATED" : activityFor(target), fromValue: application.status, toValue: target, metadata: text ? { reason: text } : undefined } });
-      const [title, message, type] = notification(target, application.publicId); await tx.notification.create({ data: { userId: application.vendor.ownerId, vendorId: application.vendorId, type, title, message, actionPath } });
+      const [title, message, type] = notification(target, application.publicId); await NotificationService.create({ event: eventFor(target, application.status), idempotencyKey: `verification:${id}:status:${target.toLowerCase()}:${application.vendor.ownerId}`, userId: application.vendor.ownerId, vendorId: application.vendorId, type, title, message, actionPath }, tx);
       await tx.auditLog.create({ data: { vendorId: application.vendorId, userId: actor.userId, action: `SHOP_VERIFICATION_${target}`, entity: "ShopVerificationApplication", entityId: id, oldValues: { status: application.status }, newValues: { status: target, reason: text || undefined } } }); return updated;
     });
     revalidateTag(cacheTags.marketplace.shops, "max");

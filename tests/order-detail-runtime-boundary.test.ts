@@ -13,11 +13,12 @@ describe("order detail runtime boundary", () => {
     expect(page).not.toContain("use(params)");
   });
 
-  it("keeps private order state in the client component using a plain order ID", () => {
+  it("loads private order detail independently using a plain order ID", () => {
     const client = source("src/app/(customer)/orders/[id]/OrderDetailClient.tsx");
     expect(client).toContain("function OrderDetailClient({ orderId }");
-    expect(client).toContain("useUserData()");
-    expect(client).toContain("refreshOrders");
+    expect(client).toContain("useCustomerOrder(orderId)");
+    expect(source("src/lib/order-client.ts")).toContain("/api/v1/orders/${encodeURIComponent(id)}");
+    expect(source("src/app/api/v1/orders/[id]/route.ts")).toContain("OrderService.getUserOrder");
   });
 
   it("marks query and authenticated APIs as request-time before request reads", () => {

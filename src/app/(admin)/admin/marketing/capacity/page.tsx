@@ -2,10 +2,13 @@ import { AdvertisingPlacement } from "@prisma/client";
 import { Suspense } from "react";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { connection } from "next/server";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cacheTags } from "@/lib/cache-policy";
 import { PromotionInventoryService } from "@/services/promotion-inventory";
+import { DashboardPageHeader } from "@/components/dashboard-page-header";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Gauge } from "lucide-react";
+import { CapacitySubmitButton } from "@/components/marketing/admin/capacity-submit-button";
 
 async function updateCapacity(formData: FormData) {
   "use server";
@@ -35,21 +38,28 @@ async function PromotionCapacityContent() {
   const state = await PromotionInventoryService.adminState();
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-semibold">Promotion capacity</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Configure simultaneous sponsored positions. Each homepage section
-          renders four visible positions; unreserved positions remain curated.
-          Existing paid commitments are never cancelled automatically.
-        </p>
-      </header>
+      <DashboardPageHeader
+        title={
+          <span className="inline-flex items-center gap-2">
+            <Gauge aria-hidden="true" className="size-5" />
+            Promotion capacity
+          </span>
+        }
+        description={
+          <>
+            Configure simultaneous sponsored positions. Each homepage section
+            renders four visible positions; unreserved positions remain curated.
+            Existing paid commitments are never cancelled automatically.
+          </>
+        }
+      />
       <section className="grid gap-4 md:grid-cols-2">
         {state.inventories.map((item) => (
           <form
             key={item.id}
             action={updateCapacity}
-            className="rounded-2xl border bg-card p-5">
-            <input type="hidden" name="placement" value={item.placement} />
+            className="rounded-xl border border-border/60 bg-card p-5">
+            <Input type="hidden" name="placement" value={item.placement} />
             <h2 className="font-semibold">{title(item.placement)}</h2>
             <label
               className="mt-4 block text-sm font-medium"
@@ -65,9 +75,7 @@ async function PromotionCapacityContent() {
               defaultValue={item.capacity}
               className="mt-2"
             />
-            <Button className="mt-4 rounded-full" type="submit">
-              Save capacity
-            </Button>
+            <CapacitySubmitButton />
           </form>
         ))}
       </section>
@@ -87,7 +95,9 @@ async function PromotionCapacityContent() {
         <div className="mt-3 space-y-2">
           {state.recovery.length ? (
             state.recovery.map((item) => (
-              <div key={item.id} className="rounded-xl border p-4 text-sm">
+              <div
+                key={item.id}
+                className="rounded-xl border border-border/60 bg-card p-4 text-sm">
                 <p className="font-medium">
                   {item.product?.name ?? item.vendor.storeName}
                 </p>
@@ -98,7 +108,7 @@ async function PromotionCapacityContent() {
               </div>
             ))
           ) : (
-            <p className="text-sm text-muted-foreground">
+            <p className="rounded-xl border border-dashed border-border/60 bg-card p-6 text-center text-sm text-muted-foreground">
               No paid booking exceptions.
             </p>
           )}
@@ -111,14 +121,14 @@ function CapacitySkeleton() {
   return (
     <div className="space-y-6" aria-busy="true">
       <div className="space-y-2">
-        <div className="h-8 w-56 animate-pulse rounded bg-muted" />
-        <div className="h-5 max-w-2xl animate-pulse rounded bg-muted" />
+        <Skeleton className="h-8 w-56" />
+        <Skeleton className="h-5 max-w-2xl" />
       </div>
       <div className="grid gap-4 md:grid-cols-2">
-        <div className="h-48 animate-pulse rounded-2xl border bg-card" />
-        <div className="h-48 animate-pulse rounded-2xl border bg-card" />
+        <Skeleton className="h-48 rounded-xl" />
+        <Skeleton className="h-48 rounded-xl" />
       </div>
-      <div className="h-32 animate-pulse rounded-2xl border bg-card" />
+      <Skeleton className="h-32 rounded-xl" />
     </div>
   );
 }

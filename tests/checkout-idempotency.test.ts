@@ -48,7 +48,8 @@ function setupSuccessfulTransaction() {
     product: { findMany: mocks.findMany, updateMany: mocks.updateProductStock },
     productVariant: { updateMany: mocks.updateVariantStock },
     order: { create: mocks.createOrder }, subOrder: { create: mocks.createSubOrder },
-    orderItem: { createMany: mocks.createMany }, notification: { create: mocks.notification },
+    orderItem: { createMany: mocks.createMany }, notification: { create: mocks.notification, upsert: mocks.notification },
+    user: { findMany: vi.fn().mockResolvedValue([]) },
   }));
 }
 

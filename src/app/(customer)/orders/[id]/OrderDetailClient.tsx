@@ -1,45 +1,55 @@
 "use client";
+
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
-import { ChevronLeft, CreditCard, MapPin, Truck } from "lucide-react";
-import { notFound } from "next/navigation";
-import { useUserData } from "@/providers/UserDataProvider";
+import { AlertCircle, CreditCard, MapPin, Package, Truck } from "lucide-react";
+import { useCustomerOrder } from "@/hooks/use-customer-orders";
 import { authHeaders } from "@/lib/providers/useProviderFetch";
+import { fulfillmentSummary, paymentSummary, subOrderFulfillmentLabel } from "@/lib/customer-order-status";
 import { PageContainer } from "@/components/marketplace/page-container";
-import { PriceDisplay } from "@/components/marketplace/price-display";
+import { PriceDisplay, formatUGX } from "@/components/marketplace/price-display";
 import { StatusBadge } from "@/components/marketplace/status-badge";
+import { DetailPageHeader } from "@/components/detail-page-header";
 import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 
-const name = (v: string) => v === "MTN_MOMO" ? "MTN Mobile Money" : v === "AIRTEL_MONEY" ? "Airtel Money" : v.replaceAll("_", " ");
-const label = (v: string) => v === "SUCCESSFUL" || v === "COMPLETED" ? "Completed" : v === "PARTIALLY_PAID" ? "Partially paid" : v === "PAYMENT_EXCEPTION" ? "Payment review required" : v.replaceAll("_", " ").toLowerCase();
-const tone = (v: string) => v === "SUCCESSFUL" || v === "COMPLETED" ? "success" : ["FAILED", "REVERSED", "CANCELLED", "EXPIRED", "PAYMENT_EXCEPTION"].includes(v) ? "danger" : "warning";
-export function OrderDetailFallback() { return <PageContainer className="py-6"><Skeleton className="h-10 w-28" /><Skeleton className="mt-5 h-72 rounded-xl" /></PageContainer>; }
+const providerName = (value: string) => value === "MTN_MOMO" ? "MTN Mobile Money" : value === "AIRTEL_MONEY" ? "Airtel Money" : value.replaceAll("_", " ");
+export function OrderDetailFallback() { return <PageContainer className="py-6"><Skeleton className="h-16" /><div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]"><Skeleton className="h-96 rounded-xl" /><Skeleton className="h-72 rounded-xl" /></div></PageContainer>; }
 
 export function OrderDetailClient({ orderId }: { orderId: string }) {
-  const { orders, ordersLoading, refreshOrders } = useUserData();
-  const order = orders.find((item) => item.id === orderId);
+  const { order, state, error: loadError, retry } = useCustomerOrder(orderId);
   const [selected, setSelected] = useState<Record<string, "MTN_MOMO" | "AIRTEL_MONEY">>({});
-  const [busy, setBusy] = useState<string | null>(null), [error, setError] = useState("");
-  const hasPending = order?.subOrders.some((sub) => sub.paymentIntents.some((intent) => intent.status === "PENDING"));
-  useEffect(() => { if (!hasPending) return; let count = 0; const timer = window.setInterval(() => { count += 1; void refreshOrders(); if (count >= 12) window.clearInterval(timer); }, count < 3 ? 3000 : 5000); return () => window.clearInterval(timer); }, [hasPending, refreshOrders]);
-  if (ordersLoading && !orders.length) return <OrderDetailFallback />;
-  if (!order) notFound();
+  const [busy, setBusy] = useState<string | null>(null); const [paymentError, setPaymentError] = useState("");
+  const hasPending = order?.subOrders.some((sub) => sub.paymentIntents.some((intent) => ["CREATED", "PENDING", "SUBMITTED"].includes(intent.status)));
+  useEffect(() => { if (!hasPending) return; let count = 0; const timer = window.setInterval(() => { count += 1; void retry(); if (count >= 12) window.clearInterval(timer); }, 5000); return () => window.clearInterval(timer); }, [hasPending, retry]);
+  if (state === "loading") return <OrderDetailFallback />;
+  if (state === "not-found") return <State title="Order not found" description="This order does not exist or is not available for this account." />;
+  if (state === "error" || !order) return <State title="We couldn’t load this order" description={loadError ?? "Please try again."} retry={() => void retry()} />;
+  const payment = paymentSummary(order.paymentStatus); const fulfillment = fulfillmentSummary(order.subOrders);
   const paid = order.subOrders.filter((sub) => sub.paymentIntents.some((intent) => intent.status === "SUCCESSFUL")).length;
   const pay = async (subOrderId: string, provider: "MTN_MOMO" | "AIRTEL_MONEY") => {
-    if (order.subOrders.find((sub) => sub.id === subOrderId)?.paymentIntents.some((intent) => intent.status === "REVERSED")) { setError("There is an issue with this payment and it is being reviewed. Do not pay again yet."); return; }
-    setBusy(subOrderId); setError("");
-    try { const response = await fetch(`/api/v1/orders/${order.id}/payments`, { method: "POST", headers: { ...authHeaders(), "content-type": "application/json" }, body: JSON.stringify({ subOrderId, provider, paymentRequestId: crypto.randomUUID() }) }); const body = await response.json(); if (!response.ok) throw new Error(body.error?.message || "Unable to start this payment."); await refreshOrders(); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to start this payment."); } finally { setBusy(null); }
+    if (order.subOrders.find((sub) => sub.id === subOrderId)?.paymentIntents.some((intent) => intent.status === "REVERSED")) { setPaymentError("There is an issue with this payment and it is being reviewed. Do not pay again yet."); return; }
+    setBusy(subOrderId); setPaymentError("");
+    try { const response = await fetch(`/api/v1/orders/${order.id}/payments`, { method: "POST", headers: { ...authHeaders(), "content-type": "application/json" }, body: JSON.stringify({ subOrderId, provider, paymentRequestId: crypto.randomUUID() }) }); const body = await response.json(); if (!response.ok) throw new Error(body.error?.message || "Unable to start this payment."); await retry(); }
+    catch (cause) { setPaymentError(cause instanceof Error ? cause.message : "Unable to start this payment."); } finally { setBusy(null); }
   };
   return <PageContainer className="py-6 pb-24 sm:py-8">
-    <Link href="/orders" className="inline-flex h-10 items-center gap-1 text-sm text-muted-foreground"><ChevronLeft className="size-4" />My orders</Link>
-    <div className="mt-4 flex flex-wrap justify-between gap-4 border-b pb-6"><div><h1 className="text-2xl font-semibold">Order #{order.orderNumber}</h1><p className="mt-1 text-sm text-muted-foreground">{paid} of {order.subOrders.length} seller payments complete</p></div><StatusBadge tone={tone(order.paymentStatus)}>{label(order.paymentStatus)}</StatusBadge></div>
-    {error && <p role="alert" className="mt-4 rounded-xl border border-destructive/30 p-3 text-sm text-destructive">{error}</p>}
-    <div className="mt-7 grid gap-7 lg:grid-cols-[minmax(0,1fr)_20rem]"><section className="space-y-5">{order.subOrders.map((sub) => { const intent = sub.paymentIntents[0], status = intent?.status ?? "PENDING", provider = selected[sub.id] ?? sub.paymentOptions[0], pickup = sub.fulfillmentMethod === "PICKUP"; return <article key={sub.id} className="rounded-xl border bg-card p-5">
-      <div className="flex flex-wrap justify-between gap-3"><div><h2 className="font-semibold">{sub.vendorName}</h2><p className="mt-1 text-sm text-muted-foreground">Direct payment · <PriceDisplay price={sub.total} /></p></div><StatusBadge tone={tone(status)}>{label(status)}</StatusBadge></div>
-      <div className="mt-4 rounded-xl bg-muted/50 p-4 text-sm"><div className="flex items-center gap-2 font-medium">{pickup ? <MapPin className="size-4" /> : <Truck className="size-4" />}{pickup ? "Pickup" : "Delivery"}<StatusBadge tone={tone(sub.fulfillmentStatus)}>{label(sub.fulfillmentStatus)}</StatusBadge></div><p className="mt-2 text-muted-foreground">{pickup ? `${sub.branchName ? `${sub.branchName} · ` : ""}${sub.pickupLocation ?? "Pickup details pending"}` : sub.deliveryAddress}</p><p className="mt-1 text-xs text-muted-foreground">Contact: {sub.fulfillmentContact}{sub.fulfillmentFee > 0 ? ` · Fee UGX ${sub.fulfillmentFee.toLocaleString()}` : " · No fulfilment fee"}</p>{pickup && sub.pickupInstructions && <p className="mt-2 text-xs text-muted-foreground">{sub.pickupInstructions}</p>}</div>
-      {status === "REVERSED" ? <div className="mt-4 border-t pt-4 text-sm text-amber-800 dark:text-amber-200"><p className="font-medium">Payment reversed — review required</p><p className="mt-1 text-xs">There is an issue with this payment and it is being reviewed. Do not pay again yet.</p></div> : status !== "SUCCESSFUL" && <div className="mt-4 border-t pt-4"><p className="text-sm font-medium">Choose payment method</p>{sub.paymentOptions.length ? <><div className="mt-3 flex flex-wrap gap-2">{sub.paymentOptions.map((option) => <Button key={option} size="sm" variant={provider === option ? "default" : "outline"} onClick={() => setSelected({ ...selected, [sub.id]: option })}>{name(option)}</Button>)}</div><Button className="mt-4" disabled={!provider || busy === sub.id || status === "PENDING"} onClick={() => provider && void pay(sub.id, provider)}>{busy === sub.id ? "Sending request…" : status === "PENDING" ? "Waiting for confirmation" : "Pay now"}</Button></> : <p className="mt-3 text-sm text-destructive">Payment is temporarily unavailable for this seller.</p>}</div>}
-    </article>; })}</section><aside><div className="rounded-xl border bg-card p-5"><div className="flex items-center gap-2"><CreditCard className="size-4 text-primary" /><h2 className="font-semibold">Payment progress</h2></div><p className="mt-3 text-sm text-muted-foreground">Each seller is paid directly to their verified merchant account. Mwezora does not hold your funds.</p><div className="mt-4 flex justify-between border-t pt-3 font-semibold"><span>Order total</span><PriceDisplay price={order.totalAmount} /></div></div></aside></div>
+    <DetailPageHeader backHref="/orders" backLabel="Back to orders" title={`Order #${order.orderNumber}`} description={new Date(order.createdAt).toLocaleDateString("en-UG", { dateStyle: "long" })}><StatusBadge tone={payment.tone}>{payment.label}</StatusBadge><StatusBadge tone={fulfillment.tone}>{fulfillment.label}</StatusBadge></DetailPageHeader>
+    {paymentError && <p role="alert" className="mt-4 rounded-xl border border-destructive/30 p-3 text-sm text-destructive">{paymentError}</p>}
+    <div className="mt-7 grid gap-7 lg:grid-cols-[minmax(0,1fr)_20rem]"><section className="space-y-5" aria-label="Items by shop">{order.subOrders.map((sub) => {
+      const items = order.items.filter((item) => item.subOrderId === sub.id); const intent = sub.paymentIntents[0]; const status = intent?.status ?? "PENDING"; const subPayment = paymentSummary(status); const provider = selected[sub.id] ?? sub.paymentOptions[0]; const pickup = sub.fulfillmentMethod === "PICKUP";
+      return <article key={sub.id} className="overflow-hidden rounded-xl border bg-card"><div className="flex flex-wrap items-start justify-between gap-3 p-5"><div><h2 className="font-semibold">{sub.vendorName}</h2><p className="mt-1 text-xs text-muted-foreground">{sub.subOrderNumber}</p></div><div className="flex flex-wrap gap-2"><StatusBadge tone={subPayment.tone}>{subPayment.label}</StatusBadge><StatusBadge tone={fulfillmentSummary([{ status: sub.status }]).tone}>{subOrderFulfillmentLabel(sub.status, sub.fulfillmentMethod)}</StatusBadge></div></div>
+        <Separator />
+        <div className="divide-y">{items.length ? items.map((item) => <div key={item.id} className="flex gap-4 p-4 sm:p-5">{item.image ? <Image src={item.image} alt="" width={80} height={80} className="size-20 shrink-0 rounded-lg object-cover" /> : <div className="grid size-20 shrink-0 place-items-center rounded-lg bg-muted"><Package className="size-6 text-muted-foreground" /></div>}<div className="min-w-0 flex-1"><h3 className="font-medium">{item.name}</h3>{item.variantName && <p className="mt-1 text-sm text-muted-foreground">{item.variantName}</p>}{item.variantOptions && <p className="mt-1 text-xs text-muted-foreground">{Object.entries(item.variantOptions).map(([key, value]) => `${key}: ${value}`).join(" · ")}</p>}<div className="mt-3 flex flex-wrap justify-between gap-2 text-sm"><span>{item.quantity} × {formatUGX(item.price)}</span><span className="font-semibold">{formatUGX(item.lineTotal)}</span></div></div></div>) : <div className="p-5 text-sm text-muted-foreground">Product details are unavailable for this historical order. The persisted shop total and payment record are shown below.</div>}</div>
+        <Separator />
+        <div className="p-5"><div className="rounded-xl bg-muted/50 p-4 text-sm"><div className="flex items-center gap-2 font-medium">{pickup ? <MapPin className="size-4" /> : <Truck className="size-4" />}{pickup ? "Pickup" : "Delivery"}</div><p className="mt-2 text-muted-foreground">{pickup ? [sub.branchName, sub.pickupLocation].filter(Boolean).join(" · ") || "Pickup details pending" : sub.deliveryAddress || "Delivery address unavailable"}</p>{pickup && sub.pickupDirections && <p className="mt-1 text-xs text-muted-foreground">{sub.pickupDirections}</p>}<p className="mt-1 text-xs text-muted-foreground">Contact: {sub.fulfillmentContact}</p>{(pickup ? sub.pickupInstructions : sub.deliveryInstructions) && <p className="mt-2 text-xs text-muted-foreground">{pickup ? sub.pickupInstructions : sub.deliveryInstructions}</p>}</div>
+          {status === "REVERSED" ? <div className="mt-4 text-sm text-amber-800 dark:text-amber-200"><p className="font-medium">Payment reversed — review required</p><p className="mt-1 text-xs">Do not pay again while this payment is being reviewed.</p></div> : status !== "SUCCESSFUL" && <div className="mt-4"><p className="text-sm font-medium">Choose payment method</p>{sub.paymentOptions.length ? <><div className="mt-3 flex flex-wrap gap-2">{sub.paymentOptions.map((option) => <Button key={option} size="sm" variant={provider === option ? "default" : "outline"} onClick={() => setSelected((current) => ({ ...current, [sub.id]: option }))}>{providerName(option)}</Button>)}</div><Button className="mt-4" disabled={!provider || busy === sub.id || ["CREATED", "PENDING", "SUBMITTED"].includes(status)} onClick={() => provider && void pay(sub.id, provider)}>{busy === sub.id ? "Sending request…" : ["CREATED", "PENDING", "SUBMITTED"].includes(status) ? "Waiting for confirmation" : "Pay now"}</Button></> : <p className="mt-3 text-sm text-destructive">Payment is temporarily unavailable for this seller.</p>}</div>}
+        </div></article>;
+    })}</section><aside className="space-y-5 lg:sticky lg:top-24 lg:self-start"><div className="rounded-xl border bg-card p-5"><div className="flex items-center gap-2"><CreditCard className="size-4 text-primary" /><h2 className="font-semibold">Order summary</h2></div><div className="mt-4 space-y-3 text-sm"><SummaryRow label="Items" value={formatUGX(order.subTotal)} /><SummaryRow label="Delivery" value={formatUGX(order.totalShipping)} />{order.discountAmount > 0 && <SummaryRow label="Discount" value={`−${formatUGX(order.discountAmount)}`} />}{order.taxAmount > 0 && <SummaryRow label="Tax" value={formatUGX(order.taxAmount)} />}<Separator /><div className="flex items-center justify-between gap-3 font-semibold"><span>Total</span><PriceDisplay price={order.totalAmount} /></div></div><p className="mt-4 text-xs leading-5 text-muted-foreground">{paid} of {order.subOrders.length} seller payments confirmed. Each seller is paid directly to their verified merchant account; Mwezora does not hold your funds.</p></div></aside></div>
   </PageContainer>;
 }
+
+function SummaryRow({ label, value }: { label: string; value: string }) { return <div className="flex justify-between gap-3"><span className="text-muted-foreground">{label}</span><span>{value}</span></div>; }
+function State({ title, description, retry }: { title: string; description: string; retry?: () => void }) { return <PageContainer className="py-12"><div className="mx-auto max-w-lg rounded-xl border bg-card p-8 text-center"><AlertCircle className="mx-auto size-8 text-muted-foreground" /><h1 className="mt-3 text-xl font-semibold">{title}</h1><p className="mt-2 text-sm text-muted-foreground">{description}</p><div className="mt-5 flex justify-center gap-3">{retry && <Button onClick={retry}>Try again</Button>}<Button asChild variant="outline"><Link href="/orders">Back to orders</Link></Button></div></div></PageContainer>; }

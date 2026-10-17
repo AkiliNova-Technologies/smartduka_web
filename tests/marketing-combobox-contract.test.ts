@@ -16,8 +16,7 @@ describe("UI-11B.6B.2 marketing combobox contract", () => {
     expect(actionFields).toContain("MarketingEntityCombobox");
     expect(actionFields).toContain('change("primaryCtaValue", "")');
     expect(actionFields).toContain('change("secondaryCtaValue", "")');
-    expect(source("src/components/marketing/featured-products-manager.tsx")).toContain("MarketingEntityCombobox");
-    expect(source("src/components/marketing/featured-shops-manager.tsx")).toContain("MarketingEntityCombobox");
+    expect(source("src/components/marketing/featured-ranking-list.tsx")).toContain("MarketingEntityCombobox");
   });
   it("has no visible native selects or checkbox inputs in admin marketing components", () => {
     const files = ["src/components/marketing/featured-products-manager.tsx", "src/components/marketing/featured-shops-manager.tsx", "src/components/marketing/admin/promotion/promotion-action-fields.tsx", "src/components/marketing/admin/promotion/promotion-placement-fields.tsx"];

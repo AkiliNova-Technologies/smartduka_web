@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma/client";
 import { getCurrentUserId } from "@/lib/auth/session";
 import { requireVendorContext } from "@/lib/auth/vendor-context";
 import { requireAdminContext } from "@/lib/auth/admin-context";
+import { NotificationService } from "@/services/notifications";
 
 export const RETURN_WINDOW_DAYS = 14;
 export const SHIPPING_REFUND_POLICY = "NON_REFUNDABLE" as const;
@@ -41,7 +42,7 @@ export class ReturnsRefundsService {
 
   static async cancelSubOrder(subOrderId: string, actor: { userId: string; vendorId?: string; admin?: boolean }) {
     return prisma.$transaction(async (tx) => {
-      const sub = await tx.subOrder.findUnique({ where: { id: subOrderId }, include: { order: true, items: true } });
+      const sub = await tx.subOrder.findUnique({ where: { id: subOrderId }, include: { order: true, items: true, vendor: { select: { ownerId: true } } } });
       if (!sub || (!actor.admin && (actor.vendorId ? sub.vendorId !== actor.vendorId : sub.order.customerId !== actor.userId))) throw new ReturnsRefundsError("SubOrder was not found.");
       if (sub.status === SubOrderStatus.CANCELLED) return sub;
       if (sub.status !== SubOrderStatus.PENDING) throw new ReturnsRefundsError("Cancellation is allowed only before fulfillment begins.");
@@ -57,6 +58,9 @@ export class ReturnsRefundsService {
         }
       }
       const updated = await tx.subOrder.update({ where: { id: sub.id }, data: { status: SubOrderStatus.CANCELLED, fulfillmentStatus: "CANCELLED" } });
+      const reference = sub.subOrderNumber || sub.id;
+      await NotificationService.create({ event: "ORDER_CANCELLED", idempotencyKey: `order:${sub.id}:status:cancelled:${sub.order.customerId}`, userId: sub.order.customerId, type: "WARNING", title: "Order cancelled", message: `Order ${reference} has been cancelled.`, actionPath: `/orders/${sub.orderId}` }, tx);
+      if (sub.vendor?.ownerId) await NotificationService.createForVendorOrder({ event: "ORDER_CANCELLED", idempotencyKey: `order:${sub.id}:cancelled`, vendorId: sub.vendorId, ownerUserId: sub.vendor.ownerId, type: "WARNING", title: "Order cancelled", message: `Order ${reference} has been cancelled.`, actionPath: "/vendor/orders" }, tx);
       if (sub.order.paymentStatus === PaymentStatus.COMPLETED) {
         const attempt = await tx.paymentAttempt.findFirst({ where: { orderId: sub.orderId, status: "COMPLETED" }, select: { id: true } });
         await tx.refund.create({ data: { orderId: sub.orderId, subOrderId: sub.id, paymentAttemptId: attempt?.id, requestedByUserId: actor.userId, amount: sub.vendorSubTotal, currency: sub.order.currency, reason: "Cancellation", status: RefundStatus.REQUESTED } });

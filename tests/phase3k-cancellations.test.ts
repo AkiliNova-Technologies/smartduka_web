@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   user: vi.fn(),
   vendor: vi.fn(),
   admin: vi.fn(),
+  notification: vi.fn(),
 }));
 vi.mock("@/lib/prisma/client", () => ({ prisma: { $transaction: mocks.tx } }));
 vi.mock("@/lib/auth/session", () => ({ getCurrentUserId: mocks.user }));
@@ -28,6 +29,8 @@ const tx = {
   productVariant: { update: mocks.variant },
   refund: { create: mocks.refund },
   paymentAttempt: { findFirst: mocks.attempt },
+  notification: { upsert: mocks.notification },
+  user: { findMany: vi.fn().mockResolvedValue([]) },
 };
 const sub = (x: Record<string, unknown> = {}) => ({
   id: "sub-a",

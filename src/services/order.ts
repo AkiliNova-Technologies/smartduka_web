@@ -17,6 +17,62 @@ import { canFulfillSubOrder } from "@/services/payment-fulfillment";
 import { publicProductWhere } from "@/lib/marketplace-eligibility";
 import { branchSupportsMethod, deliveryAreaSupported } from "@/services/fulfillment-options";
 import { lockInventoryIdentity } from "@/services/inventory-integrity";
+import { NotificationService } from "@/services/notifications";
+
+const customerOrderInclude = {
+  orderItems: { include: {
+    productReview: { select: { id: true, rating: true, title: true, comment: true, imageUrls: true } },
+    product: { select: { id: true, name: true, images: { take: 1, orderBy: { sortOrder: "asc" as const } }, vendor: { select: { storeName: true } } } },
+  } },
+  subOrders: { select: {
+    id: true, status: true, subOrderNumber: true, vendorSubTotal: true, vendorShipping: true, vendorTotal: true,
+    fulfillmentMethod: true, fulfillmentStatus: true, fulfillmentSnapshot: true,
+    vendor: { select: { storeName: true, paymentAccounts: { where: { status: "VERIFIED" as const, suspendedAt: null }, select: { provider: true } } } },
+    shopReview: { select: { id: true, rating: true, comment: true } },
+    paymentIntents: { select: { id: true, provider: true, status: true, amount: true, currency: true, providerReference: true, updatedAt: true }, orderBy: { createdAt: "desc" as const } },
+  } },
+} satisfies Prisma.OrderInclude;
+
+type CustomerOrderRecord = Prisma.OrderGetPayload<{ include: typeof customerOrderInclude }>;
+
+function serializeCustomerOrder(order: CustomerOrderRecord) {
+  return {
+    id: order.id, orderNumber: order.orderNumber, status: order.status,
+    paymentStatus: deriveParentPaymentProgress(order.subOrders, order.paymentStatus),
+    paymentGateway: order.paymentGateway, totalAmount: Number(order.totalAmount), subTotal: Number(order.subTotal),
+    totalShipping: Number(order.totalShipping), taxAmount: Number(order.taxAmount),
+    discountAmount: Math.max(0, Number(order.subTotal) + Number(order.totalShipping) + Number(order.taxAmount) - Number(order.totalAmount)),
+    createdAt: order.createdAt.toISOString(), notes: order.notes,
+    items: order.orderItems.map((item) => ({
+      id: item.id, productId: item.productId, subOrderId: item.subOrderId, variantName: item.variantNameSnapshot,
+      variantOptions: item.variantOptionsSnapshot && typeof item.variantOptionsSnapshot === "object" && !Array.isArray(item.variantOptionsSnapshot) ? item.variantOptionsSnapshot as Record<string, string> : null,
+      name: item.productNameSnapshot ?? item.product.name, quantity: item.quantity, price: Number(item.priceAtPurchase),
+      lineTotal: Number(item.totalPrice), image: item.product.images[0]?.url || null, vendorName: item.product.vendor.storeName,
+      canReview: order.paymentStatus === "COMPLETED" && order.status !== "REFUNDED" && order.status !== "FAILED" && order.subOrders.find((subOrder) => subOrder.id === item.subOrderId)?.status === "DELIVERED",
+      review: item.productReview,
+    })),
+    subOrders: order.subOrders.map((so) => {
+      const snapshot = so.fulfillmentSnapshot && typeof so.fulfillmentSnapshot === "object" && !Array.isArray(so.fulfillmentSnapshot) ? so.fulfillmentSnapshot as Record<string, unknown> : {};
+      return {
+        id: so.id, status: so.status, subOrderNumber: so.subOrderNumber, vendorName: so.vendor.storeName,
+        subTotal: Number(so.vendorSubTotal), shipping: Number(so.vendorShipping), total: Number(so.vendorTotal),
+        fulfillmentMethod: so.fulfillmentMethod, fulfillmentStatus: so.fulfillmentStatus,
+        fulfillmentFee: typeof snapshot.deliveryFee === "string" || typeof snapshot.deliveryFee === "number" ? Number(snapshot.deliveryFee) : Number(so.vendorShipping),
+        branchName: typeof snapshot.branchName === "string" ? snapshot.branchName : null,
+        deliveryAddress: so.fulfillmentMethod === "DELIVERY" ? (typeof snapshot.deliveryAddress === "string" ? snapshot.deliveryAddress : order.shippingAddress) : null,
+        deliveryInstructions: typeof snapshot.deliveryInstructions === "string" ? snapshot.deliveryInstructions : order.notes,
+        estimatedDelivery: typeof snapshot.estimatedDelivery === "string" ? snapshot.estimatedDelivery : null,
+        fulfillmentContact: typeof snapshot.deliveryContact === "string" ? snapshot.deliveryContact : typeof snapshot.pickupContact === "string" ? snapshot.pickupContact : order.shippingPhone,
+        pickupLocation: typeof snapshot.pickupLocation === "string" ? snapshot.pickupLocation : null,
+        pickupDirections: typeof snapshot.pickupDirections === "string" ? snapshot.pickupDirections : null,
+        pickupInstructions: typeof snapshot.pickupInstructions === "string" ? snapshot.pickupInstructions : null,
+        paymentOptions: [...new Set(so.vendor.paymentAccounts.map((account) => account.provider).filter((provider) => PaymentProviderRegistry.isEnabled(provider)))],
+        paymentIntents: so.paymentIntents.map((intent) => ({ id: intent.id, provider: intent.provider, status: intent.status, amount: Number(intent.amount), currency: intent.currency, providerReference: intent.providerReference, updatedAt: intent.updatedAt.toISOString() })),
+        canReview: order.paymentStatus === "COMPLETED" && order.status !== "REFUNDED" && so.status === "DELIVERED", review: so.shopReview,
+      };
+    }),
+  };
+}
 
 export interface CheckoutIntent {
   items: Array<{
@@ -63,6 +119,7 @@ export interface ResolvedCheckoutLine {
   productId: string;
   variantId: string | null;
   vendorId: string;
+  vendorOwnerId?: string;
   quantity: number;
   unitPrice: Decimal;
   /** Deprecated compatibility field; direct sales always use zero commission. */
@@ -346,6 +403,7 @@ export class OrderService {
             productId: product.id,
             variantId: variant?.id ?? null,
             vendorId: product.vendorId,
+            vendorOwnerId: product.vendor.ownerId,
             quantity: item.quantity,
             unitPrice: new Decimal(
               (variant?.price ?? product.basePrice).toString(),
@@ -552,15 +610,27 @@ export class OrderService {
           });
           const sales = branchSales.filter((sale) => sale.vendorId === group.vendorId);
           if (sales.length) await tx.inventoryMovement.createMany({ data: sales.map((sale) => ({ inventoryId: sale.inventoryId, branchId: sale.branchId, shopId: sale.vendorId, productId: sale.productId, variantId: sale.variantId, movementType: "SALE", quantity: -sale.quantity, referenceType: "SUB_ORDER", referenceId: suborder.id, reason: "Checkout sale" })) });
-          await tx.notification.create({
-            data: {
-              vendorId: group.vendorId,
-              type: "ORDER_PLACED",
-              title: "New Order Received",
-              message: `Order ${suborder.subOrderNumber} requires fulfillment.`,
-            },
-          });
+          const ownerUserId = group.items[0].vendorOwnerId;
+          if (ownerUserId) await NotificationService.createForVendorOrder({
+            event: "ORDER_RECEIVED",
+            idempotencyKey: `order:${suborder.id}:received`,
+            vendorId: group.vendorId,
+            ownerUserId,
+            type: "ORDER_PLACED",
+            title: "New order received",
+            message: `Order ${suborder.subOrderNumber} requires fulfilment.`,
+            actionPath: "/vendor/orders",
+          }, tx);
         }
+        await NotificationService.create({
+          event: "ORDER_CREATED",
+          idempotencyKey: `order:${order.id}:created:${input.userId}`,
+          userId: input.userId,
+          type: "SUCCESS",
+          title: "Order confirmed",
+          message: `Your order ${orderNumber} has been placed and is awaiting payment confirmation.`,
+          actionPath: `/orders/${order.id}`,
+        }, tx);
         return order;
       }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
     } catch (error) {
@@ -592,84 +662,31 @@ export class OrderService {
   static async getUserOrders(userId: string) {
     const orders = await prisma.order.findMany({
       where: { customerId: userId },
-      include: {
-        orderItems: {
-          include: {
-            productReview: { select: { id: true, rating: true, title: true, comment: true, imageUrls: true } },
-            product: {
-              select: {
-                id: true,
-                name: true,
-                images: { take: 1, orderBy: { sortOrder: "asc" } },
-                vendor: { select: { storeName: true } },
-              },
-            },
-          },
-        },
-        subOrders: {
-          select: {
-            id: true,
-            status: true,
-            subOrderNumber: true,
-            vendorTotal: true,
-            fulfillmentMethod: true,
-            fulfillmentStatus: true,
-            fulfillmentSnapshot: true,
-            vendor: { select: { storeName: true, paymentAccounts: { where: { status: "VERIFIED", suspendedAt: null }, select: { provider: true } } } },
-            shopReview: { select: { id: true, rating: true, comment: true } },
-            paymentIntents: { select: { id: true, provider: true, status: true, amount: true, currency: true, providerReference: true, updatedAt: true }, orderBy: { createdAt: "desc" } },
-          },
-        },
-      },
-      orderBy: { createdAt: "desc" },
+      include: customerOrderInclude,
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     });
+    return orders.map(serializeCustomerOrder);
+  }
 
-    return orders.map((order) => ({
-      id: order.id,
-      orderNumber: order.orderNumber,
-      status: order.status,
-      paymentStatus: deriveParentPaymentProgress(order.subOrders, order.paymentStatus),
-      paymentGateway: order.paymentGateway,
-      totalAmount: Number(order.totalAmount),
-      subTotal: Number(order.subTotal),
-      totalShipping: Number(order.totalShipping),
-      createdAt: order.createdAt.toISOString(),
-      items: order.orderItems.map((item) => ({
-        id: item.id,
-        productId: item.productId,
-        subOrderId: item.subOrderId,
-        variantName: item.variantNameSnapshot,
-        name: item.productNameSnapshot ?? item.product.name,
-        quantity: item.quantity,
-        price: Number(item.priceAtPurchase),
-        image: item.product.images[0]?.url || null,
-        vendorName: item.product.vendor.storeName,
-        canReview: order.paymentStatus === "COMPLETED" && order.status !== "REFUNDED" && order.status !== "FAILED" && order.subOrders.find((subOrder) => subOrder.id === item.subOrderId)?.status === "DELIVERED",
-        review: item.productReview,
-      })),
-      subOrders: order.subOrders.map((so) => {
-        const snapshot = so.fulfillmentSnapshot && typeof so.fulfillmentSnapshot === "object" && !Array.isArray(so.fulfillmentSnapshot) ? so.fulfillmentSnapshot as Record<string, unknown> : {};
-        return {
-        id: so.id,
-        status: so.status,
-        subOrderNumber: so.subOrderNumber,
-        vendorName: so.vendor.storeName,
-        total: Number(so.vendorTotal),
-        fulfillmentMethod: so.fulfillmentMethod,
-        fulfillmentStatus: so.fulfillmentStatus,
-        fulfillmentFee: typeof snapshot.deliveryFee === "string" ? Number(snapshot.deliveryFee) : 0,
-        branchName: typeof snapshot.branchName === "string" ? snapshot.branchName : null,
-        deliveryAddress: so.fulfillmentMethod === "DELIVERY" ? (typeof snapshot.deliveryAddress === "string" ? snapshot.deliveryAddress : order.shippingAddress) : null,
-        fulfillmentContact: typeof snapshot.deliveryContact === "string" ? snapshot.deliveryContact : typeof snapshot.pickupContact === "string" ? snapshot.pickupContact : order.shippingPhone,
-        pickupLocation: typeof snapshot.pickupLocation === "string" ? snapshot.pickupLocation : null,
-        pickupDirections: typeof snapshot.pickupDirections === "string" ? snapshot.pickupDirections : null,
-        pickupInstructions: typeof snapshot.pickupInstructions === "string" ? snapshot.pickupInstructions : null,
-        paymentOptions: [...new Set(so.vendor.paymentAccounts.map((account) => account.provider).filter((provider) => PaymentProviderRegistry.isEnabled(provider)))],
-        paymentIntents: so.paymentIntents.map((intent) => ({ id: intent.id, provider: intent.provider, status: intent.status, amount: Number(intent.amount), currency: intent.currency, providerReference: intent.providerReference, updatedAt: intent.updatedAt.toISOString() })),
-        canReview: order.paymentStatus === "COMPLETED" && order.status !== "REFUNDED" && so.status === "DELIVERED",
-        review: so.shopReview,
-      };}),
-    }));
+  static async getUserOrdersPage(userId: string, input: { page: number; pageSize: number; filter?: string }) {
+    const where: Prisma.OrderWhereInput = {
+      customerId: userId,
+      ...(input.filter === "awaiting-payment" ? { subOrders: { some: { paymentIntents: { none: { status: { in: ["SUCCESSFUL", "REVERSED"] } } } } } }
+        : input.filter === "completed" ? { subOrders: { every: { status: "DELIVERED" }, some: {} } }
+        : input.filter === "cancelled" ? { subOrders: { every: { status: "CANCELLED" }, some: {} } }
+        : input.filter === "in-progress" ? { subOrders: { some: { status: { in: ["PROCESSING", "READY_FOR_PICKUP", "SHIPPED"] } } } }
+        : {}),
+    };
+    const [total, orders] = await prisma.$transaction([
+      prisma.order.count({ where }),
+      prisma.order.findMany({ where, include: customerOrderInclude, orderBy: [{ createdAt: "desc" }, { id: "desc" }], skip: (input.page - 1) * input.pageSize, take: input.pageSize }),
+    ]);
+    return { orders: orders.map(serializeCustomerOrder), total };
+  }
+
+  static async getUserOrder(userId: string, orderId: string) {
+    const order = await prisma.order.findFirst({ where: { id: orderId, customerId: userId }, include: customerOrderInclude });
+    return order ? serializeCustomerOrder(order) : null;
   }
 
   static async updateSubOrderStatus(
@@ -714,29 +731,31 @@ export class OrderService {
       );
 
     const fulfillmentStatus = status === SubOrderStatus.PROCESSING ? "PREPARING" : status === SubOrderStatus.READY_FOR_PICKUP ? "READY_FOR_PICKUP" : status === SubOrderStatus.SHIPPED ? "OUT_FOR_DELIVERY" : status === SubOrderStatus.DELIVERED ? "COMPLETED" : status === SubOrderStatus.CANCELLED ? "CANCELLED" : "PENDING";
-    const updated = await prisma.subOrder.update({
-      where: { id: subOrderId },
-      data: { status, fulfillmentStatus },
-      include: {
-        order: {
-          select: {
-            id: true,
-            customerId: true,
-            orderNumber: true,
-          },
-        },
-      },
+    const updated = await prisma.$transaction(async (tx) => {
+      const changed = await tx.subOrder.update({
+        where: { id: subOrderId },
+        data: { status, fulfillmentStatus },
+        include: { order: { select: { id: true, customerId: true, orderNumber: true } } },
+      });
+      const details = status === SubOrderStatus.PROCESSING
+        ? { event: "ORDER_PROCESSING" as const, type: "INFO" as const, title: "Order accepted", message: `Order ${changed.subOrderNumber} is now being prepared.` }
+        : status === SubOrderStatus.CANCELLED
+          ? { event: "ORDER_CANCELLED" as const, type: "WARNING" as const, title: "Order cancelled", message: `Order ${changed.subOrderNumber} has been cancelled.` }
+          : status === SubOrderStatus.SHIPPED
+            ? { event: "ORDER_DISPATCHED" as const, type: "INFO" as const, title: "Order dispatched", message: `Order ${changed.subOrderNumber} is on the way.` }
+            : status === SubOrderStatus.READY_FOR_PICKUP
+              ? { event: "ORDER_READY_FOR_PICKUP" as const, type: "SUCCESS" as const, title: "Ready for pickup", message: `Order ${changed.subOrderNumber} is ready for pickup.` }
+              : { event: "ORDER_DELIVERED" as const, type: "SUCCESS" as const, title: existing.fulfillmentMethod === "PICKUP" ? "Order collected" : "Order delivered", message: `Order ${changed.subOrderNumber} has been ${existing.fulfillmentMethod === "PICKUP" ? "collected" : "delivered"}.` };
+      await NotificationService.create({
+        ...details,
+        idempotencyKey: `order:${changed.id}:status:${status.toLowerCase()}:${changed.order.customerId}`,
+        userId: changed.order.customerId,
+        actionPath: `/orders/${changed.order.id}`,
+      }, tx);
+      return changed;
     });
 
     if (status === SubOrderStatus.DELIVERED) {
-      await prisma.notification.create({
-        data: {
-          userId: updated.order.customerId,
-          type: "SUCCESS",
-          title: existing.fulfillmentMethod === "PICKUP" ? "Order Collected" : "Order Delivered",
-          message: `Your order ${updated.order.orderNumber} (${updated.subOrderNumber}) has been ${existing.fulfillmentMethod === "PICKUP" ? "collected" : "delivered"}.`,
-        },
-      });
       try {
         await MarketplaceEconomicsService.releaseVendorEarningsForSubOrder(updated.id);
       } catch {

@@ -10,9 +10,17 @@ export function DashboardPageHeader({
 }: {
   title: ReactNode;
   description?: ReactNode;
-  backHref: string;
+  backHref?: string;
   trailing?: ReactNode;
   className?: string;
 }) {
-  return <DetailPageHeader title={title} description={description} backHref={backHref} className={className}>{trailing}</DetailPageHeader>;
+  return (
+    <DetailPageHeader
+      title={title}
+      description={description}
+      backHref={backHref}
+      className={className}>
+      {trailing}
+    </DetailPageHeader>
+  );
 }

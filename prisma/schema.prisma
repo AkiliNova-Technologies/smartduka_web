@@ -19,6 +19,60 @@ enum PlatformRole {
   CUSTOMER
 }
 
+enum AnnouncementStatus {
+  DRAFT
+  SCHEDULED
+  PUBLISHED
+  CANCELLED
+  EXPIRED
+}
+
+enum AnnouncementCategory {
+  GENERAL
+  OPERATIONS
+  SECURITY
+  POLICY
+  PRODUCT
+}
+
+enum AnnouncementPriority {
+  NORMAL
+  IMPORTANT
+  CRITICAL
+}
+
+enum AnnouncementAudience {
+  ALL
+  CUSTOMERS
+  VENDORS
+  ADMINISTRATORS
+}
+
+enum AnnouncementPresentation {
+  NOTIFICATION
+  BANNER
+}
+
+enum MarketingNotificationCategory {
+  OFFERS
+  NEW_ARRIVALS
+  RECOMMENDATIONS
+  SEASONAL
+}
+
+enum MarketingNotificationAudience {
+  PROMOTIONAL_OPT_IN
+  RECOMMENDATIONS_OPT_IN
+}
+
+enum MarketingDestinationType {
+  HOME
+  PRODUCT
+  SHOP
+  CATEGORY
+  FEATURED_SECTION
+}
+
 enum VendorStatus {
   PENDING
   ACTIVE
@@ -699,7 +753,15 @@ model User {
   reviewReportsResolved              ReviewReport[]                @relation("ReviewReportResolver")
   auditLogs                          AuditLog[]
   notifications                      Notification[]
+  announcementStates                AnnouncementUserState[]
+  announcementsCreated              Announcement[]                @relation("AnnouncementCreatedBy")
+  announcementsPublished            Announcement[]                @relation("AnnouncementPublishedBy")
+  marketingNotificationStates       MarketingNotificationUserState[]
+  marketingCampaignsCreated         MarketingNotificationCampaign[] @relation("MarketingCampaignCreatedBy")
+  marketingCampaignsPublished       MarketingNotificationCampaign[] @relation("MarketingCampaignPublishedBy")
   devices                            UserDevice[]
+  browserPushSubscriptions           BrowserPushSubscription[]
+  pushDeliveryOutbox                 PushDeliveryOutbox[]
   returnRequests                     ReturnRequest[]               @relation("ReturnRequester")
   refundsRequested                   Refund[]                      @relation("RefundRequester")
   refundsApproved                    Refund[]                      @relation("RefundApprover")
@@ -823,6 +885,9 @@ model UserSettings {
   orderAlertsPush     Boolean @default(true)
   securityAlertsSMS   Boolean @default(true)
   marketingNewsletter Boolean @default(false)
+  promotionalInAppNotifications Boolean @default(false)
+  shoppingRecommendations       Boolean @default(false)
+  promotionalPushNotifications  Boolean @default(false)
 
   twoFactorEnabled       Boolean @default(false)
   buyerProtectionEnabled Boolean @default(true)
@@ -2178,15 +2243,184 @@ model Notification {
   user           User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   type       NotificationType @default(INFO)
+  eventType  String?          @db.VarChar(80)
   title      String
   message    String
   actionPath String?
   readAt     DateTime?
+  deletedAt  DateTime?
   createdAt  DateTime         @default(now())
+  pushOutbox PushDeliveryOutbox?
 
   @@index([vendorId])
   @@index([userId])
   @@index([readAt])
+  @@index([userId, deletedAt, createdAt])
+}
+
+enum BrowserPushSubscriptionStatus {
+  ACTIVE
+  REVOKED
+}
+
+enum PushDeliveryKind {
+  TRANSACTIONAL
+  ANNOUNCEMENT
+  MARKETING
+  TEST
+}
+
+enum PushDeliveryStatus {
+  PENDING
+  PROCESSING
+  RETRYING
+  DELIVERED
+  SKIPPED
+  FAILED
+}
+
+model BrowserPushSubscription {
+  id                String                        @id @default(uuid())
+  userId            String
+  user              User                          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpointHash      String                        @unique @db.VarChar(64)
+  endpointEncrypted String
+  p256dhEncrypted   String
+  authEncrypted     String
+  userAgent         String?                       @db.VarChar(512)
+  deviceName        String?                       @db.VarChar(120)
+  status            BrowserPushSubscriptionStatus @default(ACTIVE)
+  registrationVersion Int                         @default(1)
+  lastSuccessAt     DateTime?
+  lastFailureAt     DateTime?
+  failureCount      Int                           @default(0)
+  revokedAt         DateTime?
+  createdAt         DateTime                      @default(now())
+  updatedAt         DateTime                      @updatedAt
+
+  @@index([userId, status])
+  @@index([status, updatedAt])
+}
+
+model PushDeliveryOutbox {
+  id             String             @id @default(uuid())
+  idempotencyKey String             @unique @db.VarChar(191)
+  userId         String
+  user           User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notificationId String?            @unique
+  notification   Notification?      @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  // Test deliveries are intentionally bound to one verified browser. Normal
+  // business deliveries continue to fan out to the account's active devices.
+  targetSubscriptionId String?
+  targetSubscriptionVersion Int?
+  kind           PushDeliveryKind
+  title          String             @db.VarChar(160)
+  message        String             @db.VarChar(1000)
+  actionPath     String?            @db.VarChar(500)
+  status         PushDeliveryStatus @default(PENDING)
+  attempts       Int                @default(0)
+  nextAttemptAt  DateTime           @default(now())
+  lockedAt       DateTime?
+  lockToken      String?            @db.VarChar(80)
+  deliveredAt    DateTime?
+  lastFailureAt  DateTime?
+  failureCode    String?            @db.VarChar(80)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  @@index([status, nextAttemptAt])
+  @@index([userId, status])
+  @@index([targetSubscriptionId, status])
+}
+
+model Announcement {
+  id             String                   @id @default(uuid())
+  title          String                   @db.VarChar(160)
+  message        String                   @db.VarChar(2000)
+  category       AnnouncementCategory     @default(GENERAL)
+  priority       AnnouncementPriority     @default(NORMAL)
+  audience       AnnouncementAudience
+  presentation   AnnouncementPresentation @default(NOTIFICATION)
+  destination    String?                  @db.VarChar(500)
+  status         AnnouncementStatus       @default(DRAFT)
+  scheduledAt    DateTime?
+  publishedAt    DateTime?
+  expiresAt      DateTime?
+  createdById    String
+  createdBy      User                     @relation("AnnouncementCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  publishedById  String?
+  publishedBy    User?                    @relation("AnnouncementPublishedBy", fields: [publishedById], references: [id], onDelete: SetNull)
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+  userStates     AnnouncementUserState[]
+
+  @@index([status, scheduledAt])
+  @@index([status, publishedAt])
+  @@index([audience, status, publishedAt])
+  @@index([presentation, status, expiresAt])
+}
+
+model AnnouncementUserState {
+  id             String       @id @default(uuid())
+  announcementId String
+  announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  readAt         DateTime?
+  dismissedAt    DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([announcementId, userId])
+  @@index([userId, readAt])
+  @@index([userId, dismissedAt])
+}
+
+model MarketingNotificationCampaign {
+  id                   String                        @id @default(uuid())
+  name                 String                        @db.VarChar(160)
+  title                String                        @db.VarChar(160)
+  message              String                        @db.VarChar(2000)
+  category             MarketingNotificationCategory
+  audience             MarketingNotificationAudience
+  destinationType      MarketingDestinationType
+  destinationReference String?                       @db.VarChar(191)
+  destinationPath      String                        @db.VarChar(500)
+  imageUrl             String?                       @db.VarChar(1000)
+  status               AnnouncementStatus            @default(DRAFT)
+  scheduledAt          DateTime?
+  publishedAt          DateTime?
+  expiresAt            DateTime?
+  createdById          String
+  createdBy            User                          @relation("MarketingCampaignCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  publishedById        String?
+  publishedBy          User?                         @relation("MarketingCampaignPublishedBy", fields: [publishedById], references: [id], onDelete: SetNull)
+  createdAt            DateTime                      @default(now())
+  updatedAt            DateTime                      @updatedAt
+  userStates           MarketingNotificationUserState[]
+
+  @@index([status, scheduledAt])
+  @@index([status, publishedAt, expiresAt])
+  @@index([audience, status, publishedAt])
+  @@index([destinationType, destinationReference])
+}
+
+model MarketingNotificationUserState {
+  id          String                        @id @default(uuid())
+  campaignId  String
+  campaign    MarketingNotificationCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User                          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveredAt DateTime                      @default(now())
+  readAt      DateTime?
+  dismissedAt DateTime?
+  createdAt   DateTime                      @default(now())
+  updatedAt   DateTime                      @updatedAt
+
+  @@unique([campaignId, userId])
+  @@index([userId, deliveredAt])
+  @@index([userId, readAt])
+  @@index([userId, dismissedAt])
 }
 
 model Document {

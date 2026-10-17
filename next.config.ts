@@ -8,6 +8,8 @@ const nextConfig: NextConfig = {
         headers: [
           { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
           { key: "Service-Worker-Allowed", value: "/" },
+          { key: "Content-Type", value: "application/javascript; charset=utf-8" },
+          { key: "Content-Security-Policy", value: "default-src 'self'; script-src 'self'" },
         ],
       },
       {
@@ -44,6 +46,7 @@ const nextConfig: NextConfig = {
     "firebase-admin/auth",
     "jwks-rsa",
     "jose",
+    "web-push",
   ],
   images: {
     remotePatterns: [

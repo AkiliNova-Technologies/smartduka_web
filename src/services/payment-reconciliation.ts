@@ -8,6 +8,7 @@ import {
 import { Decimal } from "@prisma/client/runtime/client";
 import { prisma } from "@/lib/prisma/client";
 import { MtnMomoProvider } from "@/lib/payments/providers/mtn-momo-provider";
+import { NotificationService } from "@/services/notifications";
 
 export type NormalizedProviderEvent = {
   paymentIntentId: string;
@@ -382,26 +383,25 @@ export class PaymentReconciliationService {
             where: { id: intent.orderId, paymentStatus: PaymentStatus.PENDING },
             data: { paymentStatus: PaymentStatus.COMPLETED },
           });
-        await tx.notification.createMany({
-          skipDuplicates: true,
-          data: [
-            {
-              idempotencyKey: `payment:${intent.id}:successful:customer`,
-              userId: intent.order.customerId,
-              type: "SUCCESS",
-              title: "Payment confirmed",
-              message: `Your payment to ${intent.vendor.storeName} was confirmed.`,
-            },
-            {
-              idempotencyKey: `payment:${intent.id}:successful:vendor`,
-              vendorId: intent.vendorId,
-              userId: intent.vendor.ownerId,
-              type: "PAYMENT_RECEIVED",
-              title: "Customer payment confirmed",
-              message: `A customer payment for ${intent.vendor.storeName} was confirmed.`,
-            },
-          ],
-        });
+        await NotificationService.create({
+          event: "PAYMENT_CONFIRMED",
+          idempotencyKey: `payment:${intent.id}:successful:customer`,
+          userId: intent.order.customerId,
+          type: "SUCCESS",
+          title: "Payment confirmed",
+          message: `Your payment to ${intent.vendor.storeName} was confirmed.`,
+          actionPath: `/orders/${intent.orderId}`,
+        }, tx);
+        await NotificationService.create({
+          event: "PAYMENT_CONFIRMED",
+          idempotencyKey: `payment:${intent.id}:successful:vendor`,
+          vendorId: intent.vendorId,
+          userId: intent.vendor.ownerId,
+          type: "PAYMENT_RECEIVED",
+          title: "Customer payment confirmed",
+          message: `A customer payment for ${intent.vendor.storeName} was confirmed.`,
+          actionPath: "/vendor/orders",
+        }, tx);
       }
       if (event.status === "REVERSED") {
         await tx.order.updateMany({
@@ -427,29 +427,36 @@ export class PaymentReconciliationService {
           data: [
             {
               idempotencyKey: `payment:${intent.id}:reversed:customer`,
+              eventType: "PAYMENT_REVERSED",
               userId: intent.order.customerId,
               type: "WARNING",
               title: "Payment reversed — review required",
               message:
                 "There is an issue with this payment and it is being reviewed. Do not pay again yet.",
+              actionPath: `/orders/${intent.orderId}`,
             },
             {
               idempotencyKey: `payment:${intent.id}:reversed:vendor`,
+              eventType: "PAYMENT_REVERSED",
               vendorId: intent.vendorId,
               userId: intent.vendor.ownerId,
               type: "WARNING",
               title: "Payment reversed — review required",
               message: `A customer payment for ${intent.vendor.storeName} was reversed. Preserve fulfillment history and contact support before proceeding.`,
+              actionPath: "/vendor/orders",
             },
           ],
         });
       } else if (["FAILED", "CANCELLED", "EXPIRED"].includes(event.status))
         await tx.notification.create({
           data: {
+            idempotencyKey: `payment:${intent.id}:${event.status.toLowerCase()}:customer`,
+            eventType: "PAYMENT_FAILED",
             userId: intent.order.customerId,
             type: "ERROR",
             title: "Payment was not completed",
             message: "Your order remains awaiting payment.",
+            actionPath: `/orders/${intent.orderId}`,
           },
         });
       return { outcome: "TRANSITION_APPLIED" as const, status: event.status };

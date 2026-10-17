@@ -1,17 +1,27 @@
-import Image from "next/image";
+import { ImageIcon } from "lucide-react";
 import type { PromotionFormValue } from "./types";
+import { HeroCarousel } from "@/components/marketing/promotion-carousel";
+import { MarketingPreviewEmpty, MarketingPreviewShell } from "@/components/marketing/admin/marketing-preview-shell";
 
 export function PromotionPreview({ form }: { form: PromotionFormValue }) {
+  const hasContent = Boolean(form.title.trim() || form.desktopImageUrl.trim());
   return (
-    <section className="overflow-hidden rounded-xl border bg-card">
-      <p className="border-b px-4 py-2 text-sm font-medium">Live preview</p>
-      <div className="relative min-h-44 overflow-hidden bg-muted p-6 text-white">
-        {form.desktopImageUrl && <Image src={form.desktopImageUrl} alt="" fill sizes="(max-width: 768px) 100vw, 32rem" className="object-cover" />}
-        <div className="relative max-w-xs drop-shadow-sm">
-          <p className="text-xl font-semibold">{form.title || "Promotion title"}</p>
-          {form.subtitle && <p className="mt-2 text-sm text-white/90">{form.subtitle}</p>}
-        </div>
-      </div>
-    </section>
+    <MarketingPreviewShell
+      title="Homepage hero preview"
+      description="Desktop and mobile use the same presentation customers see."
+      empty={!hasContent ? <MarketingPreviewEmpty illustration={<ImageIcon aria-hidden="true" className="size-8 text-muted-foreground" />} title="Your next featured story starts here" description="Add your banner image and content to see how it will appear on the Mwezora homepage." /> : undefined}
+    >
+      {hasContent ? <HeroCarousel size="compact" slides={[{
+        id: "admin-preview",
+        title: form.title.trim() || "Your promotion headline",
+        description: form.subtitle?.trim() || "Add supporting text to give customers more context.",
+        ctaLabel: form.primaryCtaLabel?.trim() || "Explore offer",
+        href: "#preview",
+        desktopImage: form.desktopImageUrl || "/illustrations/empty-deals.svg",
+        mobileImage: form.mobileImageUrl || form.desktopImageUrl || "/illustrations/empty-deals.svg",
+        imageAlt: form.title.trim() || "Promotion preview",
+        textScrim: true,
+      }]} /> : null}
+    </MarketingPreviewShell>
   );
 }

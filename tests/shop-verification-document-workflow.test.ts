@@ -38,7 +38,7 @@ describe("shop verification document submission", () => {
     mocks.transaction.mockImplementation((callback: (tx: unknown) => unknown) => callback({
       shopVerificationApplication: { create: mocks.applicationCreate, update: mocks.applicationUpdate }, shopVerificationDocument: { createMany: mocks.submissionCreateMany },
       vendorProfile: { update: mocks.vendorUpdate }, shopVerificationActivity: { create: mocks.activityCreate },
-      notification: { create: mocks.notificationCreate, createMany: mocks.notificationCreateMany }, auditLog: { create: mocks.auditCreate }, user: { findMany: mocks.adminFindMany },
+      notification: { create: mocks.notificationCreate, createMany: mocks.notificationCreateMany, upsert: mocks.notificationCreate }, auditLog: { create: mocks.auditCreate }, user: { findMany: mocks.adminFindMany },
     }));
   });
 
@@ -56,7 +56,7 @@ describe("shop verification document submission", () => {
     ]) });
     expect(mocks.vendorUpdate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ verificationStatus: "PENDING" }) }));
     expect(mocks.auditCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ action: "SHOP_VERIFICATION_SUBMITTED", entityId: "verification-1" }) });
-    expect(mocks.notificationCreateMany).toHaveBeenCalledWith({ data: [expect.objectContaining({ userId: "admin-1", actionPath: "/admin/verifications/verification-1" })] });
+    expect(mocks.notificationCreate).toHaveBeenCalledWith(expect.objectContaining({ create: expect.objectContaining({ userId: "admin-1", actionPath: "/admin/verifications/verification-1" }) }));
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/admin/verifications");
   });
 

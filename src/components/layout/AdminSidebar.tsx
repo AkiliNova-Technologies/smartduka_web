@@ -3,6 +3,7 @@
 import * as React from "react";
 import {
   CircleAlert,
+  BellRing,
   DatabaseZap,
   LayoutDashboard,
   Landmark,
@@ -54,10 +55,12 @@ export function AdminSidebar(
 ) {
   const { userRole } = useAuth();
   const canManageBilling = ["SUPER_ADMIN", "ADMIN", "BILLING"].includes(userRole ?? "");
+  const canManageAnnouncements = ["SUPER_ADMIN", "ADMIN"].includes(userRole ?? "");
   const groups = navigationGroups.map((group) => {
     if (group.label === "Payments") return { ...group, items: canManageBilling ? [...group.items, { label: "Platform Revenue", href: "/admin/revenue", icon: ReceiptText }] : [] };
     if (group.label === "Marketing" && canManageBilling) return { ...group, items: [...group.items, { label: "Promotion capacity", href: "/admin/marketing/capacity", icon: LayoutGrid }] };
     if (group.label === "Operations" && userRole === "SUPER_ADMIN") return { ...group, items: [...group.items, { label: "Test data cleanup", href: "/admin/test-data-cleanup", icon: DatabaseZap }] };
+    if (group.label === "Customers" && canManageAnnouncements) return { ...group, items: [...group.items, { label: "Notifications", href: "/admin/notifications", icon: BellRing }] };
     return group;
   }).filter((group) => group.items.length);
   return <DashboardSidebar {...props} workspace={{ name: `${brand.name} Admin`, description: "Administration workspace", icon: ShieldCheck }} navigationGroups={groups} />;
