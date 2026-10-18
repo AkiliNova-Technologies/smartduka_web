@@ -25,3 +25,16 @@ export function subOrderFulfillmentLabel(status: string, method: "DELIVERY" | "P
   if (status === "CANCELLED" || status === "REFUNDED") return "Cancelled";
   return "Awaiting fulfillment";
 }
+
+/** Keeps historical fulfillment fields intact while avoiding repeated display text. */
+export function uniqueFulfillmentText(...values: Array<string | null | undefined>) {
+  const seen = new Set<string>();
+  return values.flatMap((value) => {
+    const text = value?.trim();
+    if (!text) return [];
+    const key = text.replace(/\s+/g, " ").toLocaleLowerCase("en-UG");
+    if (seen.has(key)) return [];
+    seen.add(key);
+    return [text];
+  });
+}

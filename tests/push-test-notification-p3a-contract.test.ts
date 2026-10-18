@@ -22,8 +22,8 @@ describe("P3A test notification boundaries", () => {
     const schema = read("prisma/schema.prisma");
     const service = read("src/services/push-delivery-outbox.ts");
     expect(schema).toContain("TEST");
-    expect(schema).toContain("targetSubscriptionId String?");
-    expect(schema).toContain("targetSubscriptionVersion Int?");
+    expect(schema).toMatch(/targetSubscriptionId\s+String\?/);
+    expect(schema).toMatch(/targetSubscriptionVersion\s+Int\?/);
     expect(service).toContain("static async enqueueTest");
     expect(service).toContain("kind: PushDeliveryKind.TEST");
     expect(service).toContain("targetSubscriptionId: subscription.id");

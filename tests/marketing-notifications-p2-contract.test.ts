@@ -48,8 +48,8 @@ describe("P2 consent, limits and destinations", () => {
   });
 
   it("enforces consent on the server without affecting transactional notifications", () => {
-    expect(service).toContain("if (!user?.settings?.promotionalInAppNotifications) return [] as MarketingNotificationAudience[]");
-    expect(service).toContain("user.settings.shoppingRecommendations");
+    expect(service).toContain("eligibleMarketingAudiences(user?.settings)");
+    expect(read("src/lib/marketing-campaign-eligibility.ts")).toContain("settings.shoppingRecommendations");
     expect(service.match(/eligibleAudiencesForUser/g)?.length).toBeGreaterThanOrEqual(4);
     expect(read("src/services/notifications.ts")).not.toContain("promotionalInAppNotifications");
   });

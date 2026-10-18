@@ -2,6 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { AlertCircle, ArrowRight, Calendar, Package } from "lucide-react";
 import { useCustomerOrders } from "@/hooks/use-customer-orders";
 import {
@@ -52,6 +54,11 @@ export function OrdersClient({
   filter: string;
 }) {
   const { result, loading, error, retry } = useCustomerOrders(page, filter);
+  const router = useRouter();
+  useEffect(() => {
+    if (loading || error || !result || result.data.length || page <= 1) return;
+    router.replace(href(Math.max(1, result.meta.pageCount), filter), { scroll: false });
+  }, [error, filter, loading, page, result, router]);
   return (
     <PageContainer className="py-6 pb-24 sm:py-8">
       <PageHeader
@@ -127,7 +134,7 @@ export function OrdersClient({
                   <div className="flex flex-col gap-5 lg:flex-row lg:items-center">
                     <div className="flex min-w-0 flex-1 gap-4">
                       <div
-                        className="flex shrink-0 -space-x-3"
+                        className="hidden shrink-0 -space-x-3 sm:flex"
                         aria-label={`${itemCount} purchased items`}>
                         {previews.length ? (
                           previews.map((item, index) =>
@@ -186,13 +193,15 @@ export function OrdersClient({
                               .join(" · ")}
                           </p>
                         )}
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          <StatusBadge tone={payment.tone}>
-                            {payment.label}
-                          </StatusBadge>
-                          <StatusBadge tone={fulfillment.tone}>
-                            {fulfillment.label}
-                          </StatusBadge>
+                        <div className="mt-3 flex flex-wrap gap-x-3 gap-y-2">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs text-muted-foreground">Payment:</span>
+                            <StatusBadge tone={payment.tone}>{payment.label}</StatusBadge>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs text-muted-foreground">Fulfillment:</span>
+                            <StatusBadge tone={fulfillment.tone}>{fulfillment.label}</StatusBadge>
+                          </div>
                         </div>
                       </div>
                     </div>

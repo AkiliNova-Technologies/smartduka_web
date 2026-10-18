@@ -126,13 +126,8 @@ export class SettingsService {
    */
   static async updateSettings(userId: string, data: UserSettingsPayload) {
     const safeData = sanitizeUserSettingsPayload(data);
-    return prisma.userSettings.upsert({
-      where: { userId },
-      update: {
-        ...safeData,
-        updatedAt: new Date(),
-      },
-      create: {
+    return prisma.$transaction(async (tx) => {
+      const settings = await tx.userSettings.upsert({ where: { userId }, update: { ...safeData, updatedAt: new Date() }, create: {
         userId,
         fullName: safeData.fullName ?? null,
         phoneNumber: safeData.phoneNumber ?? null,
@@ -154,7 +149,13 @@ export class SettingsService {
         themeMode: safeData.themeMode ?? "system",
         accentColor: safeData.accentColor ?? "classic",
         personality: safeData.personality ?? "LOVELY",
-      },
+      } });
+      if (safeData.promotionalPushNotifications === false || safeData.promotionalInAppNotifications === false) {
+        await tx.pushDeliveryOutbox.updateMany({ where: { userId, marketingCampaignId: { not: null }, status: { in: ["PENDING", "RETRYING"] } }, data: { status: "SKIPPED", failureCode: "MARKETING_CONSENT_REVOKED", lastFailureAt: new Date() } });
+      } else if (safeData.shoppingRecommendations === false) {
+        await tx.pushDeliveryOutbox.updateMany({ where: { userId, marketingCampaign: { audience: "RECOMMENDATIONS_OPT_IN" }, status: { in: ["PENDING", "RETRYING"] } }, data: { status: "SKIPPED", failureCode: "RECOMMENDATION_CONSENT_REVOKED", lastFailureAt: new Date() } });
+      }
+      return settings;
     });
   }
 }

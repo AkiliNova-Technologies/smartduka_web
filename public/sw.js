@@ -39,7 +39,7 @@ self.addEventListener("push", (event) => {
   const path = safeInternalPath(payload.path);
   // Only bounded server-generated tags are honored. Transactional tags are
   // opaque event hashes, so they do not disclose order or account identifiers.
-  const tag = payload.tag === "mwezora-push-test" || (typeof payload.tag === "string" && /^mwezora:transactional:[a-f0-9]{24}$/.test(payload.tag))
+  const tag = payload.tag === "mwezora-push-test" || (typeof payload.tag === "string" && (/^mwezora:transactional:[a-f0-9]{24}$/.test(payload.tag) || /^mwezora:announcement:[a-f0-9]{24}$/.test(payload.tag) || /^mwezora:marketing:[a-f0-9]{24}$/.test(payload.tag)))
     ? payload.tag
     : `mwezora:${path}:${title}`;
   event.waitUntil(self.registration.showNotification(title, {

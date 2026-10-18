@@ -1,5 +1,6 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider } from "firebase/auth";
+import { connectAuthEmulator, getAuth, GoogleAuthProvider } from "firebase/auth";
+import { assertSafeFirebaseAuthEmulator } from "@/lib/firebase/emulator-safety";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -13,6 +14,11 @@ const firebaseConfig = {
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);
+const emulatorHost = process.env.NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_HOST;
+if (emulatorHost) {
+  const safe = assertSafeFirebaseAuthEmulator({ host: emulatorHost, projectId: firebaseConfig.projectId ?? "" });
+  if (!auth.emulatorConfig) connectAuthEmulator(auth, `http://${safe.host}`, { disableWarnings: true });
+}
 export const googleProvider = new GoogleAuthProvider();
 
 export { app };

@@ -1,11 +1,14 @@
 import {
   AnnouncementAudience,
   AnnouncementCategory,
+  AnnouncementContentClass,
   AnnouncementPresentation,
   AnnouncementPriority,
+  AnnouncementPushDispatchStatus,
   AnnouncementStatus,
   PlatformRole,
   Prisma,
+  PushDeliveryStatus,
   UserStatus,
 } from "@prisma/client";
 import { requireAdminContext } from "@/lib/auth/admin-context";
@@ -25,6 +28,8 @@ export interface AnnouncementInput {
   priority: AnnouncementPriority;
   audience: AnnouncementAudience;
   presentation?: AnnouncementPresentation;
+  contentClass?: AnnouncementContentClass;
+  pushEnabled?: boolean;
   destination?: string | null;
   scheduledAt?: string | null;
   expiresAt?: string | null;
@@ -56,7 +61,10 @@ function validated(input: AnnouncementInput, now = new Date()) {
   if (!Object.values(AnnouncementAudience).includes(input.audience)) throw new AnnouncementError("Choose a valid audience.");
   const presentation = input.presentation ?? AnnouncementPresentation.NOTIFICATION;
   if (!Object.values(AnnouncementPresentation).includes(presentation)) throw new AnnouncementError("Choose a valid presentation.");
-  return { title: text(input.title, 160, "Title"), message: text(input.message, 2000, "Message"), category: input.category, priority: input.priority, audience: input.audience, presentation, destination, scheduledAt, expiresAt };
+  const contentClass = input.contentClass ?? AnnouncementContentClass.ESSENTIAL;
+  if (!Object.values(AnnouncementContentClass).includes(contentClass)) throw new AnnouncementError("Choose a valid announcement classification.");
+  if (input.category === AnnouncementCategory.PRODUCT && contentClass !== AnnouncementContentClass.PROMOTIONAL) throw new AnnouncementError("Product announcements must be classified as promotional.");
+  return { title: text(input.title, 160, "Title"), message: text(input.message, 2000, "Message"), category: input.category, priority: input.priority, audience: input.audience, presentation, contentClass, pushEnabled: input.pushEnabled === true, destination, scheduledAt, expiresAt };
 }
 
 function audienceFor(user: { platformRole: PlatformRole | null; vendorId: string | null; ownedVendor: { id: string } | null }) {
@@ -75,8 +83,9 @@ async function userAudiences(userId: string) {
 
 const adminSelect = {
   id: true, title: true, message: true, category: true, priority: true, audience: true,
-  presentation: true, destination: true, status: true, scheduledAt: true, publishedAt: true,
+  presentation: true, contentClass: true, pushEnabled: true, destination: true, status: true, scheduledAt: true, publishedAt: true,
   expiresAt: true, createdAt: true, updatedAt: true,
+  pushDispatch: { select: { status: true, processedRecipients: true, queuedRecipients: true, completedAt: true } },
   createdBy: { select: { id: true, name: true } }, publishedBy: { select: { id: true, name: true } },
 } satisfies Prisma.AnnouncementSelect;
 
@@ -84,7 +93,12 @@ export class AnnouncementService {
   static async adminList() {
     await requireAdminContext("platform:manage_announcements");
     await this.advanceLifecycle();
-    return prisma.announcement.findMany({ select: adminSelect, orderBy: { createdAt: "desc" }, take: 250 });
+    const announcements = await prisma.announcement.findMany({ select: adminSelect, orderBy: { createdAt: "desc" }, take: 250 });
+    const counts = await prisma.pushDeliveryOutbox.groupBy({ by: ["announcementId", "status"], where: { announcementId: { in: announcements.map(({ id }) => id) } }, _count: { _all: true } });
+    return announcements.map((announcement) => {
+      const count = (status: PushDeliveryStatus) => counts.find((row) => row.announcementId === announcement.id && row.status === status)?._count._all ?? 0;
+      return { ...announcement, pushDelivery: { accepted: count(PushDeliveryStatus.DELIVERED), retrying: count(PushDeliveryStatus.RETRYING), failed: count(PushDeliveryStatus.FAILED), skipped: count(PushDeliveryStatus.SKIPPED) } };
+    });
   }
 
   static async create(input: AnnouncementInput) {
@@ -123,6 +137,7 @@ export class AnnouncementService {
       const status = scheduled ? AnnouncementStatus.SCHEDULED : AnnouncementStatus.PUBLISHED;
       const changed = await tx.announcement.updateMany({ where: { id, status: { in: [AnnouncementStatus.DRAFT, AnnouncementStatus.SCHEDULED] } }, data: { status, publishedAt: scheduled ? null : now, publishedById: actor.userId } });
       if (changed.count !== 1) throw new AnnouncementError("Announcement was changed by another administrator.", "CONFLICT");
+      if (!scheduled && current.pushEnabled) await tx.announcementPushDispatch.upsert({ where: { announcementId: id }, update: {}, create: { announcementId: id } });
       await tx.auditLog.create({ data: { userId: actor.userId, action: scheduled ? "ANNOUNCEMENT_SCHEDULED" : "ANNOUNCEMENT_PUBLISHED", entity: "Announcement", entityId: id, newValues: { status, scheduledAt: current.scheduledAt } } });
       return tx.announcement.findUniqueOrThrow({ where: { id }, select: adminSelect });
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
@@ -130,9 +145,12 @@ export class AnnouncementService {
 
   static async cancel(id: string) {
     const actor = await requireAdminContext("platform:manage_announcements");
+    const now = new Date();
     return prisma.$transaction(async (tx) => {
-      const changed = await tx.announcement.updateMany({ where: { id, status: { in: [AnnouncementStatus.DRAFT, AnnouncementStatus.SCHEDULED] } }, data: { status: AnnouncementStatus.CANCELLED } });
-      if (changed.count !== 1) throw new AnnouncementError("Only draft or scheduled announcements can be cancelled.", "CONFLICT");
+      const changed = await tx.announcement.updateMany({ where: { id, status: { in: [AnnouncementStatus.DRAFT, AnnouncementStatus.SCHEDULED, AnnouncementStatus.PUBLISHED] } }, data: { status: AnnouncementStatus.CANCELLED } });
+      if (changed.count !== 1) throw new AnnouncementError("Only active announcements can be cancelled.", "CONFLICT");
+      await tx.announcementPushDispatch.updateMany({ where: { announcementId: id, status: { in: [AnnouncementPushDispatchStatus.PENDING, AnnouncementPushDispatchStatus.PROCESSING] } }, data: { status: AnnouncementPushDispatchStatus.CANCELLED, cancelledAt: now, lockedAt: null, lockToken: null } });
+      await tx.pushDeliveryOutbox.updateMany({ where: { announcementId: id, status: { in: [PushDeliveryStatus.PENDING, PushDeliveryStatus.RETRYING, PushDeliveryStatus.PROCESSING] } }, data: { status: PushDeliveryStatus.SKIPPED, failureCode: "ANNOUNCEMENT_CANCELLED", lastFailureAt: now, lockedAt: null, lockToken: null } });
       await tx.auditLog.create({ data: { userId: actor.userId, action: "ANNOUNCEMENT_CANCELLED", entity: "Announcement", entityId: id } });
       return tx.announcement.findUniqueOrThrow({ where: { id }, select: adminSelect });
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
@@ -140,10 +158,16 @@ export class AnnouncementService {
 
   static async advanceLifecycle(now = new Date()) {
     return prisma.$transaction(async (tx) => {
-      const due = await tx.announcement.findMany({ where: { status: AnnouncementStatus.SCHEDULED, scheduledAt: { lte: now }, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] }, select: { id: true } });
+      const due = await tx.announcement.findMany({ where: { status: AnnouncementStatus.SCHEDULED, scheduledAt: { lte: now }, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] }, select: { id: true, pushEnabled: true } });
       const expiring = await tx.announcement.findMany({ where: { status: { in: [AnnouncementStatus.SCHEDULED, AnnouncementStatus.PUBLISHED] }, expiresAt: { lte: now } }, select: { id: true } });
       const published = await tx.announcement.updateMany({ where: { status: AnnouncementStatus.SCHEDULED, scheduledAt: { lte: now }, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] }, data: { status: AnnouncementStatus.PUBLISHED, publishedAt: now } });
       const expired = await tx.announcement.updateMany({ where: { status: { in: [AnnouncementStatus.SCHEDULED, AnnouncementStatus.PUBLISHED] }, expiresAt: { lte: now } }, data: { status: AnnouncementStatus.EXPIRED } });
+      const pushDue = due.filter((item) => item.pushEnabled);
+      if (pushDue.length) await tx.announcementPushDispatch.createMany({ data: pushDue.map(({ id }) => ({ announcementId: id })), skipDuplicates: true });
+      if (expiring.length) {
+        await tx.announcementPushDispatch.updateMany({ where: { announcementId: { in: expiring.map(({ id }) => id) }, status: { in: [AnnouncementPushDispatchStatus.PENDING, AnnouncementPushDispatchStatus.PROCESSING] } }, data: { status: AnnouncementPushDispatchStatus.EXPIRED, cancelledAt: now, lockedAt: null, lockToken: null } });
+        await tx.pushDeliveryOutbox.updateMany({ where: { announcementId: { in: expiring.map(({ id }) => id) }, status: { in: [PushDeliveryStatus.PENDING, PushDeliveryStatus.RETRYING, PushDeliveryStatus.PROCESSING] } }, data: { status: PushDeliveryStatus.SKIPPED, failureCode: "ANNOUNCEMENT_EXPIRED", lastFailureAt: now, lockedAt: null, lockToken: null } });
+      }
       if (published.count) await tx.auditLog.createMany({ data: due.map(({ id }) => ({ action: "ANNOUNCEMENT_PUBLISHED", entity: "Announcement", entityId: id, newValues: { status: AnnouncementStatus.PUBLISHED, scheduler: true } })) });
       if (expired.count) await tx.auditLog.createMany({ data: expiring.map(({ id }) => ({ action: "ANNOUNCEMENT_EXPIRED", entity: "Announcement", entityId: id, newValues: { status: AnnouncementStatus.EXPIRED } })) });
       return { published: published.count, expired: expired.count };

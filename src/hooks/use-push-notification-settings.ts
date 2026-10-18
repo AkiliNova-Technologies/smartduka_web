@@ -40,21 +40,21 @@ export function usePushNotificationSettings() {
   }, []);
   React.useEffect(() => { const timer = window.setTimeout(() => void refresh(), 0); return () => window.clearTimeout(timer); }, [refresh]);
   const enable = async () => {
-    const current = browserState(); if (!current.supported) return;
-    if (current.ios && !current.standalone) { toast.error("On iPhone and iPad, add Mwezora to your Home Screen before enabling notifications."); return; }
+    const current = browserState(); if (!current.supported) return false;
+    if (current.ios && !current.standalone) { toast.error("On iPhone and iPad, add Mwezora to your Home Screen before enabling notifications."); return false; }
     setWorking(true);
     try {
       const config = await pushClient.configuration();
       if (!config.enabled || !config.publicKey) throw new Error("Push notifications are not configured for this environment.");
-      const nextPermission = await Notification.requestPermission(); setPermission(nextPermission); if (nextPermission !== "granted") return;
+      const nextPermission = await Notification.requestPermission(); setPermission(nextPermission); if (nextPermission !== "granted") return false;
       const registration = (await navigator.serviceWorker.getRegistration("/")) ?? (await navigator.serviceWorker.register("/sw.js", { scope: "/", updateViaCache: "none" }));
       const currentSubscription = await registration.pushManager.getSubscription();
       const subscription = currentSubscription ?? (await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: fromBase64Url(config.publicKey) }));
       const serialized = subscription.toJSON();
       if (!serialized.endpoint || !serialized.keys?.p256dh || !serialized.keys.auth) throw new Error("Your browser returned an incomplete push subscription. Please try again.");
       await pushClient.register({ endpoint: serialized.endpoint, expirationTime: serialized.expirationTime ?? null, keys: { p256dh: serialized.keys.p256dh, auth: serialized.keys.auth }, deviceName: navigator.platform || undefined });
-      setSubscribed(true); toast.success("Device notifications are enabled.");
-    } catch (error) { toast.error(error instanceof Error ? error.message : "Unable to enable notifications."); } finally { setWorking(false); }
+      setSubscribed(true); toast.success("Device notifications are enabled."); return true;
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Unable to enable notifications."); return false; } finally { setWorking(false); }
   };
   const disable = async () => {
     setWorking(true);

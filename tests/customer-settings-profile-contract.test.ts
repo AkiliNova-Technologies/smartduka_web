@@ -9,7 +9,7 @@ const provider = read("src/providers/UserDataProvider.tsx");
 describe("customer profile settings", () => {
   it("keeps email read-only and exposes only supported profile fields", () => {
     expect(settings).toContain('id="email-address"');
-    expect(settings).toContain('readOnly aria-readonly="true"');
+    expect(settings).toMatch(/readOnly\s+aria-readonly="true"/);
     expect(settings).toContain("fullName: normalizedProfile.fullName");
     expect(settings).toContain("phoneNumber: normalizedProfile.phone || null");
     expect(settings).not.toContain("profile photo upload");
@@ -25,7 +25,7 @@ describe("customer profile settings", () => {
 
   it("persists delivery district and retains the established sign-out flow", () => {
     expect(settings).toContain("updateSettings({ deliveryDistrict: district || null })");
-    expect(settings).toContain("await logout(); router.replace(\"/\")");
+    expect(settings).toMatch(/await logout\(\);\s+router\.replace\("\/"\)/);
     expect(settings).toContain("Delivery preferences");
     expect(settings).toContain("Account actions");
   });

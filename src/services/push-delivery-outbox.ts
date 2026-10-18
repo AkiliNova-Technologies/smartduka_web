@@ -1,12 +1,19 @@
 import { createHash, randomUUID } from "node:crypto";
 import webpush from "web-push";
-import { BrowserPushSubscriptionStatus, PushDeliveryKind, PushDeliveryStatus, type Prisma } from "@prisma/client";
+import { AnnouncementContentClass, AnnouncementStatus, BrowserPushSubscriptionStatus, PushDeliveryKind, PushDeliveryStatus, UserStatus, type Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma/client";
 import { BrowserPushSubscriptionService } from "@/services/browser-push-subscriptions";
 import { getWebPushConfiguration } from "@/lib/web-push-config";
+import { AnnouncementPushService } from "@/services/announcement-push";
+import { MarketingPushService } from "@/services/marketing-push";
+import { resolveMarketingDestination } from "@/services/marketing-notifications";
+import { marketingConsentEligible, marketingSettingsWhere } from "@/lib/marketing-campaign-eligibility";
 
 const MAX_ATTEMPTS = 5;
 const BATCH_SIZE = 25;
+const STALE_LOCK_MS = 10 * 60_000;
+const INVOCATION_BUDGET_MS = 20_000;
+const SEND_TIMEOUT_MS = 5_000;
 const transientStatuses = new Set([408, 425, 429, 500, 502, 503, 504]);
 const INTERNAL_PATH = /^\/(?!\/)[A-Za-z0-9/_?=&.%-]*$/;
 const safePath = (value?: string | null) => value && value.trim().length <= 500 && INTERNAL_PATH.test(value.trim()) ? value.trim() : null;
@@ -118,25 +125,45 @@ export class PushDeliveryOutboxService {
   }
 
   static async run(now = new Date()) {
-    if (!getWebPushConfiguration()) return { claimed: 0, delivered: 0, retried: 0, failed: 0, skipped: 0, disabled: true };
+    const fanout = await AnnouncementPushService.runFanout(now);
+    const marketingFanout = await MarketingPushService.runFanout(now);
+    if (!getWebPushConfiguration()) return { claimed: 0, delivered: 0, retried: 0, failed: 0, skipped: 0, disabled: true, fanout, marketingFanout };
+    await prisma.pushDeliveryOutbox.updateMany({
+      where: { status: PushDeliveryStatus.PROCESSING, lockedAt: { lt: new Date(now.getTime() - STALE_LOCK_MS) } },
+      data: { status: PushDeliveryStatus.RETRYING, lockedAt: null, lockToken: null, nextAttemptAt: now, failureCode: "WORKER_LOCK_EXPIRED", lastFailureAt: now },
+    });
     const candidates = await prisma.pushDeliveryOutbox.findMany({ where: { status: { in: [PushDeliveryStatus.PENDING, PushDeliveryStatus.RETRYING] }, nextAttemptAt: { lte: now } }, orderBy: { nextAttemptAt: "asc" }, take: BATCH_SIZE, select: { id: true } });
     const token = randomUUID();
-    const claimed: string[] = [];
+    const deadline = Date.now() + INVOCATION_BUDGET_MS;
+    const results = { claimed: 0, delivered: 0, retried: 0, failed: 0, skipped: 0, disabled: false };
     for (const candidate of candidates) {
+      if (Date.now() >= deadline) break;
       const update = await prisma.pushDeliveryOutbox.updateMany({ where: { id: candidate.id, status: { in: [PushDeliveryStatus.PENDING, PushDeliveryStatus.RETRYING] }, nextAttemptAt: { lte: now } }, data: { status: PushDeliveryStatus.PROCESSING, lockedAt: now, lockToken: token, attempts: { increment: 1 } } });
-      if (update.count) claimed.push(candidate.id);
-    }
-    const results = { claimed: claimed.length, delivered: 0, retried: 0, failed: 0, skipped: 0, disabled: false };
-    for (const id of claimed) {
-      const result = await this.deliverClaim(id, token);
+      if (!update.count) continue;
+      results.claimed += 1;
+      const result = await this.deliverClaim(candidate.id, token, deadline);
       results[result] += 1;
     }
-    return results;
+    return { ...results, fanout, marketingFanout };
   }
 
-  private static async deliverClaim(id: string, token: string): Promise<"delivered" | "retried" | "failed" | "skipped"> {
-    const job = await prisma.pushDeliveryOutbox.findFirst({ where: { id, status: PushDeliveryStatus.PROCESSING, lockToken: token }, include: { user: { select: { browserPushSubscriptions: { where: { status: BrowserPushSubscriptionStatus.ACTIVE }, select: { id: true, registrationVersion: true, endpointEncrypted: true, p256dhEncrypted: true, authEncrypted: true } } } } } });
+  private static async deliverClaim(id: string, token: string, deadline: number): Promise<"delivered" | "retried" | "failed" | "skipped"> {
+    const job = await prisma.pushDeliveryOutbox.findFirst({ where: { id, status: PushDeliveryStatus.PROCESSING, lockToken: token }, include: { announcement: true, marketingCampaign: true, user: { select: { status: true, deletedAt: true, settings: { select: { promotionalInAppNotifications: true, promotionalPushNotifications: true, shoppingRecommendations: true } }, browserPushSubscriptions: { where: { status: BrowserPushSubscriptionStatus.ACTIVE }, select: { id: true, registrationVersion: true, endpointEncrypted: true, p256dhEncrypted: true, authEncrypted: true } } } } } });
     if (!job) return "skipped";
+    if (job.announcementId) {
+      const valid = job.announcement?.pushEnabled && job.announcement.status === AnnouncementStatus.PUBLISHED && (!job.announcement.expiresAt || job.announcement.expiresAt > new Date()) && job.user.status === UserStatus.ACTIVE && !job.user.deletedAt && (job.announcement.contentClass !== AnnouncementContentClass.PROMOTIONAL || job.user.settings?.promotionalPushNotifications === true);
+      if (!valid) {
+        await this.finish(job.id, token, PushDeliveryStatus.SKIPPED, "ANNOUNCEMENT_INELIGIBLE");
+        return "skipped";
+      }
+    }
+    if (job.marketingCampaignId) {
+      const campaign = job.marketingCampaign;
+      const valid = campaign?.pushEnabled && campaign.status === AnnouncementStatus.PUBLISHED && !!campaign.publishedAt && campaign.publishedAt <= new Date() && (!campaign.expiresAt || campaign.expiresAt > new Date()) && job.user.status === UserStatus.ACTIVE && !job.user.deletedAt && marketingConsentEligible(job.user.settings, campaign.audience, true);
+      if (!valid) { await this.finish(job.id, token, PushDeliveryStatus.SKIPPED, "MARKETING_CAMPAIGN_INELIGIBLE"); return "skipped"; }
+      try { await resolveMarketingDestination(campaign.destinationType, campaign.destinationReference); }
+      catch { await this.finish(job.id, token, PushDeliveryStatus.SKIPPED, "MARKETING_DESTINATION_UNAVAILABLE"); return "skipped"; }
+    }
     // A TEST job is bound to exactly the subscription that was ownership-checked
     // when it was enqueued. A status change or account reassignment makes it skip.
     const subscriptions = job.targetSubscriptionId
@@ -149,13 +176,43 @@ export class PushDeliveryOutboxService {
     const config = getWebPushConfiguration();
     if (!config) return this.retryOrFail(job.id, token, job.attempts, "CONFIGURATION_UNAVAILABLE");
     webpush.setVapidDetails(config.subject, config.publicKey, config.privateKey);
-    const tag = notificationTag(job);
+    const tag = job.announcementId ? AnnouncementPushService.notificationTag(job.announcementId) : job.marketingCampaignId ? MarketingPushService.notificationTag(job.marketingCampaignId) : notificationTag(job);
     const payload = JSON.stringify({ title: job.title, body: job.message, path: safePath(job.actionPath) ?? "/notifications", ...(tag ? { tag } : {}) });
     let sent = 0;
     let transient = false;
     for (const subscription of subscriptions) {
+      if (Date.now() >= deadline) {
+        if (!sent) return this.retryOrFail(job.id, token, job.attempts, "WORKER_TIME_BUDGET");
+        break;
+      }
+      if (job.announcementId) {
+        const eligible = await prisma.browserPushSubscription.findFirst({
+          where: {
+            id: subscription.id,
+            userId: job.userId,
+            status: BrowserPushSubscriptionStatus.ACTIVE,
+            registrationVersion: subscription.registrationVersion,
+            user: {
+              status: UserStatus.ACTIVE,
+              deletedAt: null,
+              ...(job.announcement?.contentClass === AnnouncementContentClass.PROMOTIONAL ? { settings: { promotionalPushNotifications: true } } : {}),
+            },
+          },
+          select: { id: true },
+        });
+        const activeAnnouncement = await prisma.announcement.count({ where: { id: job.announcementId, pushEnabled: true, status: AnnouncementStatus.PUBLISHED, OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] } });
+        if (!eligible || !activeAnnouncement) continue;
+      }
+      if (job.marketingCampaignId) {
+        const eligible = await prisma.browserPushSubscription.findFirst({
+          where: { id: subscription.id, userId: job.userId, status: BrowserPushSubscriptionStatus.ACTIVE, registrationVersion: subscription.registrationVersion, user: { status: UserStatus.ACTIVE, deletedAt: null, settings: marketingSettingsWhere(job.marketingCampaign!.audience, true) } },
+          select: { id: true },
+        });
+        const activeCampaign = await prisma.marketingNotificationCampaign.count({ where: { id: job.marketingCampaignId, pushEnabled: true, status: AnnouncementStatus.PUBLISHED, publishedAt: { lte: new Date() }, OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }], userStates: { some: { userId: job.userId } } } });
+        if (!eligible || !activeCampaign) continue;
+      }
       try {
-        await webpush.sendNotification(BrowserPushSubscriptionService.decode(subscription), payload, { TTL: 60 * 60, urgency: "normal" });
+        await webpush.sendNotification(BrowserPushSubscriptionService.decode(subscription), payload, { TTL: 60 * 60, urgency: "normal", timeout: Math.min(SEND_TIMEOUT_MS, Math.max(1, deadline - Date.now())) });
         sent += 1;
         await prisma.browserPushSubscription.update({ where: { id: subscription.id }, data: { lastSuccessAt: new Date(), failureCount: 0 } });
       } catch (error) {

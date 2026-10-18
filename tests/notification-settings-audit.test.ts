@@ -14,10 +14,11 @@ describe("customer notification settings audit", () => {
     expect(settings).toContain("shoppingRecommendations");
     expect(settings).not.toContain('"orderAlertsEmail",');
     expect(settings).not.toContain('"securityAlertsSMS",');
-    expect(settings).not.toContain("promotionalPushNotifications");
+    expect(settings).toContain("promotionalPushNotifications");
     expect(service).toContain('"promotionalInAppNotifications", "shoppingRecommendations"');
-    expect(marketing).toContain("if (!user?.settings?.promotionalInAppNotifications)");
-    expect(marketing).toContain("user.settings.shoppingRecommendations");
+    expect(marketing).toContain("eligibleMarketingAudiences(user?.settings)");
+    expect(read("src/lib/marketing-campaign-eligibility.ts")).toContain("settings.shoppingRecommendations");
+    expect(service).toContain("MARKETING_CONSENT_REVOKED");
   });
 
   it("uses accessible switches, keeps essential updates informational, and places device controls below preferences", () => {

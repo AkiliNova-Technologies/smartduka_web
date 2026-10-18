@@ -34,6 +34,7 @@ import { Separator } from "@/components/ui/separator";
 import { AppearanceSettings } from "@/components/settings/AppearanceSettings";
 import Link from "next/link";
 import { PushNotificationSettings } from "@/components/settings/PushNotificationSettings";
+import { usePushNotificationSettings } from "@/hooks/use-push-notification-settings";
 
 type SettingsTab = "profile" | "appearance" | "notifications";
 const SETTINGS_TABS: { id: SettingsTab; label: string; icon: LucideIcon }[] = [
@@ -46,6 +47,7 @@ export default function SettingsContent() {
   const { settings, settingsLoading, settingsSaving, updateSettings } =
     useUserData();
   const { user, logout, actionLoading } = useAuth();
+  const push = usePushNotificationSettings();
   const router = useRouter();
   const searchParams = useSearchParams();
   const requestedTab = searchParams.get("tab");
@@ -425,6 +427,25 @@ export default function SettingsContent() {
                         onCheckedChange={(promotionalInAppNotifications) =>
                           void updateSettings({ promotionalInAppNotifications })
                         }
+                      />
+                      <OptionalPreference
+                        id="promotional-push-notifications"
+                        icon={Bell}
+                        title="Promotional push notifications"
+                        description={
+                          push.denied
+                            ? "Browser notifications are blocked. Allow them in your browser or site settings before opting in."
+                            : "Receive optional browser notifications about offers, products, and shops you may like."
+                        }
+                        checked={settings.promotionalPushNotifications}
+                        disabled={settingsSaving || push.working || (push.denied && !settings.promotionalPushNotifications)}
+                        onCheckedChange={async (promotionalPushNotifications) => {
+                          if (promotionalPushNotifications && !push.subscribed) {
+                            const enabled = await push.enable();
+                            if (!enabled) return;
+                          }
+                          await updateSettings({ promotionalPushNotifications });
+                        }}
                       />
                       <OptionalPreference
                         id="shopping-recommendations"

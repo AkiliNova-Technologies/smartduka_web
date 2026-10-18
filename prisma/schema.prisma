@@ -53,6 +53,19 @@ enum AnnouncementPresentation {
   BANNER
 }
 
+enum AnnouncementContentClass {
+  ESSENTIAL
+  PROMOTIONAL
+}
+
+enum AnnouncementPushDispatchStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  CANCELLED
+  EXPIRED
+}
+
 enum MarketingNotificationCategory {
   OFFERS
   NEW_ARRIVALS
@@ -745,43 +758,43 @@ model User {
 
   wishlistItems                      WishlistItem[]
   recentlyViewed                     RecentlyViewed[]
-  customerOrders                     Order[]                       @relation("CustomerOrders")
+  customerOrders                     Order[]                          @relation("CustomerOrders")
   reviewsWritten                     ProductReview[]
   shopReviewsWritten                 ShopReview[]
   reviewReplies                      ReviewReply[]
-  reviewReports                      ReviewReport[]                @relation("ReviewReporter")
-  reviewReportsResolved              ReviewReport[]                @relation("ReviewReportResolver")
+  reviewReports                      ReviewReport[]                   @relation("ReviewReporter")
+  reviewReportsResolved              ReviewReport[]                   @relation("ReviewReportResolver")
   auditLogs                          AuditLog[]
   notifications                      Notification[]
-  announcementStates                AnnouncementUserState[]
-  announcementsCreated              Announcement[]                @relation("AnnouncementCreatedBy")
-  announcementsPublished            Announcement[]                @relation("AnnouncementPublishedBy")
-  marketingNotificationStates       MarketingNotificationUserState[]
-  marketingCampaignsCreated         MarketingNotificationCampaign[] @relation("MarketingCampaignCreatedBy")
-  marketingCampaignsPublished       MarketingNotificationCampaign[] @relation("MarketingCampaignPublishedBy")
+  announcementStates                 AnnouncementUserState[]
+  announcementsCreated               Announcement[]                   @relation("AnnouncementCreatedBy")
+  announcementsPublished             Announcement[]                   @relation("AnnouncementPublishedBy")
+  marketingNotificationStates        MarketingNotificationUserState[]
+  marketingCampaignsCreated          MarketingNotificationCampaign[]  @relation("MarketingCampaignCreatedBy")
+  marketingCampaignsPublished        MarketingNotificationCampaign[]  @relation("MarketingCampaignPublishedBy")
   devices                            UserDevice[]
   browserPushSubscriptions           BrowserPushSubscription[]
   pushDeliveryOutbox                 PushDeliveryOutbox[]
-  returnRequests                     ReturnRequest[]               @relation("ReturnRequester")
-  refundsRequested                   Refund[]                      @relation("RefundRequester")
-  refundsApproved                    Refund[]                      @relation("RefundApprover")
-  disputesOpened                     Dispute[]                     @relation("DisputeCustomer")
-  disputesResolved                   Dispute[]                     @relation("DisputeResolver")
-  riskFlagsCreated                   RiskFlag[]                    @relation("RiskFlagCreator")
-  riskFlagsResolved                  RiskFlag[]                    @relation("RiskFlagResolver")
-  customerRiskFlags                  RiskFlag[]                    @relation("RiskFlagCustomer")
-  marketplaceReportsFiled            MarketplaceReport[]           @relation("MarketplaceReportReporter")
-  marketplaceReportsAssigned         MarketplaceReport[]           @relation("MarketplaceReportAssignee")
-  marketplaceReportsAssignedBy       MarketplaceReport[]           @relation("MarketplaceReportAssignedBy")
-  marketplaceReportsResolved         MarketplaceReport[]           @relation("MarketplaceReportResolver")
-  marketplaceReportActivities        MarketplaceReportActivity[]   @relation("MarketplaceReportActivityActor")
-  marketplaceReportNotes             MarketplaceReportNote[]       @relation("MarketplaceReportNoteAuthor")
-  verificationApplicationsSubmitted  ShopVerificationApplication[] @relation("ShopVerificationSubmittedBy")
-  verificationApplicationsAssigned   ShopVerificationApplication[] @relation("ShopVerificationAssignedAdmin")
-  verificationApplicationsAssignedBy ShopVerificationApplication[] @relation("ShopVerificationAssignedBy")
-  verificationApplicationsDecided    ShopVerificationApplication[] @relation("ShopVerificationDecisionBy")
-  verificationActivities             ShopVerificationActivity[]    @relation("ShopVerificationActivityActor")
-  verificationNotes                  ShopVerificationNote[]        @relation("ShopVerificationNoteAuthor")
+  returnRequests                     ReturnRequest[]                  @relation("ReturnRequester")
+  refundsRequested                   Refund[]                         @relation("RefundRequester")
+  refundsApproved                    Refund[]                         @relation("RefundApprover")
+  disputesOpened                     Dispute[]                        @relation("DisputeCustomer")
+  disputesResolved                   Dispute[]                        @relation("DisputeResolver")
+  riskFlagsCreated                   RiskFlag[]                       @relation("RiskFlagCreator")
+  riskFlagsResolved                  RiskFlag[]                       @relation("RiskFlagResolver")
+  customerRiskFlags                  RiskFlag[]                       @relation("RiskFlagCustomer")
+  marketplaceReportsFiled            MarketplaceReport[]              @relation("MarketplaceReportReporter")
+  marketplaceReportsAssigned         MarketplaceReport[]              @relation("MarketplaceReportAssignee")
+  marketplaceReportsAssignedBy       MarketplaceReport[]              @relation("MarketplaceReportAssignedBy")
+  marketplaceReportsResolved         MarketplaceReport[]              @relation("MarketplaceReportResolver")
+  marketplaceReportActivities        MarketplaceReportActivity[]      @relation("MarketplaceReportActivityActor")
+  marketplaceReportNotes             MarketplaceReportNote[]          @relation("MarketplaceReportNoteAuthor")
+  verificationApplicationsSubmitted  ShopVerificationApplication[]    @relation("ShopVerificationSubmittedBy")
+  verificationApplicationsAssigned   ShopVerificationApplication[]    @relation("ShopVerificationAssignedAdmin")
+  verificationApplicationsAssignedBy ShopVerificationApplication[]    @relation("ShopVerificationAssignedBy")
+  verificationApplicationsDecided    ShopVerificationApplication[]    @relation("ShopVerificationDecisionBy")
+  verificationActivities             ShopVerificationActivity[]       @relation("ShopVerificationActivityActor")
+  verificationNotes                  ShopVerificationNote[]           @relation("ShopVerificationNoteAuthor")
 
   @@index([status])
   @@index([vendorId])
@@ -881,10 +894,10 @@ model UserSettings {
   momoNetwork String?
   momoNumber  String?
 
-  orderAlertsEmail    Boolean @default(true)
-  orderAlertsPush     Boolean @default(true)
-  securityAlertsSMS   Boolean @default(true)
-  marketingNewsletter Boolean @default(false)
+  orderAlertsEmail              Boolean @default(true)
+  orderAlertsPush               Boolean @default(true)
+  securityAlertsSMS             Boolean @default(true)
+  marketingNewsletter           Boolean @default(false)
   promotionalInAppNotifications Boolean @default(false)
   shoppingRecommendations       Boolean @default(false)
   promotionalPushNotifications  Boolean @default(false)
@@ -1020,19 +1033,19 @@ model VendorProfile {
   bankAccountNumber String?
   bankName          String?
 
-  fulfillmentMethods FulfillmentMethod[] @default([DELIVERY])
-  branchInventoryEnabled Boolean          @default(false)
-  deliveryFee        Decimal             @default(3500.00) @db.Decimal(18, 2)
-  deliveryEstimate   String?
-  pickupLocation     String?
-  pickupDirections   String?             @db.Text
-  pickupInstructions String?             @db.Text
-  returnWindowDays   Int                 @default(7)
-  returnPolicy       String?             @db.Text
-  returnInstructions String?             @db.Text
-  returnAddress      String?             @db.Text
-  acceptsExchanges   Boolean             @default(false)
-  exchangePolicy     String?             @db.Text
+  fulfillmentMethods     FulfillmentMethod[] @default([DELIVERY])
+  branchInventoryEnabled Boolean             @default(false)
+  deliveryFee            Decimal             @default(3500.00) @db.Decimal(18, 2)
+  deliveryEstimate       String?
+  pickupLocation         String?
+  pickupDirections       String?             @db.Text
+  pickupInstructions     String?             @db.Text
+  returnWindowDays       Int                 @default(7)
+  returnPolicy           String?             @db.Text
+  returnInstructions     String?             @db.Text
+  returnAddress          String?             @db.Text
+  acceptsExchanges       Boolean             @default(false)
+  exchangePolicy         String?             @db.Text
 
   trialStartedAt   DateTime?
   trialEndsAt      DateTime?
@@ -1078,30 +1091,30 @@ model VendorProfile {
 }
 
 model ShopBranch {
-  id                 String            @id @default(uuid())
+  id                 String              @id @default(uuid())
   shopId             String
-  shop               VendorProfile     @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  shop               VendorProfile       @relation(fields: [shopId], references: [id], onDelete: Restrict)
   name               String
   slug               String
-  branchType         ShopBranchType    @default(STORE)
-  isPrimary          Boolean           @default(false)
-  isActive           Boolean           @default(true)
-  pickupEnabled      Boolean           @default(false)
-  deliveryEnabled    Boolean           @default(false)
+  branchType         ShopBranchType      @default(STORE)
+  isPrimary          Boolean             @default(false)
+  isActive           Boolean             @default(true)
+  pickupEnabled      Boolean             @default(false)
+  deliveryEnabled    Boolean             @default(false)
   addressLine        String?
   city               String?
   district           String?
   country            String?
-  latitude           Decimal?          @db.Decimal(10, 7)
-  longitude          Decimal?          @db.Decimal(10, 7)
+  latitude           Decimal?            @db.Decimal(10, 7)
+  longitude          Decimal?            @db.Decimal(10, 7)
   contactPhone       String?
   openingHours       Json?
-  pickupInstructions String?           @db.Text
-  deliveryAreas      String[]          @default([])
-  deliveryFee        Decimal?           @db.Decimal(18, 2)
+  pickupInstructions String?             @db.Text
+  deliveryAreas      String[]            @default([])
+  deliveryFee        Decimal?            @db.Decimal(18, 2)
   deliveryEstimate   String?
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
   subOrders          SubOrder[]
   inventories        BranchInventory[]
   inventoryMovements InventoryMovement[]
@@ -1112,19 +1125,19 @@ model ShopBranch {
 }
 
 model BranchInventory {
-  id               String         @id @default(uuid())
+  id               String              @id @default(uuid())
   branchId         String
-  branch           ShopBranch     @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  branch           ShopBranch          @relation(fields: [branchId], references: [id], onDelete: Restrict)
   shopId           String
-  shop             VendorProfile  @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  shop             VendorProfile       @relation(fields: [shopId], references: [id], onDelete: Restrict)
   productId        String
-  product          Product        @relation(fields: [productId], references: [id], onDelete: Restrict)
+  product          Product             @relation(fields: [productId], references: [id], onDelete: Restrict)
   variantId        String?
-  variant          ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Restrict)
-  onHandQuantity   Int            @default(0)
-  reservedQuantity Int            @default(0)
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
+  variant          ProductVariant?     @relation(fields: [variantId], references: [id], onDelete: Restrict)
+  onHandQuantity   Int                 @default(0)
+  reservedQuantity Int                 @default(0)
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
   movements        InventoryMovement[]
 
   @@index([shopId, productId, variantId])
@@ -1132,23 +1145,23 @@ model BranchInventory {
 }
 
 model InventoryMovement {
-  id          String                @id @default(uuid())
-  inventoryId String
-  inventory   BranchInventory       @relation(fields: [inventoryId], references: [id], onDelete: Restrict)
-  branchId    String
-  branch      ShopBranch            @relation(fields: [branchId], references: [id], onDelete: Restrict)
-  shopId      String
-  shop        VendorProfile         @relation(fields: [shopId], references: [id], onDelete: Restrict)
-  productId   String
-  variantId   String?
-  movementType InventoryMovementType
-  quantity    Int
+  id            String                @id @default(uuid())
+  inventoryId   String
+  inventory     BranchInventory       @relation(fields: [inventoryId], references: [id], onDelete: Restrict)
+  branchId      String
+  branch        ShopBranch            @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  shopId        String
+  shop          VendorProfile         @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  productId     String
+  variantId     String?
+  movementType  InventoryMovementType
+  quantity      Int
   referenceType String?
-  referenceId String?
-  reason      String?
-  createdById String?
-  requestId   String?
-  createdAt   DateTime              @default(now())
+  referenceId   String?
+  reason        String?
+  createdById   String?
+  requestId     String?
+  createdAt     DateTime              @default(now())
 
   @@unique([shopId, requestId])
   @@index([inventoryId, createdAt])
@@ -1490,8 +1503,8 @@ model ProductVariant {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  orderItems OrderItem[]
-  reviews    ProductReview[]
+  orderItems        OrderItem[]
+  reviews           ProductReview[]
   branchInventories BranchInventory[]
 
   @@unique([productId, optionKey])
@@ -1733,7 +1746,7 @@ model SubOrder {
   vendorId String
   vendor   VendorProfile @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   branchId String?
-  branch   ShopBranch?    @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  branch   ShopBranch?   @relation(fields: [branchId], references: [id], onDelete: Restrict)
 
   subOrderNumber       String            @unique
   vendorSubTotal       Decimal           @db.Decimal(18, 2)
@@ -2242,14 +2255,14 @@ model Notification {
   userId         String?
   user           User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  type       NotificationType @default(INFO)
-  eventType  String?          @db.VarChar(80)
+  type       NotificationType    @default(INFO)
+  eventType  String?             @db.VarChar(80)
   title      String
   message    String
   actionPath String?
   readAt     DateTime?
   deletedAt  DateTime?
-  createdAt  DateTime         @default(now())
+  createdAt  DateTime            @default(now())
   pushOutbox PushDeliveryOutbox?
 
   @@index([vendorId])
@@ -2280,84 +2293,113 @@ enum PushDeliveryStatus {
 }
 
 model BrowserPushSubscription {
-  id                String                        @id @default(uuid())
-  userId            String
-  user              User                          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  endpointHash      String                        @unique @db.VarChar(64)
-  endpointEncrypted String
-  p256dhEncrypted   String
-  authEncrypted     String
-  userAgent         String?                       @db.VarChar(512)
-  deviceName        String?                       @db.VarChar(120)
-  status            BrowserPushSubscriptionStatus @default(ACTIVE)
-  registrationVersion Int                         @default(1)
-  lastSuccessAt     DateTime?
-  lastFailureAt     DateTime?
-  failureCount      Int                           @default(0)
-  revokedAt         DateTime?
-  createdAt         DateTime                      @default(now())
-  updatedAt         DateTime                      @updatedAt
+  id                  String                        @id @default(uuid())
+  userId              String
+  user                User                          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpointHash        String                        @unique @db.VarChar(64)
+  endpointEncrypted   String
+  p256dhEncrypted     String
+  authEncrypted       String
+  userAgent           String?                       @db.VarChar(512)
+  deviceName          String?                       @db.VarChar(120)
+  status              BrowserPushSubscriptionStatus @default(ACTIVE)
+  registrationVersion Int                           @default(1)
+  lastSuccessAt       DateTime?
+  lastFailureAt       DateTime?
+  failureCount        Int                           @default(0)
+  revokedAt           DateTime?
+  createdAt           DateTime                      @default(now())
+  updatedAt           DateTime                      @updatedAt
 
   @@index([userId, status])
   @@index([status, updatedAt])
 }
 
 model PushDeliveryOutbox {
-  id             String             @id @default(uuid())
-  idempotencyKey String             @unique @db.VarChar(191)
-  userId         String
-  user           User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  notificationId String?            @unique
-  notification   Notification?      @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  id                        String                         @id @default(uuid())
+  idempotencyKey            String                         @unique @db.VarChar(191)
+  userId                    String
+  user                      User                           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notificationId            String?                        @unique
+  notification              Notification?                  @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  announcementId            String?
+  announcement              Announcement?                  @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  marketingCampaignId       String?
+  marketingCampaign         MarketingNotificationCampaign? @relation(fields: [marketingCampaignId], references: [id], onDelete: Cascade)
   // Test deliveries are intentionally bound to one verified browser. Normal
   // business deliveries continue to fan out to the account's active devices.
-  targetSubscriptionId String?
+  targetSubscriptionId      String?
   targetSubscriptionVersion Int?
-  kind           PushDeliveryKind
-  title          String             @db.VarChar(160)
-  message        String             @db.VarChar(1000)
-  actionPath     String?            @db.VarChar(500)
-  status         PushDeliveryStatus @default(PENDING)
-  attempts       Int                @default(0)
-  nextAttemptAt  DateTime           @default(now())
-  lockedAt       DateTime?
-  lockToken      String?            @db.VarChar(80)
-  deliveredAt    DateTime?
-  lastFailureAt  DateTime?
-  failureCode    String?            @db.VarChar(80)
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
+  kind                      PushDeliveryKind
+  title                     String                         @db.VarChar(160)
+  message                   String                         @db.VarChar(1000)
+  actionPath                String?                        @db.VarChar(500)
+  status                    PushDeliveryStatus             @default(PENDING)
+  attempts                  Int                            @default(0)
+  nextAttemptAt             DateTime                       @default(now())
+  lockedAt                  DateTime?
+  lockToken                 String?                        @db.VarChar(80)
+  deliveredAt               DateTime?
+  lastFailureAt             DateTime?
+  failureCode               String?                        @db.VarChar(80)
+  createdAt                 DateTime                       @default(now())
+  updatedAt                 DateTime                       @updatedAt
 
+  @@unique([announcementId, userId])
+  @@unique([marketingCampaignId, targetSubscriptionId])
   @@index([status, nextAttemptAt])
   @@index([userId, status])
   @@index([targetSubscriptionId, status])
 }
 
 model Announcement {
-  id             String                   @id @default(uuid())
-  title          String                   @db.VarChar(160)
-  message        String                   @db.VarChar(2000)
-  category       AnnouncementCategory     @default(GENERAL)
-  priority       AnnouncementPriority     @default(NORMAL)
-  audience       AnnouncementAudience
-  presentation   AnnouncementPresentation @default(NOTIFICATION)
-  destination    String?                  @db.VarChar(500)
-  status         AnnouncementStatus       @default(DRAFT)
-  scheduledAt    DateTime?
-  publishedAt    DateTime?
-  expiresAt      DateTime?
-  createdById    String
-  createdBy      User                     @relation("AnnouncementCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
-  publishedById  String?
-  publishedBy    User?                    @relation("AnnouncementPublishedBy", fields: [publishedById], references: [id], onDelete: SetNull)
-  createdAt      DateTime                 @default(now())
-  updatedAt      DateTime                 @updatedAt
-  userStates     AnnouncementUserState[]
+  id            String                    @id @default(uuid())
+  title         String                    @db.VarChar(160)
+  message       String                    @db.VarChar(2000)
+  category      AnnouncementCategory      @default(GENERAL)
+  priority      AnnouncementPriority      @default(NORMAL)
+  audience      AnnouncementAudience
+  presentation  AnnouncementPresentation  @default(NOTIFICATION)
+  contentClass  AnnouncementContentClass  @default(ESSENTIAL)
+  pushEnabled   Boolean                   @default(false)
+  destination   String?                   @db.VarChar(500)
+  status        AnnouncementStatus        @default(DRAFT)
+  scheduledAt   DateTime?
+  publishedAt   DateTime?
+  expiresAt     DateTime?
+  createdById   String
+  createdBy     User                      @relation("AnnouncementCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  publishedById String?
+  publishedBy   User?                     @relation("AnnouncementPublishedBy", fields: [publishedById], references: [id], onDelete: SetNull)
+  createdAt     DateTime                  @default(now())
+  updatedAt     DateTime                  @updatedAt
+  userStates    AnnouncementUserState[]
+  pushDispatch  AnnouncementPushDispatch?
+  pushOutbox    PushDeliveryOutbox[]
 
   @@index([status, scheduledAt])
   @@index([status, publishedAt])
   @@index([audience, status, publishedAt])
   @@index([presentation, status, expiresAt])
+}
+
+model AnnouncementPushDispatch {
+  id                  String                         @id @default(uuid())
+  announcementId      String                         @unique
+  announcement        Announcement                   @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  status              AnnouncementPushDispatchStatus @default(PENDING)
+  cursorUserId        String?
+  processedRecipients Int                            @default(0)
+  queuedRecipients    Int                            @default(0)
+  lockedAt            DateTime?
+  lockToken           String?                        @db.VarChar(80)
+  createdAt           DateTime                       @default(now())
+  startedAt           DateTime?
+  completedAt         DateTime?
+  cancelledAt         DateTime?
+  updatedAt           DateTime                       @updatedAt
+
+  @@index([status, updatedAt])
 }
 
 model AnnouncementUserState {
@@ -2377,32 +2419,55 @@ model AnnouncementUserState {
 }
 
 model MarketingNotificationCampaign {
-  id                   String                        @id @default(uuid())
-  name                 String                        @db.VarChar(160)
-  title                String                        @db.VarChar(160)
-  message              String                        @db.VarChar(2000)
+  id                   String                           @id @default(uuid())
+  name                 String                           @db.VarChar(160)
+  title                String                           @db.VarChar(160)
+  message              String                           @db.VarChar(2000)
   category             MarketingNotificationCategory
   audience             MarketingNotificationAudience
   destinationType      MarketingDestinationType
-  destinationReference String?                       @db.VarChar(191)
-  destinationPath      String                        @db.VarChar(500)
-  imageUrl             String?                       @db.VarChar(1000)
-  status               AnnouncementStatus            @default(DRAFT)
+  destinationReference String?                          @db.VarChar(191)
+  destinationPath      String                           @db.VarChar(500)
+  imageUrl             String?                          @db.VarChar(1000)
+  pushEnabled          Boolean                          @default(false)
+  status               AnnouncementStatus               @default(DRAFT)
   scheduledAt          DateTime?
   publishedAt          DateTime?
   expiresAt            DateTime?
   createdById          String
-  createdBy            User                          @relation("MarketingCampaignCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  createdBy            User                             @relation("MarketingCampaignCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   publishedById        String?
-  publishedBy          User?                         @relation("MarketingCampaignPublishedBy", fields: [publishedById], references: [id], onDelete: SetNull)
-  createdAt            DateTime                      @default(now())
-  updatedAt            DateTime                      @updatedAt
+  publishedBy          User?                            @relation("MarketingCampaignPublishedBy", fields: [publishedById], references: [id], onDelete: SetNull)
+  createdAt            DateTime                         @default(now())
+  updatedAt            DateTime                         @updatedAt
   userStates           MarketingNotificationUserState[]
+  pushDispatch         MarketingPushDispatch?
+  pushOutbox           PushDeliveryOutbox[]
 
   @@index([status, scheduledAt])
   @@index([status, publishedAt, expiresAt])
   @@index([audience, status, publishedAt])
   @@index([destinationType, destinationReference])
+}
+
+model MarketingPushDispatch {
+  id                  String                         @id @default(uuid())
+  campaignId          String                         @unique
+  campaign            MarketingNotificationCampaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  status              AnnouncementPushDispatchStatus @default(PENDING)
+  cursorUserId        String?
+  processedRecipients Int                            @default(0)
+  eligibleRecipients  Int                            @default(0)
+  queuedJobs          Int                            @default(0)
+  lockedAt            DateTime?
+  lockToken           String?                        @db.VarChar(80)
+  createdAt           DateTime                       @default(now())
+  startedAt           DateTime?
+  completedAt         DateTime?
+  cancelledAt         DateTime?
+  updatedAt           DateTime                       @updatedAt
+
+  @@index([status, updatedAt])
 }
 
 model MarketingNotificationUserState {

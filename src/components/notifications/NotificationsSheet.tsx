@@ -163,7 +163,11 @@ export function NotificationCard({
             {notification.message}
           </span>
           <span className="mt-2 block text-[11px] font-medium text-muted-foreground/70">
-            {notification.source === "MARKETING" && <span className="mr-2 rounded-full bg-primary/10 px-2 py-0.5 text-primary">Promotional</span>}
+            {notification.source === "MARKETING" && (
+              <span className="mr-2 rounded-full bg-primary/10 px-2 py-0.5 text-primary">
+                Promotional
+              </span>
+            )}
             {formatTimeAgo(notification.createdAt, now)}
           </span>
         </span>
@@ -291,11 +295,11 @@ export function NotificationsSheet({
     },
   };
   return (
-    <Sheet open={open} onOpenChange={onOpenChange} >
+    <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
-        className="flex w-full flex-col overflow-hidden border-l border-border/60 bg-background p-0 sm:max-w-md">
-        <SheetHeader  className="sticky top-0 z-10 shrink-0 border-b border-border/60 bg-background/95 px-4 pb-4 pr-12 pt-[max(1.25rem,env(safe-area-inset-top))] backdrop-blur">
+        className="flex min-w-[360px] w-full flex-col overflow-hidden border-l border-border/60 bg-background p-0 sm:max-w-lg">
+        <SheetHeader className="sticky top-0 z-10 shrink-0 border-b border-border/60 bg-background/95 px-4 pb-4 pr-12 pt-[max(1.25rem,env(safe-area-inset-top))] backdrop-blur">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <SheetTitle className="flex items-center gap-2 text-base font-semibold">
@@ -396,7 +400,13 @@ export function NotificationsSheet({
             </TooltipProvider>
           )}
         </div>
-        <div className="shrink-0 border-t bg-background p-3"><Button asChild variant="ghost" className="w-full"><Link href="/notifications" onClick={() => onOpenChange(false)}>View all notifications</Link></Button></div>
+        <div className="shrink-0 border-t bg-background p-3">
+          <Button asChild variant="ghost" className="w-full">
+            <Link href="/notifications" onClick={() => onOpenChange(false)}>
+              View all notifications
+            </Link>
+          </Button>
+        </div>
       </SheetContent>
     </Sheet>
   );

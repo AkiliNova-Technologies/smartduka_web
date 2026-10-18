@@ -9,7 +9,7 @@ describe("P3A browser push boundaries", () => {
   it("keeps browser subscriptions separate from native device tokens", () => {
     const schema = read("prisma/schema.prisma");
     expect(schema).toContain("model BrowserPushSubscription");
-    expect(schema).toContain("endpointHash      String                        @unique");
+    expect(schema).toMatch(/endpointHash\s+String\s+@unique/);
     expect(schema).toContain("model UserDevice");
     expect(read("src/services/user-devices.ts")).not.toContain("BrowserPushSubscription");
   });
@@ -32,7 +32,7 @@ describe("P3A browser push boundaries", () => {
     const schema = read("prisma/schema.prisma");
     const worker = read("src/services/push-delivery-outbox.ts");
     expect(schema).toContain("model PushDeliveryOutbox");
-    expect(schema).toContain("idempotencyKey String             @unique");
+    expect(schema).toMatch(/idempotencyKey\s+String\s+@unique/);
     expect(worker).toContain("const MAX_ATTEMPTS = 5");
     expect(worker).toContain("updateMany");
     expect(worker).toContain("PushDeliveryStatus.PROCESSING");
