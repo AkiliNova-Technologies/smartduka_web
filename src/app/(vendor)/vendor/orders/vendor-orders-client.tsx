@@ -4,6 +4,16 @@ import * as React from "react";
 import { Eye, MapPin, Package, Search, Truck } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 import {
@@ -50,6 +60,10 @@ export default function VendorOrdersPage({ initialData }: { initialData: VendorO
   const statusCounts = initialData.statusCounts;
   const [selected, setSelected] = React.useState<VendorOrder | null>(null);
   const [updating, setUpdating] = React.useState<string | null>(null);
+  const [pendingDelivery, setPendingDelivery] = React.useState<{
+    order: VendorOrder;
+    action: { status: string; label: string };
+  } | null>(null);
   const updateQuery = React.useCallback(
     (next: Record<string, string | null>) => {
       const params = new URLSearchParams(searchParams.toString());
@@ -72,11 +86,6 @@ export default function VendorOrdersPage({ initialData }: { initialData: VendorO
     order: VendorOrder,
     action: { status: string; label: string },
   ) => {
-    if (
-      action.status === "DELIVERED" &&
-      !window.confirm(order.fulfillmentMethod === "PICKUP" ? "Confirm that this order was collected?" : "Mark this order as delivered?")
-    )
-      return;
     setUpdating(order.id);
     try {
       const confirmed = await updateSubOrderStatus(order.id, action.status);
@@ -87,6 +96,7 @@ export default function VendorOrdersPage({ initialData }: { initialData: VendorO
           : current,
       );
       setOrders((current) => current.map((item) => item.id === order.id ? { ...item, status: confirmed, allowedActions: [] } : item));
+      setPendingDelivery(null);
       router.refresh();
     } catch (error) {
       toast.error(
@@ -95,6 +105,17 @@ export default function VendorOrdersPage({ initialData }: { initialData: VendorO
     } finally {
       setUpdating(null);
     }
+  };
+
+  const requestTransition = (
+    order: VendorOrder,
+    action: { status: string; label: string },
+  ) => {
+    if (action.status === "DELIVERED") {
+      setPendingDelivery({ order, action });
+      return;
+    }
+    void transition(order, action);
   };
 
   return (
@@ -183,7 +204,7 @@ export default function VendorOrdersPage({ initialData }: { initialData: VendorO
                     size="sm"
                     disabled={updating === order.id}
                     className="rounded-full dark:text-white px-4"
-                    onClick={() => transition(order, order.allowedActions[0])}>
+                    onClick={() => requestTransition(order, order.allowedActions[0])}>
                     {updating === order.id
                       ? "Updating…"
                       : order.allowedActions[0].label}
@@ -330,7 +351,7 @@ export default function VendorOrdersPage({ initialData }: { initialData: VendorO
                   <Button
                     key={action.status}
                     disabled={updating === selected.id}
-                    onClick={() => transition(selected, action)}>
+                    onClick={() => requestTransition(selected, action)}>
                     {updating === selected.id ? "Updating…" : action.label}
                   </Button>
                 ))}
@@ -339,6 +360,48 @@ export default function VendorOrdersPage({ initialData }: { initialData: VendorO
           </SheetContent>
         )}
       </Sheet>
+      <AlertDialog
+        open={Boolean(pendingDelivery)}
+        onOpenChange={(open) => {
+          if (!open && !updating) setPendingDelivery(null);
+        }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {pendingDelivery?.order.fulfillmentMethod === "PICKUP"
+                ? "Confirm order collection?"
+                : "Mark order as delivered?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingDelivery?.order.fulfillmentMethod === "PICKUP"
+                ? "Confirm that the customer collected"
+                : "Confirm that the customer received"}{" "}
+              order {pendingDelivery?.order.subOrderNumber}. This updates the
+              customer-facing order status.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={Boolean(updating)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
+              disabled={Boolean(updating)}
+              onClick={(event) => {
+                event.preventDefault();
+                if (pendingDelivery) {
+                  void transition(pendingDelivery.order, pendingDelivery.action);
+                }
+              }}>
+              {updating
+                ? "Updating…"
+                : pendingDelivery?.order.fulfillmentMethod === "PICKUP"
+                  ? "Confirm collection"
+                  : "Mark delivered"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

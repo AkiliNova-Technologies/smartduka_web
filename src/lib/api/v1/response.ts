@@ -7,6 +7,7 @@ export const V1_ERROR_CODES = [
   "CONFLICT", "IDEMPOTENCY_CONFLICT", "INSUFFICIENT_STOCK", "PRODUCT_UNAVAILABLE",
   "INVALID_VARIANT", "PAYMENT_FAILED", "ORDER_NOT_FOUND", "VENDOR_ACCESS_DENIED",
   "INVALID_ASSET_REFERENCE",
+  "VENDOR_PLAN_LIMIT_REACHED",
 ] as const;
 export type V1ErrorCode = (typeof V1_ERROR_CODES)[number] | string;
 
@@ -32,6 +33,10 @@ export function v1Exception(error: unknown) {
   if (error instanceof AccountInactiveError) return v1Error("FORBIDDEN", "This account is inactive.", 403);
   if (error instanceof VendorAuthorizationError) return v1Error("VENDOR_ACCESS_DENIED", "Vendor access is required.", 403);
   const code = error && typeof error === "object" && "code" in error && typeof error.code === "string" ? error.code : "INTERNAL_ERROR";
+  if (code === "VENDOR_PLAN_LIMIT_REACHED" && error && typeof error === "object" && "details" in error) {
+    const message = error instanceof Error ? error.message : "Your current plan limit has been reached.";
+    return Response.json({ error: { code, message, details: error.details } }, { status: 409 });
+  }
   const isPrismaError = error instanceof Error && /^PrismaClient/.test(error.name);
   const status = isPrismaError ? 500 : code === "NOT_FOUND" || code === "ORDER_NOT_FOUND" ? 404 : code === "CONFLICT" || code === "IDEMPOTENCY_CONFLICT" || code === "DUPLICATE" || code === "INSUFFICIENT_STOCK" ? 409 : code === "FORBIDDEN" || code === "VENDOR_ACCESS_DENIED" ? 403 : code === "VALIDATION_ERROR" || code === "INVALID_ASSET_REFERENCE" ? 400 : 500;
   const message = error instanceof Error && !/(prisma|sql|database)/i.test(error.message) ? error.message : "Unable to complete this request.";

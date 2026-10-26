@@ -10,6 +10,7 @@ const postgresBin = process.env.POSTGRES_BIN ?? "/usr/lib/postgresql/17/bin";
 const cluster = mkdtempSync(join(tmpdir(), "mwezora-customer-orders-postgres-"));
 const database = "mwezora_customer_orders_tests";
 const browserAcceptance = process.argv.includes("--browser");
+const vendorEntitlementAcceptance = process.argv.includes("--vendor-entitlements");
 const firebaseProject = "demo-mwezora-acceptance";
 const browserPassword = "Acceptance-only-password-2026";
 
@@ -89,6 +90,7 @@ try {
   run(`${postgresBin}/psql`, ["-h", "127.0.0.1", "-p", String(port), "-U", "postgres", "-d", database, "-v", "ON_ERROR_STOP=1", "-c", "CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN; CREATE SCHEMA storage; CREATE TABLE storage.buckets (id text PRIMARY KEY, name text NOT NULL, public boolean NOT NULL DEFAULT false, file_size_limit bigint, allowed_mime_types text[]);"]);
   run("npx", ["prisma", "migrate", "deploy"], { env: environment });
   run("npx", ["vitest", "run", "tests/customer-orders-db.integration.test.ts", "tests/announcement-push-db.integration.test.ts"], { env: environment });
+  if (vendorEntitlementAcceptance) run("npx", ["vitest", "run", "tests/vendor-entitlement-browser-fixture.integration.test.ts"], { env: { ...environment, RUN_VENDOR_ENTITLEMENT_BROWSER_ACCEPTANCE: "1" } });
   run("npx", ["vitest", "run", "tests/marketing-push-db.integration.test.ts"], { env: environment });
   if (browserAcceptance) {
     rmSync(join(process.cwd(), nextDistDir), { recursive: true, force: true });
@@ -113,6 +115,8 @@ try {
       NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: "000000000000",
       NEXT_PUBLIC_FIREBASE_APP_ID: "1:000000000000:web:acceptance",
       RUN_CUSTOMER_ORDERS_BROWSER_ACCEPTANCE: "1",
+      RUN_VENDOR_ENTITLEMENT_BROWSER_ACCEPTANCE: vendorEntitlementAcceptance ? "1" : "0",
+      VENDOR_QUOTA_ENFORCEMENT_ENABLED: vendorEntitlementAcceptance ? "true" : "false",
       CUSTOMER_ORDERS_BROWSER_BASE_URL: appOrigin,
       CUSTOMER_ORDERS_BROWSER_PASSWORD: browserPassword,
       FIREBASE_CLI_DISABLE_UPDATE_CHECK: "true",
@@ -128,13 +132,14 @@ try {
     const emulatorAuth = getAuth(seederApp);
     const existingUsers = await emulatorAuth.listUsers();
     if (existingUsers.users.length) await emulatorAuth.deleteUsers(existingUsers.users.map((user) => user.uid));
-    for (const [uid, email, displayName] of [["firebase-customer-a", "customer-a@orders.test", "Acceptance Customer A"], ["firebase-customer-b", "customer-b@orders.test", "Acceptance Customer B"], ["firebase-marketing-admin", "marketing-admin@orders.test", "Marketing Acceptance Admin"]]) {
+    for (const [uid, email, displayName] of [["firebase-customer-a", "customer-a@orders.test", "Acceptance Customer A"], ["firebase-customer-b", "customer-b@orders.test", "Acceptance Customer B"], ["firebase-marketing-admin", "marketing-admin@orders.test", "Marketing Acceptance Admin"], ["vendor-owner-a", "vendor-1@orders.test", "Fixture Vendor 1"], ["vendor-owner-b", "vendor-2@orders.test", "Fixture Vendor 2"]]) {
       await emulatorAuth.createUser({ uid, email, displayName, password: browserPassword, emailVerified: true });
     }
     await deleteApp(seederApp);
     appProcess = start("npm", ["run", "dev", "--", "--hostname", "127.0.0.1", "--port", String(appPort)], browserEnvironment);
     await waitFor(`${appOrigin}/login`, "isolated Next.js application", 180);
     const playwrightArgs = ["playwright", "test", "tests/browser/customer-orders.acceptance.spec.ts", "tests/browser/marketing-push.acceptance.spec.ts"];
+    if (vendorEntitlementAcceptance) playwrightArgs.push("tests/browser/vendor-entitlements.acceptance.spec.ts");
     if (process.env.CUSTOMER_ORDERS_PLAYWRIGHT_GREP) playwrightArgs.push("--grep", process.env.CUSTOMER_ORDERS_PLAYWRIGHT_GREP);
     if (process.env.CUSTOMER_ORDERS_PLAYWRIGHT_PROJECT) playwrightArgs.push("--project", process.env.CUSTOMER_ORDERS_PLAYWRIGHT_PROJECT);
     run("npx", playwrightArgs, { env: browserEnvironment });

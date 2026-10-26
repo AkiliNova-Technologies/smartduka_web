@@ -34,8 +34,10 @@ async function assertSafeTarget() {
 }
 
 async function seedVendor(input: { ownerId: string; vendorId: string; index: number; productId: string; variant?: boolean }) {
-  await prisma.user.create({ data: { id: input.ownerId, name: `Fixture Vendor ${input.index}`, email: `vendor-${input.index}@orders.test`, status: "ACTIVE", vendorRole: "OWNER" } });
+  await prisma.user.create({ data: { id: input.ownerId, name: `Fixture Vendor ${input.index}`, email: `vendor-${input.index}@orders.test`, status: "ACTIVE", platformRole: "VENDOR", vendorRole: "OWNER" } });
   await prisma.vendorProfile.create({ data: { id: input.vendorId, ownerId: input.ownerId, storeName: `Fixture Shop ${input.index}`, slug: `fixture-shop-${input.index}`, status: "ACTIVE" } });
+  // Owners also need the explicit membership link used by authenticated vendor routes.
+  await prisma.user.update({ where: { id: input.ownerId }, data: { vendorId: input.vendorId } });
   const image = input.index === 1 ? "/images/promotions/demo-home/fashion-desktop.webp" : "/images/promotions/demo-home/accessories-desktop.webp";
   const product = await prisma.product.create({ data: { id: input.productId, vendorId: input.vendorId, name: input.variant ? "Variant Jacket" : "Standard Basket", slug: input.variant ? "fixture-variant-jacket" : "fixture-standard-basket", basePrice: input.variant ? 90_000 : 130_000, inventoryCount: 100, status: "ACTIVE", images: { create: { url: image, isFeatured: true, sortOrder: 0 } } } });
   const branch = await prisma.shopBranch.create({ data: { id: `branch-${input.index}`, shopId: input.vendorId, name: input.index === 1 ? "Delivery Centre" : "Pickup Centre", slug: input.index === 1 ? "delivery-centre" : "pickup-centre", isPrimary: true, isActive: true, deliveryEnabled: input.index === 1, pickupEnabled: input.index === 2, addressLine: `${input.index} Acceptance Road`, city: "Kampala", district: "Nakawa", country: "Uganda", contactPhone: `070000000${input.index}`, deliveryAreas: input.index === 1 ? ["Nakawa"] : [], deliveryFee: input.index === 1 ? 3500 : null, deliveryEstimate: input.index === 1 ? "Same day" : null, pickupInstructions: input.index === 2 ? "Bring the order reference and photo ID." : null } });

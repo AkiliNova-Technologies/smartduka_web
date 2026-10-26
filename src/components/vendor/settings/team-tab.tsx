@@ -11,6 +11,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useVendorEntitlement } from "@/hooks/use-vendor-entitlement";
+import { ResourceUsage } from "@/components/vendor/resource-usage";
 
 const roles = ["ADMIN", "MANAGER", "STAFF", "ACCOUNTANT"];
 
@@ -24,6 +26,7 @@ type TeamMember = {
 };
 
 export function TeamTab() {
+  const access = useVendorEntitlement();
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("MANAGER");
@@ -75,6 +78,7 @@ export function TeamTab() {
       )}
       <section className="rounded-2xl border bg-card p-5">
         <h3 className="font-medium">Add team member</h3>
+        {access.entitlement && <div className="mt-3"><ResourceUsage compact resource="STAFF_ACCOUNTS" entitlement={access.entitlement} /></div>}
         {staff && <p className="mt-1 text-sm text-muted-foreground">{staff.used} of {staff.limit} staff seats used{staff.state === "TRIAL" ? " · Free trial" : ""}</p>}
         {staff?.state === "LIMITED" && <p className="mt-3 text-sm text-muted-foreground">Subscription required. Existing team members remain active, but adding new members requires an active plan. <Link className="text-primary underline" href="/vendor/subscription">View plans</Link></p>}
         {staff && !staff.canAdd && staff.state !== "LIMITED" && <p className="mt-3 text-sm text-muted-foreground">You&apos;ve reached your current staff limit. <Link className="text-primary underline" href="/vendor/subscription">View plans</Link></p>}

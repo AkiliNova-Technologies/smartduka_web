@@ -15,6 +15,8 @@ import {
 } from "@/components/ui/sheet";
 import { DataTable } from "@/components/data-table";
 import { StatusBadge } from "@/components/marketplace/status-badge";
+import { ResourceUsageGrid } from "@/components/vendor/resource-usage";
+import { useVendorEntitlement } from "@/hooks/use-vendor-entitlement";
 import { type ColumnDef, type Row } from "@tanstack/react-table";
 type Plan = {
   code: string;
@@ -83,6 +85,7 @@ const list = (p: Plan) =>
       ? b.error.message
       : f;
 export default function SubscriptionPage() {
+  const authoritative = useVendorEntitlement();
   const [data, setData] = React.useState<Data | null>(null),
     [ready, setReady] = React.useState(false),
     [failure, setFailure] = React.useState(""),
@@ -190,26 +193,14 @@ export default function SubscriptionPage() {
   const comparisonRows = React.useMemo<PlanComparison[]>(
     () => {
       const plans = data?.plans ?? [];
-      const features = [...new Set(plans.flatMap(list))];
-
+      const values = (starter: string, growth: string, premium: string) => Object.fromEntries(plans.map(plan => [plan.code, plan.code === "STARTER" ? starter : plan.code === "GROWTH" ? growth : premium]));
       return [
-        ...features.map((feature) => ({
-          id: feature,
-          feature: label(feature),
-          values: Object.fromEntries(
-            plans.map((plan) => [
-              plan.code,
-              list(plan).includes(feature) ? "Included" : "—",
-            ]),
-          ),
-        })),
-        {
-          id: "team-members",
-          feature: "Team members",
-          values: Object.fromEntries(
-            plans.map((plan) => [plan.code, `Up to ${plan.staffSeats}`]),
-          ),
-        },
+        { id: "products", feature: "Active products", values: values("100", "1,000", "Fair-use unlimited") },
+        { id: "branches", feature: "Branches", values: values("1", "5", "20") },
+        { id: "team-members", feature: "Non-owner staff", values: values("2", "10", "30") },
+        { id: "analytics", feature: "Analytics entitlement", values: values("Basic", "Advanced", "Advanced + Premium insights") },
+        { id: "inventory", feature: "Inventory entitlement", values: values("Standard", "Standard", "Advanced") },
+        { id: "exports", feature: "CSV exports", values: values("—", "Included", "Included") },
       ];
     },
     [data?.plans],
@@ -227,6 +218,9 @@ export default function SubscriptionPage() {
     [data?.plans],
   );
   const active = data?.entitlement.activeSubscription;
+  const snapshot = authoritative.entitlement;
+  const stateLabel = snapshot ? ({ TRIAL_ACTIVE: "Trial active", TRIAL_EXPIRED: "Trial expired", SUBSCRIPTION_ACTIVE: "Active", SUBSCRIPTION_GRACE: "Grace period", SUBSCRIPTION_EXPIRED: "Expired", CANCELLED_BUT_ACTIVE: "Cancelled · active until period end", LEGACY_TRANSITION: "Legacy transition", NO_ENTITLEMENT: "Subscription required" } as const)[snapshot.state] : "Loading access";
+  const currentPlan = snapshot?.plan?.code ? data?.plans.find(plan => plan.code === snapshot.plan?.code) : null;
   return (
     <div className="min-w-0 space-y-8">
       <header>
@@ -266,27 +260,21 @@ export default function SubscriptionPage() {
                     Your shop access
                   </p>
                   <h2 className="text-lg font-semibold">
-                    {active?.plan.name ??
-                      (data.entitlement.status === "TRIAL"
-                        ? "Free trial"
-                        : "Subscription required")}
+                    {currentPlan?.name ?? snapshot?.plan?.code ?? (snapshot?.state === "TRIAL_ACTIVE" ? "Free trial · 14-day introductory trial" : "Subscription required")}
                   </h2>
+                  {currentPlan && <p className="text-sm text-muted-foreground">{money(currentPlan.price)} / month</p>}
                 </div>
               </div>
-              <Badge variant={active ? "default" : "secondary"}>
-                {active
-                  ? "Active"
-                  : data.entitlement.status === "TRIAL"
-                    ? "Trial active"
-                    : "Limited access"}
-              </Badge>
+              <Badge variant={snapshot?.state === "SUBSCRIPTION_ACTIVE" || snapshot?.state === "TRIAL_ACTIVE" ? "default" : "secondary"}>{stateLabel}</Badge>
             </div>
-            <p className="mt-4 text-sm text-muted-foreground">
-              {active
-                ? `Current period ends ${date(active.currentPeriodEnd)}.`
-                : `Trial ends ${date(data.entitlement.trialEndsAt)} · ${data.entitlement.daysRemaining} days remaining.`}
-            </p>
+            {authoritative.error && <p className="mt-4 text-sm text-destructive">{authoritative.error}</p>}
+            {snapshot?.state === "TRIAL_ACTIVE" && <p className="mt-4 text-sm text-muted-foreground">Trial ends {date(snapshot.effectiveUntil)} · {authoritative.data?.daysRemaining ?? 0} days remaining. The stored expiry date remains authoritative.</p>}
+            {snapshot?.state === "TRIAL_EXPIRED" && <p className="mt-4 text-sm text-muted-foreground">Your introductory trial expired {date(snapshot.effectiveUntil)}. Existing data remains available.</p>}
+            {snapshot?.source.includes("SUBSCRIPTION") && <p className="mt-4 text-sm text-muted-foreground">Paid period ends {date(snapshot.effectiveUntil)}{snapshot.state === "SUBSCRIPTION_GRACE" ? ` · grace ends ${date(snapshot.graceEndsAt)}` : ""}.</p>}
+            {authoritative.data?.subscriptionPaymentState && <p className="mt-3 rounded-lg bg-muted p-3 text-sm text-muted-foreground">Payment confirmation is {authoritative.data.subscriptionPaymentState === "NEEDS_REVIEW" ? "under review" : "pending"}. It does not grant plan access.</p>}
           </section>
+          {snapshot && <section className="space-y-3"><div><h2 className="text-xl font-semibold">Resource usage</h2><p className="mt-1 text-sm text-muted-foreground">Authoritative usage for this shop.</p></div><ResourceUsageGrid entitlement={snapshot} /></section>}
+          {snapshot && <section className="rounded-2xl border bg-card p-5"><h2 className="text-lg font-semibold">Available capabilities</h2><div className="mt-3 flex flex-wrap gap-2">{Object.entries(snapshot.capabilityModes).filter(([, mode]) => Boolean(mode)).map(([capability, mode]) => <Badge key={capability} variant="secondary">{label(capability)} · {mode === "PREVIEW" ? "Preview" : "Available"}</Badge>)}</div><p className="mt-3 text-xs text-muted-foreground">Capabilities describe plan access. Features still under development are not presented as working tools.</p></section>}
           <section>
             <h2 className="text-xl font-semibold">Available plans</h2>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -304,13 +292,13 @@ export default function SubscriptionPage() {
                 <code>npm run seed:subscription-plans</code>.
               </p>
             ) : (
-              <div className="mt-4 grid gap-4 lg:grid-cols-2">
+              <div className="mt-4 grid gap-4 lg:grid-cols-3">
                 {data.plans.map((plan) => {
                   const current = active?.plan.code === plan.code;
                   return (
                     <article
                       key={plan.code}
-                      className={`flex flex-col rounded-2xl border bg-card p-5 shadow-sm ${plan.code === "BUSINESS" ? "border-primary/40" : ""}`}>
+                      className={`flex flex-col rounded-2xl border bg-card p-5 shadow-sm ${plan.code === "GROWTH" ? "border-primary/40" : ""}`}>
                       <div className="flex justify-between">
                         <div className="grid size-9 place-items-center rounded-xl bg-primary/10 text-primary">
                           <CircleDollarSign className="size-4" />

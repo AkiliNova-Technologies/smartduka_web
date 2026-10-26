@@ -55,12 +55,14 @@ export default function VendorSettingsPage() {
   const { fullProfile, fullProfileLoading } = useVendor();
   const searchParams = useSearchParams();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<TabID>(() =>
-    ["payments", "payouts"].includes(searchParams.get("tab") ?? "") ? "payments" : "branding",
-  );
+  const [activeTab, setActiveTab] = useState<TabID>(() => {
+    const requested = searchParams.get("tab");
+    if (requested === "payouts") return "payments";
+    return TABS.some((tab) => tab.id === requested) ? requested as TabID : "branding";
+  });
   const selectTab = (tab: TabID) => {
     setActiveTab(tab);
-    router.replace(tab === "payments" ? "/vendor/settings?tab=payments" : "/vendor/settings", { scroll: false });
+    router.replace(tab === "branding" ? "/vendor/settings" : `/vendor/settings?tab=${tab}`, { scroll: false });
   };
 
   // Loading skeleton — only shows on first load, not on subsequent navigations

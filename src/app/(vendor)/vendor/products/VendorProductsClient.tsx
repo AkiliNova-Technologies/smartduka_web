@@ -17,10 +17,13 @@ import { useProducts } from "@/hooks/use-products";
 import { useVendor } from "@/hooks/use-vendor";
 import { cn } from "@/lib/utils";
 import type { Product } from "@/types/marketplace";
+import { useVendorEntitlement } from "@/hooks/use-vendor-entitlement";
+import { ResourceUsage } from "@/components/vendor/resource-usage";
 
 export default function VendorProductsPage() {
   const { profile, loading: vendorLoading } = useVendor();
   const vendorId = profile?.id;
+  const access = useVendorEntitlement();
 
   const {
     products: apiProducts,
@@ -184,6 +187,8 @@ export default function VendorProductsPage() {
           </p>
         </div>
       </div>
+
+      {access.entitlement && <div className="space-y-2"><ResourceUsage compact resource="ACTIVE_PRODUCTS" entitlement={access.entitlement} />{access.entitlement.limits.ACTIVE_PRODUCTS !== null && access.entitlement.usage.ACTIVE_PRODUCTS >= Math.floor(access.entitlement.limits.ACTIVE_PRODUCTS * 0.9) && <p className="rounded-lg bg-amber-500/5 p-3 text-xs text-amber-800 dark:text-amber-200">{access.entitlement.usage.ACTIVE_PRODUCTS >= access.entitlement.limits.ACTIVE_PRODUCTS ? "Active product capacity reached. Drafts and edits remain available; publishing another product requires additional capacity." : "You are nearing your active product capacity."} <Link className="font-medium underline" href="/vendor/subscription">View plans</Link></p>}</div>}
 
       {error && (
         <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 text-xs font-medium flex items-center justify-between">

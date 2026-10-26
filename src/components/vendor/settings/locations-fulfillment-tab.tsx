@@ -20,6 +20,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { useBranchInventory } from "@/hooks/use-branch-inventory";
 import { useShopBranches } from "@/hooks/use-shop-branches";
 import type { ShopBranchDto, ShopBranchInput } from "@/lib/shop-branches-client";
+import { useVendorEntitlement } from "@/hooks/use-vendor-entitlement";
+import { ResourceUsage } from "@/components/vendor/resource-usage";
 
 const blank: ShopBranchInput = {
   name: "", slug: "", branchType: "STORE", isPrimary: false, isActive: true,
@@ -32,6 +34,7 @@ type FieldName = "name" | "slug" | "addressLine" | "pickupEnabled" | "deliveryFe
 type FieldErrors = Partial<Record<FieldName, string>>;
 
 export function LocationsFulfillmentTab() {
+  const access = useVendorEntitlement();
   const { branches, loading, saving, error, save } = useShopBranches();
   const inventory = useBranchInventory();
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -100,6 +103,8 @@ export function LocationsFulfillmentTab() {
   return <div className="space-y-6">
     <header><h2 className="text-xl font-semibold tracking-tight">Locations &amp; fulfilment</h2><p className="mt-1 text-sm text-muted-foreground">Configure where your business operates and how each location fulfils customer orders.</p></header>
 
+    {access.entitlement && <div className="space-y-2"><ResourceUsage compact resource="SHOP_BRANCHES" entitlement={access.entitlement} />{access.entitlement.limits.SHOP_BRANCHES !== null && access.entitlement.usage.SHOP_BRANCHES >= access.entitlement.limits.SHOP_BRANCHES && <p className="text-sm text-muted-foreground">Branch capacity reached. Existing locations can still be edited or deactivated. <Link className="font-medium text-primary underline" href="/vendor/subscription">View plans</Link></p>}</div>}
+
     <Card>
       <CardHeader><CardTitle className="flex items-center gap-2"><PackageCheck className="size-4" />How customers receive orders</CardTitle><CardDescription>Choose how customers can receive purchases from your shop.</CardDescription></CardHeader>
       <CardContent className="space-y-4">
@@ -118,6 +123,7 @@ export function LocationsFulfillmentTab() {
       <CardFooter className="border-t">{inventory.data?.mode === "LOCATION_MANAGED" ? <Button asChild variant="outline"><Link href="/vendor/inventory">Open inventory</Link></Button> : <Button type="button" variant="outline" onClick={() => setConfirmInventory(true)} disabled={!activeBranches.length} title={!activeBranches.length ? "Add and activate a location first" : undefined}>Enable location inventory</Button>}</CardFooter>
     </Card>
 
+    {error && <p className="text-sm text-muted-foreground">{error} <Link className="font-medium text-primary underline" href="/vendor/subscription">View subscription plans</Link></p>}
     <LocationDialog open={dialogOpen} onOpenChange={(next) => !saving && setDialogOpen(next)} editing={Boolean(editingId)} form={form} set={set} fieldErrors={fieldErrors} serviceError={error} saving={saving} onSubmit={submit} />
     <Dialog open={confirmInventory} onOpenChange={(next) => !enablingInventory && setConfirmInventory(next)}><DialogContent><DialogHeader><DialogTitle>Enable location inventory?</DialogTitle><DialogDescription>This advanced mode tracks stock separately at every location and does not enable automatically when you add a location.</DialogDescription></DialogHeader><div className="flex gap-3 rounded-xl border border-border bg-muted/30 p-4"><TriangleAlert className="mt-0.5 size-5 shrink-0 text-primary" /><p className="text-sm text-muted-foreground">Unallocated stock cannot fulfil location-based orders until it is assigned. Existing stock constraints and active-order protections remain in place.</p></div><DialogFooter><Button type="button" variant="outline" onClick={() => setConfirmInventory(false)} disabled={enablingInventory}>Cancel</Button><Button type="button" onClick={() => void enableInventory()} disabled={enablingInventory}>{enablingInventory && <Loader2 className="size-4 animate-spin" />}{enablingInventory ? "Enabling…" : "Enable inventory mode"}</Button></DialogFooter></DialogContent></Dialog>
   </div>;

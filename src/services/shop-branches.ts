@@ -2,6 +2,7 @@ import { Prisma, ShopBranchType } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma/client";
 import { requireVendorContext } from "@/lib/auth/vendor-context";
+import { VendorQuotaService } from "@/services/vendor-quota";
 
 export const shopBranchInputSchema = z.object({
   name: z.string().trim().min(2).max(120),
@@ -47,6 +48,7 @@ export class ShopBranchService {
     const input = clean(shopBranchInputSchema.parse(raw));
     const { openingHours, ...values } = input;
     return prisma.$transaction(async (tx) => {
+      if (input.isActive) await VendorQuotaService.assertCanConsumeResource({ shopId: context.vendorId, resource: "SHOP_BRANCHES", transaction: tx as unknown as Prisma.TransactionClient });
       if (input.isPrimary) await tx.shopBranch.updateMany({ where: { shopId: context.vendorId, isPrimary: true }, data: { isPrimary: false } });
       const branch = await tx.shopBranch.create({ data: { ...values, openingHours: openingHours === null ? Prisma.JsonNull : openingHours, shopId: context.vendorId } });
       await tx.auditLog.create({ data: { vendorId: context.vendorId, userId: context.user.id, action: "SHOP_BRANCH_CREATED", entity: "ShopBranch", entityId: branch.id, newValues: { name: branch.name, isPrimary: branch.isPrimary } } });
@@ -61,6 +63,7 @@ export class ShopBranchService {
     return prisma.$transaction(async (tx) => {
       const existing = await tx.shopBranch.findFirst({ where: { id, shopId: context.vendorId } });
       if (!existing) throw new ShopBranchError("Location not found.", "NOT_FOUND");
+      if (!existing.isActive && input.isActive) await VendorQuotaService.assertCanConsumeResource({ shopId: context.vendorId, resource: "SHOP_BRANCHES", transaction: tx as unknown as Prisma.TransactionClient });
       if (!input.isActive) {
         const activeOrder = await tx.subOrder.findFirst({ where: { branchId: id, fulfillmentStatus: { in: ["PENDING", "PREPARING", "READY_FOR_PICKUP", "OUT_FOR_DELIVERY"] } }, select: { id: true } });
         if (activeOrder) throw new ShopBranchError("This location has active orders and cannot be disabled yet.", "CONFLICT");

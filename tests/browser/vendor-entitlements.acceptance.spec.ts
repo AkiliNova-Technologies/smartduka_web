@@ -1,0 +1,16 @@
+import { expect, test, type Page } from "@playwright/test";
+
+const enabled = process.env.RUN_VENDOR_ENTITLEMENT_BROWSER_ACCEPTANCE === "1";
+const password = process.env.CUSTOMER_ORDERS_BROWSER_PASSWORD ?? "";
+async function login(page: Page, email: string) { await page.goto("/login?callbackUrl=/vendor/subscription"); await page.getByLabel("Email Address").fill(email); await page.locator("#password").fill(password); await page.getByRole("button", { name: "Continue", exact: true }).click(); await expect.poll(() => new URL(page.url()).pathname).toBe("/vendor/subscription"); }
+async function logout(page: Page) { await page.getByRole("button", { name: "Open account menu" }).click(); await page.getByRole("menuitem", { name: "Sign out" }).click(); await expect.poll(() => new URL(page.url()).pathname).toBe("/"); }
+
+test.describe("isolated vendor entitlement experience", () => {
+  test.skip(!enabled, "Requires the guarded disposable database and Firebase Auth Emulator runner.");
+  test.beforeEach(() => { if (!password) throw new Error("The isolated browser password is required."); });
+
+  test("shows authoritative Starter overview, usage, comparison, and product quota", async ({ page }) => { await login(page, "vendor-1@orders.test"); await expect(page.getByRole("heading", { name: "Starter", level: 2 })).toBeVisible(); await expect(page.getByText("UGX 25,000 / month").first()).toBeVisible(); await expect(page.getByText("Active products").first()).toBeVisible(); await expect(page.getByText("Branches").first()).toBeVisible(); await expect(page.getByText("Staff").first()).toBeVisible(); await expect(page.getByText("Fair-use unlimited")).toBeVisible(); await page.goto("/vendor/products"); await expect(page.getByText("Active products").first()).toBeVisible(); });
+  test("clears shop-scoped entitlement state when switching accounts", async ({ page }) => { await login(page, "vendor-1@orders.test"); await expect(page.getByRole("heading", { name: "Starter", level: 2 })).toBeVisible(); await logout(page); await login(page, "vendor-2@orders.test"); await expect(page.getByRole("heading", { name: "Growth", level: 2 })).toBeVisible(); await expect(page.getByText("UGX 60,000 / month").first()).toBeVisible(); await expect(page.getByRole("heading", { name: "Starter", level: 2 })).not.toBeVisible(); });
+  test("adapts to light and dark themes and accent variables", async ({ page }) => { await login(page, "vendor-1@orders.test"); await page.goto("/settings?tab=appearance"); await page.getByRole("button", { name: "dark", exact: true }).click(); await page.getByRole("radio", { name: /Rose/ }).click(); await page.goto("/vendor/subscription"); await expect(page.locator("html")).toHaveClass(/dark/); const accent = await page.locator("html").evaluate(element => getComputedStyle(element).getPropertyValue("--primary")); expect(accent.trim()).not.toBe(""); });
+  test("is responsive without horizontal overflow", async ({ page }) => { await login(page, "vendor-1@orders.test"); const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth); expect(overflow).toBe(false); await expect(page.getByText("Resource usage")).toBeVisible(); });
+});

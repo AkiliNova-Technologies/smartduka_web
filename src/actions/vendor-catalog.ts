@@ -6,6 +6,9 @@ import { Decimal } from "@prisma/client/runtime/client";
 import { requireVendorContext } from "@/lib/auth/vendor-context";
 import { optionKey, validateVariants } from "@/lib/variant-validation";
 import { createVariantWithSku } from "@/lib/variant-sku";
+import { VendorQuotaService } from "@/services/vendor-quota";
+
+const consumesProductQuota = (status: ProductStatus) => status === ProductStatus.ACTIVE || status === ProductStatus.PUBLISHED;
 
 function generateSlug(text: string): string {
   return text
@@ -78,6 +81,7 @@ export async function createVendorProduct(input: CreateProductInput) {
   }
 
   return prisma.$transaction(async (tx) => {
+    if (consumesProductQuota(status)) await VendorQuotaService.assertCanConsumeResource({ shopId: vendorId, resource: "ACTIVE_PRODUCTS", transaction: tx as unknown as Prisma.TransactionClient });
     const product = await tx.product.create({
       data: {
         vendorId,
@@ -180,6 +184,9 @@ export async function updateVendorProduct(productId: string, input: UpdateProduc
   }
 
   return prisma.$transaction(async (tx) => {
+    if (mutations.status && consumesProductQuota(mutations.status) && !consumesProductQuota(existingProduct.status)) {
+      await VendorQuotaService.assertCanConsumeResource({ shopId: vendorId, resource: "ACTIVE_PRODUCTS", transaction: tx as unknown as Prisma.TransactionClient });
+    }
     if (images) {
       await tx.productImage.deleteMany({ where: { productId } });
       dataPayload.images = {

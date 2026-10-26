@@ -7,6 +7,7 @@ import { randomUUID } from "node:crypto";
 import { cacheLife, cacheTag } from "next/cache";
 import { cacheProfiles, cacheTags } from "@/lib/cache-policy";
 import { VendorEntitlementService } from "@/services/vendor-entitlement";
+import { VendorQuotaService } from "@/services/vendor-quota";
 import { publicProductWhere } from "@/lib/marketplace-eligibility";
 import { assertCanonicalCoversAllocations } from "@/services/inventory-integrity";
 
@@ -768,6 +769,9 @@ export class ProductService {
     const writeProduct = async (productId: string, preparedVariants: typeof variants) =>
       prisma.$transaction(async (tx) => {
         const transactionStartedAt = performance.now();
+        if (input.status === "PUBLISHED") {
+          await VendorQuotaService.assertCanConsumeResource({ shopId: input.vendorId, resource: "ACTIVE_PRODUCTS", transaction: tx as unknown as Prisma.TransactionClient });
+        }
         const product = await tx.product.create({
           data: {
         id: productId,
@@ -886,7 +890,12 @@ export class ProductService {
     }
     const variants = input.variants === undefined ? undefined : validateVariants(input.variants);
     return prisma.$transaction(async (tx) => {
-      const inventoryOwner = await tx.product.findUniqueOrThrow({ where: { id: input.id }, select: { vendorId: true, variants: { select: { id: true } } } });
+      const inventoryOwner = await tx.product.findUniqueOrThrow({ where: { id: input.id }, select: { vendorId: true, status: true, variants: { select: { id: true } } } });
+      const wasActive = inventoryOwner.status === "ACTIVE" || inventoryOwner.status === "PUBLISHED";
+      const becomesActive = input.status === "ACTIVE" || input.status === "PUBLISHED";
+      if (!wasActive && becomesActive) {
+        await VendorQuotaService.assertCanConsumeResource({ shopId: inventoryOwner.vendorId, resource: "ACTIVE_PRODUCTS", transaction: tx as unknown as Prisma.TransactionClient });
+      }
       if (variants !== undefined) {
         const existing = await tx.productVariant.findMany({ where: { productId: input.id }, include: { _count: { select: { orderItems: true } } } });
         const existingById = new Map(existing.map((variant) => [variant.id, variant]));

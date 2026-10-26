@@ -511,7 +511,7 @@ export default function VendorProductEditPage() {
           toast.success("Product updated successfully!");
           router.push("/vendor/products");
         } else {
-          toast.error(result.error || "Failed to update product.");
+          toast.error(result.error || "Failed to update product.", { action: { label: "View plans", onClick: () => router.push("/vendor/subscription") } });
         }
       } else {
         const result = await createProduct!({
@@ -539,7 +539,7 @@ export default function VendorProductEditPage() {
           toast.success("Product published successfully!");
           router.push("/vendor/products");
         } else {
-          toast.error(result.error || "Failed to publish product.");
+          toast.error(result.error || "Failed to publish product.", { action: { label: "View plans", onClick: () => router.push("/vendor/subscription") } });
         }
       }
     } catch {

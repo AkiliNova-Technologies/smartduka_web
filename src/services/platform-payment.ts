@@ -5,6 +5,7 @@ import { platformRevenueConfig } from "@/lib/platform-revenue/config";
 import { MtnMomoProvider } from "@/lib/payments/providers/mtn-momo-provider";
 import type { PaymentProviderAdapter } from "@/lib/payments/payment-provider";
 import { PromotionInventoryService, type PromotionTransaction } from "@/services/promotion-inventory";
+import { VendorSubscriptionService } from "@/services/vendor-subscriptions";
 
 const terminal = new Set<PlatformPaymentIntentStatus>(["FAILED", "CANCELLED", "EXPIRED", "REVERSED"]);
 const platformMtnEnvironment = (): NodeJS.ProcessEnv => ({ ...process.env, MTN_MOMO_ENVIRONMENT: process.env.PLATFORM_MTN_ENVIRONMENT, MTN_MOMO_BASE_URL: process.env.PLATFORM_MTN_BASE_URL, MTN_MOMO_COLLECTION_SUBSCRIPTION_KEY: process.env.PLATFORM_MTN_COLLECTION_SUBSCRIPTION_KEY, MTN_MOMO_API_USER: process.env.PLATFORM_MTN_API_USER, MTN_MOMO_API_KEY: process.env.PLATFORM_MTN_API_KEY, MTN_MOMO_TARGET_ENVIRONMENT: process.env.PLATFORM_MTN_TARGET_ENVIRONMENT, MTN_SANDBOX_COLLECTION_TESTING_ENABLED: process.env.PLATFORM_MTN_SANDBOX_TESTING_ENABLED, MTN_SANDBOX_TEST_CURRENCY: "UGX" });
@@ -17,16 +18,22 @@ export class PlatformPaymentService {
     return { provider: "MTN", enabled: platformRevenueConfig.platformMtnEnabled, merchantConfigured: platformRevenueConfig.platformMtnConfigured, configured, environment: platformRevenueConfig.platformMtnEnvironment, sandboxTesting: platformRevenueConfig.platformMtnSandboxTesting, liveTestEnabled: platformRevenueConfig.platformMtnLiveTestEnabled, productionEnabled: platformRevenueConfig.platformMtnProductionEnabled, ready: sandboxReady, readiness: !configured ? "NOT_CONFIGURED" : sandboxReady ? "SANDBOX_READY" : platformRevenueConfig.platformMtnLiveTestEnabled ? "LIVE_TEST_READY" : "NOT_CONFIGURED", productionReady: false };
   }
 
-  static async initiate(input: { vendorId: string; revenueOrderId: string; payerPhone: string; idempotencyKey: string }, testProvider?: PaymentProviderAdapter) {
+  static async initiate(input: { vendorId: string; revenueOrderId: string; payerPhone: string; idempotencyKey: string; actorUserId?: string }, testProvider?: PaymentProviderAdapter) {
     if(testProvider&&process.env.NODE_ENV!=="test")throw new Error("Payment test adapters are available only in the test environment.");
     const readiness = this.readiness();
     if (!readiness.ready) throw new Error("Platform MTN payment initiation is available only for explicitly enabled sandbox qualification.");
-    const candidate = await prisma.platformRevenueOrder.findFirst({ where: { id: input.revenueOrderId, vendorId: input.vendorId }, select: { campaign: { select: { placement: true } } } });
+    const candidate = await prisma.platformRevenueOrder.findFirst({ where: { id: input.revenueOrderId, vendorId: input.vendorId }, select: { campaign: { select: { placement: true } }, subscriptionBillingIntent: { select: { requestedById: true, amount: true, currency: true, expiresAt: true, merchantDestinationHash: true } }, vendor: { select: { ownerId: true } } } });
     if (!candidate) throw new Error("Revenue order not found.");
+    if (candidate.subscriptionBillingIntent) {
+      if (!input.actorUserId || input.actorUserId !== candidate.vendor.ownerId || candidate.subscriptionBillingIntent.requestedById !== candidate.vendor.ownerId) throw new Error("Only the shop owner can initiate subscription billing.");
+      if (candidate.subscriptionBillingIntent.expiresAt <= new Date()) throw new Error("This subscription billing intent expired. Create a new billing request.");
+      if (candidate.subscriptionBillingIntent.currency !== "UGX" || candidate.subscriptionBillingIntent.merchantDestinationHash !== VendorSubscriptionService.merchantDestinationHash()) throw new Error("The subscription merchant configuration changed. Create a new billing request.");
+    }
     const prepare = async (tx: PromotionTransaction) => {
       if (candidate.campaign) await PromotionInventoryService.lock(tx, candidate.campaign.placement);
       const order = await tx.platformRevenueOrder.findFirst({ where: { id: input.revenueOrderId, vendorId: input.vendorId }, include: { campaign: { include: { reservation: true } }, paymentIntents: { orderBy: { createdAt: "desc" }, take: 1 } } });
       if (!order) throw new Error("Revenue order not found.");
+      if (candidate.subscriptionBillingIntent && (Number(candidate.subscriptionBillingIntent.amount) !== Number(order.amountDue) || candidate.subscriptionBillingIntent.currency !== order.currency)) throw new Error("Subscription billing amount verification failed.");
       if (Number(order.amountDue) <= 0) throw new Error("This purchase is fully funded by promotional credit.");
       if (order.campaign && (!order.campaign.reservation || order.campaign.reservation.status !== "HOLD" || !order.campaign.reservation.holdExpiresAt || order.campaign.reservation.holdExpiresAt <= new Date())) throw new Error("The temporary advertising-slot hold expired. Review availability and create a new booking.");
       const existing = order.paymentIntents[0];

@@ -1,7 +1,8 @@
-import { VendorUserRole } from "@prisma/client";
+import { Prisma, VendorUserRole } from "@prisma/client";
 import { requireVendorContext } from "@/lib/auth/vendor-context";
 import { prisma } from "@/lib/prisma/client";
 import { VendorEntitlementService } from "@/services/vendor-entitlement";
+import { VendorQuotaService } from "@/services/vendor-quota";
 
 export class VendorTeamError extends Error { constructor(message: string, public code = "VENDOR_TEAM_ERROR") { super(message); } }
 
@@ -33,11 +34,9 @@ export class VendorTeamService {
     if (!member || member.status !== "ACTIVE") throw new VendorTeamError("Choose an active Mwezora user.");
     if (member.id === context.user.id) throw new VendorTeamError("The owner already has full shop access.");
     if (member.vendorId && member.vendorId !== context.vendorId) throw new VendorTeamError("This user already belongs to another shop.");
-    const entitlement = await VendorEntitlementService.summary(context.vendorId);
-    const limit = VendorEntitlementService.staffSeatLimit(entitlement);
     return prisma.$transaction(async tx => {
-      const used = await tx.user.count({ where: { vendorId: context.vendorId, id: { not: context.vendor.ownerId }, vendorRole: { in: [...delegableRoles] } } });
-      if (used >= limit) throw new VendorTeamError(limit === 0 ? "A subscription is required before adding team members." : "You've reached the staff limit for your current Mwezora plan.", "STAFF_LIMIT_REACHED");
+      const consumesSeat = member.vendorId !== context.vendorId || !member.vendorRole || !delegableRoles.has(member.vendorRole);
+      if (consumesSeat) await VendorQuotaService.assertCanConsumeResource({ shopId: context.vendorId, resource: "STAFF_ACCOUNTS", transaction: tx as unknown as Prisma.TransactionClient });
       const updated = await tx.user.update({ where: { id: member.id }, data: { vendorId: context.vendorId, vendorRole: role } });
       await tx.auditLog.create({ data: { vendorId: context.vendorId, userId: context.user.id, action: member.vendorId ? "VENDOR_TEAM_ROLE_CHANGED" : "VENDOR_TEAM_MEMBER_ADDED", entity: "User", entityId: member.id, oldValues: { vendorRole: member.vendorRole }, newValues: { vendorRole: role } } });
       return updated;

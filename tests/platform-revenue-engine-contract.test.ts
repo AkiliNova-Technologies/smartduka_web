@@ -15,10 +15,11 @@ describe("platform revenue engine boundary", () => {
     expect(schema).toContain("model PromotionCreditLedger");
   });
 
-  it("starts trials only for active shops and grants introductory credit once", () => {
+  it("does not activate trials or grant advertising credit during entitlement reads", () => {
     expect(entitlements).toContain("vendor.status !== VendorStatus.ACTIVE");
-    expect(entitlements).toContain("WELCOME_PROMOTION_CREDIT:${vendorId}");
-    expect(entitlements).toContain("grantKey: creditKey");
+    expect(entitlements).toContain("it no longer starts trials or grants advertising credit");
+    expect(entitlements).not.toContain("WELCOME_PROMOTION_CREDIT:${vendorId}");
+    expect(entitlements).not.toContain("grantKey: creditKey");
   });
 
   it("calculates promotion pricing and ownership on the server", () => {

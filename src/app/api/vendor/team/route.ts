@@ -1,5 +1,6 @@
 import { errorResponse, getErrorMessage, successResponse } from "@/lib/api-utils";
 import { VendorTeamError, VendorTeamService } from "@/services/vendor-team";
+import { VendorPlanLimitError } from "@/services/vendor-quota";
 
 export async function GET() {
   try { const [members, staff] = await Promise.all([VendorTeamService.list(), VendorTeamService.seatUsage()]); return successResponse({ members, staff }); }
@@ -12,5 +13,5 @@ export async function POST(request: Request) {
     if (body.action === "remove") return successResponse(await VendorTeamService.remove(body.memberId));
     if (body.action === "change-role") return successResponse(await VendorTeamService.changeRole(body.memberId, body.role));
     return successResponse(await VendorTeamService.add(body.email, body.role), 201);
-  } catch (error) { return errorResponse(getErrorMessage(error), error instanceof VendorTeamError ? 400 : 403); }
+  } catch (error) { return errorResponse(getErrorMessage(error), error instanceof VendorPlanLimitError ? 409 : error instanceof VendorTeamError ? 400 : 403, error instanceof VendorPlanLimitError ? error.code : undefined); }
 }

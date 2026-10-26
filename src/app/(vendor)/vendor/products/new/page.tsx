@@ -377,7 +377,7 @@ export default function VendorProductFormPage() {
         toast.success("Product published successfully!");
         router.push("/vendor/products");
       } else {
-        toast.error(result.error || "Failed to publish product.");
+        toast.error(result.error || "Failed to publish product.", { action: { label: "View plans", onClick: () => router.push("/vendor/subscription") } });
       }
     } catch {
       toast.error("Failed to save product. Please try again.");
