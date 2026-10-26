@@ -758,7 +758,7 @@ export class ProductService {
    * Create a new product with images
    */
   static async createProduct(input: CreateProductInput) {
-    VendorEntitlementService.requireCapability(await VendorEntitlementService.summary(input.vendorId), "PRODUCT_PUBLISHING");
+    if (input.status === "PUBLISHED") VendorEntitlementService.requireCapability(await VendorEntitlementService.summary(input.vendorId), "PRODUCT_PUBLISHING");
     await CategoryService.assertCompatibleProductCategories(input.categoryId, input.subCategoryId);
     const variants = validateVariants(input.variants);
     const needsAutomaticVariantSkus = variants.some((variant) => !variant.sku);

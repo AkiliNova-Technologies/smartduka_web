@@ -58,6 +58,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { validateProductStep, type ProductFormErrors } from "@/lib/product-form-validation";
+import { useProductFormRecovery } from "@/hooks/use-product-form-recovery";
+import { isVendorEntitlementError } from "@/lib/vendor-entitlement-error";
 
 interface SubCategoryItem {
   id: string;
@@ -268,6 +270,9 @@ export default function VendorProductEditPage() {
   const fetchedRef = React.useRef(false);
   const variantsInitializedRef = React.useRef(false);
   const specsInitializedRef = React.useRef(false);
+  const recoveryValue = React.useMemo(() => ({ formData, variants, productSpecs, productType, currentStep }), [currentStep, formData, productSpecs, productType, variants]);
+  const recovery = useProductFormRecovery({ vendorId, scope: productId ?? "new", value: recoveryValue, enabled: Boolean(vendorId && formData), serverUpdatedAt: existingProduct?.updatedAt });
+  const [isSavingDraft, setIsSavingDraft] = React.useState(false);
 
   React.useEffect(() => {
     if (!isEditMode || !productId || fetchedRef.current) return;
@@ -505,13 +510,17 @@ export default function VendorProductEditPage() {
           colors: formData.colors,
           specs: productSpecs.length ? productSpecs.filter((spec) => spec.name.trim() && spec.value.trim()).map(({ name, value }) => ({ name, value })) : specs,
           tags: formData.tags,
+          images,
           variants: productType === "variants" ? variants : [],
+          status: existingProduct?.status === "DRAFT" ? "PUBLISHED" : existingProduct?.status,
         });
         if (result.success) {
-          toast.success("Product updated successfully!");
+          recovery.clear();
+          toast.success(existingProduct?.status === "DRAFT" ? "Product published successfully!" : "Product updated successfully!");
           router.push("/vendor/products");
         } else {
-          toast.error(result.error || "Failed to update product.", { action: { label: "View plans", onClick: () => router.push("/vendor/subscription") } });
+          const message = result.error || "Failed to update product.";
+          toast.error(message, isVendorEntitlementError(message) ? { action: { label: "View plans", onClick: () => router.push("/vendor/subscription") } } : undefined);
         }
       } else {
         const result = await createProduct!({
@@ -539,13 +548,49 @@ export default function VendorProductEditPage() {
           toast.success("Product published successfully!");
           router.push("/vendor/products");
         } else {
-          toast.error(result.error || "Failed to publish product.", { action: { label: "View plans", onClick: () => router.push("/vendor/subscription") } });
+          const message = result.error || "Failed to publish product.";
+          toast.error(message, isVendorEntitlementError(message) ? { action: { label: "View plans", onClick: () => router.push("/vendor/subscription") } } : undefined);
         }
       }
     } catch {
       toast.error("Failed to save product.");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleSaveDraft = async () => {
+    if (!productId || !formData || isSavingDraft || isSubmitting) return;
+    setIsSavingDraft(true);
+    const images = [formData.image, ...formData.images].filter((url) => url.trim()).map((url, index) => ({ url, isFeatured: index === 0, sortOrder: index }));
+    try {
+      const result = await updateProduct!(productId, {
+        name: formData.title.trim() || "Untitled product",
+        slug: formData.slug || generateSlug(formData.title || "Untitled product"),
+        brand: formData.brand,
+        description: formData.description,
+        basePrice: Number(formData.price) || 0,
+        compareAtPrice: formData.compareAtPrice ? Number(formData.compareAtPrice) : null,
+        categoryId: formData.categoryId || null,
+        subCategoryId: formData.subCategoryId || null,
+        inventoryCount: productType === "simple" ? Number(formData.inventoryCount) || 0 : 0,
+        sku: formData.sku,
+        sizes: formData.sizes,
+        colors: formData.colors,
+        specs: productSpecs.filter((spec) => spec.name.trim() && spec.value.trim()).map(({ name, value }) => ({ name, value })),
+        tags: formData.tags,
+        images,
+        variants: productType === "variants" ? variants : [],
+        status: "DRAFT",
+      });
+      if (!result.success) throw new Error(result.error);
+      recovery.clear();
+      setExistingProduct((current) => current ? { ...current, status: "DRAFT", updatedAt: new Date().toISOString() } : current);
+      toast.success("Draft saved");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Draft could not be saved. Your recovery copy is still on this device.");
+    } finally {
+      setIsSavingDraft(false);
     }
   };
 
@@ -561,6 +606,19 @@ export default function VendorProductEditPage() {
           </span>
         ) : undefined}
       />
+
+      {recovery.recovery && recovery.recovery.value.formData && (
+        <div className="flex flex-col gap-3 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs text-foreground">Newer unsaved changes from {new Date(recovery.recovery.savedAt).toLocaleString()} are available.</p>
+          <div className="flex gap-2"><Button type="button" size="sm" variant="outline" onClick={recovery.clear}>Discard</Button><Button type="button" size="sm" onClick={() => { const saved = recovery.recovery!; setFormData(saved.value.formData); setVariants(saved.value.variants); setProductSpecs(saved.value.productSpecs); setProductType(saved.value.productType); setCurrentStep(saved.value.currentStep); recovery.dismissRecovery(); }}>Restore</Button></div>
+        </div>
+      )}
+      {existingProduct?.status === "DRAFT" && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/50 bg-card px-4 py-3">
+          <span className="text-xs text-muted-foreground">{isSavingDraft ? "Saving draft…" : recovery.localSavedAt ? "Recovery copy saved on this device" : "Draft changes are recoverable after refresh"}</span>
+          <Button type="button" variant="outline" size="sm" onClick={() => handleSaveDraft()} disabled={isSavingDraft || isSubmitting}>{isSavingDraft ? "Saving…" : "Save Draft"}</Button>
+        </div>
+      )}
 
       <div className="bg-muted/10 border border-border/40 rounded-full p-4 flex items-center justify-center select-none">
         <div className="flex items-center gap-4 max-w-3xl w-full justify-between">

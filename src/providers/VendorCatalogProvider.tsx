@@ -62,6 +62,7 @@ interface UpdateProductHookInput {
   colors?: string[];
   specs?: Record<string, string>[];
   tags?: string[];
+  images?: { url: string; isFeatured?: boolean; sortOrder?: number }[];
   variants?: { id?: string; sku?: string; name: string; price: number; inventoryCount: number; options: Record<string, string>; isActive?: boolean }[];
 }
 

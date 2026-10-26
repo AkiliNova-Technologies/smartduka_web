@@ -336,11 +336,23 @@ export default function AdminCategoriesPage() {
         data={allCategories}
         getRowId={(row) => row.id}
         isLoading={isLoading}
-        renderTabs={
-          <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground select-none flex items-center gap-2">
-            <span>Marketplace Catalog Structure</span>
-          </div>
-        }
+        features={{ search: true }}
+        getSearchText={(category) => {
+          const parent = allCategories.find((item) => item.id === category.parentId);
+          return [
+            category.name,
+            category.slug,
+            category.description,
+            parent?.name,
+            category.isActive === false ? "inactive" : "active",
+          ]
+            .filter(Boolean)
+            .join(" ");
+        }}
+        search={{
+          placeholder: "Search categories...",
+          ariaLabel: "Search categories",
+        }}
         toolbarActions={
           <Sheet open={drawerOpen} onOpenChange={handleSheetOpenChange}>
             <SheetTrigger asChild>
