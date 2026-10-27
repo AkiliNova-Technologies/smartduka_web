@@ -19,7 +19,11 @@ const LEGACY_PUBLIC_API_PREFIXES = [
   "/api/vendors/public",
 ];
 const PUBLIC_WEBHOOK_PATH = "/api/webhooks/pesapal";
-const NATIVE_BEARER_ROUTES = new Set(["GET /api/v1/me"]);
+const NATIVE_BEARER_ROUTES = new Set([
+  "GET /api/v1/me",
+  "GET /api/v1/wishlist",
+  "POST /api/v1/wishlist",
+]);
 
 function normalizePathname(pathname: string): string {
   return pathname === "/" ? pathname : pathname.replace(/\/+$/, "");
@@ -71,7 +75,14 @@ export function isNativeBearerPassThrough(
   authorization: string | null,
 ): boolean {
   const normalizedPathname = normalizePathname(pathname);
-  if (!NATIVE_BEARER_ROUTES.has(`${method.toUpperCase()} ${normalizedPathname}`)) {
+  const normalizedMethod = method.toUpperCase();
+  const wishlistDelete =
+    normalizedMethod === "DELETE" &&
+    /^\/api\/v1\/wishlist\/[^/]+$/.test(normalizedPathname);
+  if (
+    !wishlistDelete &&
+    !NATIVE_BEARER_ROUTES.has(`${normalizedMethod} ${normalizedPathname}`)
+  ) {
     return false;
   }
   return /^Bearer\s+\S+$/i.test(authorization ?? "");

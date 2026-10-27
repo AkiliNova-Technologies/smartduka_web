@@ -105,6 +105,39 @@ describe("public V1 marketplace catalogue reads", () => {
     expect(mocks.verifyToken).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ["GET", "/api/v1/wishlist"],
+    ["POST", "/api/v1/wishlist"],
+    ["DELETE", "/api/v1/wishlist/product-1"],
+  ])("passes audited native wishlist %s requests", async (method, pathname) => {
+    const response = await proxy(
+      bearerRequest(pathname, "Bearer firebase-id-token", method),
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("x-middleware-next")).toBe("1");
+    expect(response.headers.get("x-middleware-request-authorization")).toBe(
+      "Bearer firebase-id-token",
+    );
+    expect(
+      response.headers.get("x-middleware-request-x-marketplace-user-id"),
+    ).toBeNull();
+  });
+
+  it("does not pass native Bearer access to wishlist-like routes", async () => {
+    for (const [method, pathname] of [
+      ["PATCH", "/api/v1/wishlist"],
+      ["DELETE", "/api/v1/wishlist"],
+      ["GET", "/api/v1/wishlist-private"],
+      ["DELETE", "/api/v1/wishlist/product-1/history"],
+    ]) {
+      const response = await proxy(
+        bearerRequest(pathname, "Bearer firebase-id-token", method),
+      );
+      expect(response.status).toBe(401);
+    }
+  });
+
   it.each(["", "Bearer", "Bearer   ", "Basic credentials", "token-only"])(
     "rejects malformed native authorization %j",
     async (authorization) => {

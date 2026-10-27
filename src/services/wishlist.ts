@@ -36,7 +36,11 @@ export class WishlistService {
 
   static async addToWishlist(userId: string, productId: string) {
     const product = await prisma.product.findFirst({ where: { id: productId, ...publicProductWhere }, select: { id: true } });
-    if (!product) throw new Error("Product not found.");
+    if (!product) {
+      const error = new Error("Product not found.");
+      Object.assign(error, { code: "NOT_FOUND" });
+      throw error;
+    }
     return prisma.wishlistItem.upsert({
       where: { userId_productId: { userId, productId } },
       update: {},
