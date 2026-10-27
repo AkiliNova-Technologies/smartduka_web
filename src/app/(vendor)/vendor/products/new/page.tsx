@@ -116,7 +116,8 @@ export default function VendorProductFormPage() {
   const [hasValidated, setHasValidated] = React.useState(false);
   const [categorySelectOpen, setCategorySelectOpen] = React.useState(false);
   const [categoryQuery, setCategoryQuery] = React.useState("");
-  const [subCategorySelectOpen, setSubCategorySelectOpen] = React.useState(false);
+  const [subCategorySelectOpen, setSubCategorySelectOpen] =
+    React.useState(false);
   const [subCategoryQuery, setSubCategoryQuery] = React.useState("");
   // Retained only for the legacy block below while the shared editor owns the live UI.
   const [useVariants, setUseVariants] = React.useState(false);
@@ -150,15 +151,25 @@ export default function VendorProductFormPage() {
     weight: "",
     outsole: "",
   });
-  const recoveryValue = React.useMemo(() => ({ formData, variants, productSpecs, productType, currentStep }), [currentStep, formData, productSpecs, productType, variants]);
-  const recovery = useProductFormRecovery({ vendorId, scope: "new", value: recoveryValue, enabled: Boolean(vendorId) });
+  const recoveryValue = React.useMemo(
+    () => ({ formData, variants, productSpecs, productType, currentStep }),
+    [currentStep, formData, productSpecs, productType, variants],
+  );
+  const recovery = useProductFormRecovery({
+    vendorId,
+    scope: "new",
+    value: recoveryValue,
+    enabled: Boolean(vendorId),
+  });
   const [isSavingDraft, setIsSavingDraft] = React.useState(false);
   const categoryOptions = categories as CategoryTree[];
   const selectedCategory = categoryOptions.find(
     (category) => category.id === formData.categoryId,
   );
   const filteredCategories = categoryOptions.filter((category) =>
-    category.name.toLocaleLowerCase().includes(categoryQuery.trim().toLocaleLowerCase()),
+    category.name
+      .toLocaleLowerCase()
+      .includes(categoryQuery.trim().toLocaleLowerCase()),
   );
   const selectedSubCategory = availableSubCategories.find(
     (subCategory) => subCategory.id === formData.subCategoryId,
@@ -168,12 +179,14 @@ export default function VendorProductFormPage() {
       .toLocaleLowerCase()
       .includes(subCategoryQuery.trim().toLocaleLowerCase()),
   );
-  const previewInventory = productType === "variants"
-    ? variants
-        .filter((variant) => variant.isActive && variant.inventoryCount >= 0)
-        .reduce((total, variant) => total + variant.inventoryCount, 0)
-    : Number(formData.inventoryCount) || 0;
-  const previewInventoryConfigured = productType === "simple" || variants.length > 0;
+  const previewInventory =
+    productType === "variants"
+      ? variants
+          .filter((variant) => variant.isActive && variant.inventoryCount >= 0)
+          .reduce((total, variant) => total + variant.inventoryCount, 0)
+      : Number(formData.inventoryCount) || 0;
+  const previewInventoryConfigured =
+    productType === "simple" || variants.length > 0;
 
   const updateField = React.useCallback(
     (field: string, value: string | string[]) => {
@@ -202,7 +215,8 @@ export default function VendorProductFormPage() {
   const validateStep = (step: number) => {
     const errors = validateProductStep(step, {
       ...formData,
-      inventoryCount: productType === "simple" ? formData.inventoryCount : undefined,
+      inventoryCount:
+        productType === "simple" ? formData.inventoryCount : undefined,
     });
     setFieldErrors((current) => ({ ...current, ...errors }));
     for (const field of step === 1
@@ -365,17 +379,21 @@ export default function VendorProductFormPage() {
           : undefined,
         categoryId: formData.categoryId,
         subCategoryId: formData.subCategoryId || undefined,
-        inventoryCount: productType === "variants" ? 0 : Number(formData.inventoryCount),
+        inventoryCount:
+          productType === "variants" ? 0 : Number(formData.inventoryCount),
         sku: formData.sku,
         status: "PUBLISHED" as const,
         sizes: formData.sizes,
         colors: formData.colors,
         specs: productSpecs.length
-          ? productSpecs.filter((spec) => spec.name.trim() && spec.value.trim()).map(({ name, value }) => ({ name, value }))
+          ? productSpecs
+              .filter((spec) => spec.name.trim() && spec.value.trim())
+              .map(({ name, value }) => ({ name, value }))
           : specs,
         tags: formData.tags,
         images,
-        variants: productType === "variants" && variants.length ? variants : undefined,
+        variants:
+          productType === "variants" && variants.length ? variants : undefined,
       });
 
       if (result.success) {
@@ -384,7 +402,17 @@ export default function VendorProductFormPage() {
         router.push("/vendor/products");
       } else {
         const message = result.error || "Failed to publish product.";
-        toast.error(message, isVendorEntitlementError(message) ? { action: { label: "View plans", onClick: () => router.push("/vendor/subscription") } } : undefined);
+        toast.error(
+          message,
+          isVendorEntitlementError(message)
+            ? {
+                action: {
+                  label: "View plans",
+                  onClick: () => router.push("/vendor/subscription"),
+                },
+              }
+            : undefined,
+        );
       }
     } catch {
       toast.error("Failed to save product. Please try again.");
@@ -397,7 +425,13 @@ export default function VendorProductFormPage() {
     if (!vendorId || isSavingDraft || isSubmitting) return;
     setIsSavingDraft(true);
     const draftName = formData.title.trim() || "Untitled product";
-    const images = [formData.image, ...formData.images].filter((url) => url.trim()).map((url, index) => ({ url, isFeatured: index === 0, sortOrder: index }));
+    const images = [formData.image, ...formData.images]
+      .filter((url) => url.trim())
+      .map((url, index) => ({
+        url,
+        isFeatured: index === 0,
+        sortOrder: index,
+      }));
     try {
       const result = await createProduct!({
         name: draftName,
@@ -405,18 +439,24 @@ export default function VendorProductFormPage() {
         brand: formData.brand,
         description: formData.description,
         basePrice: Number(formData.price) || 0,
-        compareAtPrice: formData.compareAtPrice ? Number(formData.compareAtPrice) : undefined,
+        compareAtPrice: formData.compareAtPrice
+          ? Number(formData.compareAtPrice)
+          : undefined,
         categoryId: formData.categoryId || undefined,
         subCategoryId: formData.subCategoryId || undefined,
-        inventoryCount: productType === "simple" ? Number(formData.inventoryCount) || 0 : 0,
+        inventoryCount:
+          productType === "simple" ? Number(formData.inventoryCount) || 0 : 0,
         sku: formData.sku,
         status: "DRAFT",
         sizes: formData.sizes,
         colors: formData.colors,
-        specs: productSpecs.filter((spec) => spec.name.trim() && spec.value.trim()).map(({ name, value }) => ({ name, value })),
+        specs: productSpecs
+          .filter((spec) => spec.name.trim() && spec.value.trim())
+          .map(({ name, value }) => ({ name, value })),
         tags: formData.tags,
         images,
-        variants: productType === "variants" && variants.length ? variants : undefined,
+        variants:
+          productType === "variants" && variants.length ? variants : undefined,
       });
       if (!result.success) throw new Error(result.error);
       const id = (result.data as { id?: string } | undefined)?.id;
@@ -424,7 +464,11 @@ export default function VendorProductFormPage() {
       toast.success("Draft saved");
       router.replace(id ? `/vendor/products/${id}/edit` : "/vendor/products");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Draft could not be saved. Your recovery copy is still on this device.");
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Draft could not be saved. Your recovery copy is still on this device.",
+      );
     } finally {
       setIsSavingDraft(false);
     }
@@ -442,20 +486,62 @@ export default function VendorProductFormPage() {
 
   return (
     <div className="space-y-8 max-w-8xl w-full mx-auto animate-in fade-in duration-300">
-      <DashboardPageHeader title="Add Product" description="Create a new product for your shop" backHref="/vendor/products" />
+      <DashboardPageHeader
+        title="Add Product"
+        description="Create a new product for your shop"
+        backHref="/vendor/products"
+      />
 
       {recovery.recovery && (
-        <div className="flex flex-col gap-3 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-xs text-foreground">Unsaved product changes from {new Date(recovery.recovery.savedAt).toLocaleString()} are available.</p>
+        <div className="flex flex-col gap-3 rounded-full border border-amber-500/30 bg-amber-500/5 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs text-foreground">
+            Unsaved product changes from{" "}
+            {new Date(recovery.recovery.savedAt).toLocaleString()} are
+            available.
+          </p>
           <div className="flex gap-2">
-            <Button type="button" size="sm" variant="outline" onClick={() => { recovery.clear(); }}>Discard</Button>
-            <Button type="button" size="sm" onClick={() => { const saved = recovery.recovery!; setFormData(saved.value.formData); setVariants(saved.value.variants); setProductSpecs(saved.value.productSpecs); setProductType(saved.value.productType); setCurrentStep(saved.value.currentStep); recovery.dismissRecovery(); }}>Restore</Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                recovery.clear();
+              }}>
+              Discard
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => {
+                const saved = recovery.recovery!;
+                setFormData(saved.value.formData);
+                setVariants(saved.value.variants);
+                setProductSpecs(saved.value.productSpecs);
+                setProductType(saved.value.productType);
+                setCurrentStep(saved.value.currentStep);
+                recovery.dismissRecovery();
+              }}>
+              Restore
+            </Button>
           </div>
         </div>
       )}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/50 bg-card px-4 py-3">
-        <span className="text-xs text-muted-foreground">{isSavingDraft ? "Saving draft…" : recovery.localSavedAt ? "Recovery copy saved on this device" : "Changes are saved locally after you pause typing"}</span>
-        <Button type="button" variant="outline" size="sm" onClick={handleSaveDraft} disabled={isSavingDraft || isSubmitting}>{isSavingDraft ? "Saving…" : "Save Draft"}</Button>
+        <span className="text-xs text-muted-foreground">
+          {isSavingDraft
+            ? "Saving draft…"
+            : recovery.localSavedAt
+              ? "Recovery copy saved on this device"
+              : "Changes are saved locally after you pause typing"}
+        </span>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={handleSaveDraft}
+          disabled={isSavingDraft || isSubmitting}>
+          {isSavingDraft ? "Saving…" : "Save Draft"}
+        </Button>
       </div>
 
       <div className="bg-muted/10 border border-border/40 rounded-full p-4 flex items-center justify-center select-none">
@@ -540,7 +626,13 @@ export default function VendorProductFormPage() {
                 />
                 <FieldError id="title-error">{fieldErrors.title}</FieldError>
               </div>
-              {productType === "variants" && <p className="text-xs text-muted-foreground">Prices and inventory are configured for each variant combination in the next step. Stock is managed by your product variants.</p>}
+              {productType === "variants" && (
+                <p className="text-xs text-muted-foreground">
+                  Prices and inventory are configured for each variant
+                  combination in the next step. Stock is managed by your product
+                  variants.
+                </p>
+              )}
               <div className="space-y-2">
                 <Label
                   htmlFor="product-type"
@@ -730,7 +822,10 @@ export default function VendorProductFormPage() {
                                     subCategory.id === formData.subCategoryId
                                   }
                                   onClick={() => {
-                                    updateField("subCategoryId", subCategory.id);
+                                    updateField(
+                                      "subCategoryId",
+                                      subCategory.id,
+                                    );
                                     setSubCategorySelectOpen(false);
                                   }}
                                   className="rounded-lg text-xs font-medium">
@@ -743,7 +838,8 @@ export default function VendorProductFormPage() {
                                         {subCategory.productCount} products
                                       </span>
                                     )}
-                                  {subCategory.id === formData.subCategoryId && (
+                                  {subCategory.id ===
+                                    formData.subCategoryId && (
                                     <Check className="size-4 shrink-0" />
                                   )}
                                 </CommandItem>
@@ -791,7 +887,9 @@ export default function VendorProductFormPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    {productType === "variants" ? "Starting Price (UGX) *" : "Selling Price (UGX) *"}
+                    {productType === "variants"
+                      ? "Starting Price (UGX) *"
+                      : "Selling Price (UGX) *"}
                   </Label>
                   <Input
                     data-product-field="price"
@@ -825,57 +923,60 @@ export default function VendorProductFormPage() {
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {productType === "simple" && <div className="space-y-2">
-                  <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    Stock Quantity *
-                  </Label>
-                  <Input
-                    type="number"
-                    value={formData.inventoryCount}
-                    onChange={(e) =>
-                      updateField("inventoryCount", e.target.value)
-                    }
-                    onBlur={() => hasValidated && validateStep(1)}
-                    aria-invalid={Boolean(fieldErrors.inventoryCount)}
-                    placeholder="0"
-                    className="h-10 border-border/60 rounded-full bg-background font-medium text-xs"
-                  />
-                  <FieldError id="stock-error">
-                    {fieldErrors.inventoryCount}
-                  </FieldError>
-                </div>}
-                {productType === "simple" && <div className="space-y-2">
-                  <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground flex items-center justify-between">
-                    <span>SKU Code</span>
-                  </Label>
-                  <div className="relative">
+                {productType === "simple" && (
+                  <div className="space-y-2">
+                    <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                      Stock Quantity *
+                    </Label>
                     <Input
-                      value={formData.sku}
-                      onChange={(e) => updateField("sku", e.target.value)}
-                      placeholder="Auto-generated"
-                      className={cn(
-                        "h-10 border-border/60 rounded-full bg-background font-mono text-xs font-medium pr-10",
-                        formData.sku && "bg-muted/30",
-                      )}
+                      type="number"
+                      value={formData.inventoryCount}
+                      onChange={(e) =>
+                        updateField("inventoryCount", e.target.value)
+                      }
+                      onBlur={() => hasValidated && validateStep(1)}
+                      aria-invalid={Boolean(fieldErrors.inventoryCount)}
+                      placeholder="0"
+                      className="h-10 border-border/60 rounded-full bg-background font-medium text-xs"
                     />
-                    {formData.sku && (
-                      <Button
-                        type="button"
-                        onClick={() => {
-                          updateField(
-                            "sku",
-                            generateSku(formData.brand, formData.title),
-                          );
-                          toast.success("SKU regenerated");
-                        }}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 hover:bg-muted rounded-full transition-colors cursor-pointer"
-                        title="Regenerate SKU">
-                        <RefreshCw className="w-3.5 h-3.5 text-muted-foreground" />
-                      </Button>
-                    )}
+                    <FieldError id="stock-error">
+                      {fieldErrors.inventoryCount}
+                    </FieldError>
                   </div>
-                </div>
-                }
+                )}
+                {productType === "simple" && (
+                  <div className="space-y-2">
+                    <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+                      <span>SKU Code</span>
+                    </Label>
+                    <div className="relative">
+                      <Input
+                        value={formData.sku}
+                        onChange={(e) => updateField("sku", e.target.value)}
+                        placeholder="Auto-generated"
+                        className={cn(
+                          "h-10 border-border/60 rounded-full bg-background font-mono text-xs font-medium pr-10",
+                          formData.sku && "bg-muted/30",
+                        )}
+                      />
+                      {formData.sku && (
+                        <Button
+                          type="button"
+                          onClick={() => {
+                            updateField(
+                              "sku",
+                              generateSku(formData.brand, formData.title),
+                            );
+                            toast.success("SKU regenerated");
+                          }}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 hover:bg-muted rounded-full transition-colors cursor-pointer"
+                          title="Regenerate SKU">
+                          <RefreshCw className="w-3.5 h-3.5 text-muted-foreground" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="space-y-2">
                 <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
@@ -1414,9 +1515,21 @@ export default function VendorProductFormPage() {
               </div>
               <div className="grid grid-cols-2 gap-2 pt-1 border-t border-border/30">
                 <div className="space-y-1">
-                  <span className="text-[9px] font-medium text-muted-foreground uppercase tracking-wider">Stock</span>
-                  <span className={cn("text-[11px] font-bold", previewInventoryConfigured && previewInventory > 0 ? "text-emerald-600" : "text-rose-500")}>
-                    {!previewInventoryConfigured ? "Variants not configured" : previewInventory > 0 ? `${previewInventory} units` : "Out of stock"}
+                  <span className="text-[9px] font-medium text-muted-foreground uppercase tracking-wider">
+                    Stock
+                  </span>
+                  <span
+                    className={cn(
+                      "text-[11px] font-bold",
+                      previewInventoryConfigured && previewInventory > 0
+                        ? "text-emerald-600"
+                        : "text-rose-500",
+                    )}>
+                    {!previewInventoryConfigured
+                      ? "Variants not configured"
+                      : previewInventory > 0
+                        ? `${previewInventory} units`
+                        : "Out of stock"}
                   </span>
                 </div>
                 {formData.categoryId && (

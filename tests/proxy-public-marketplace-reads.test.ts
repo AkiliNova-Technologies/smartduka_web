@@ -13,6 +13,17 @@ function guestRequest(pathname: string, method = "GET") {
   return new NextRequest(`https://smartduka.test${pathname}`, { method });
 }
 
+function bearerRequest(pathname: string, authorization: string, method = "GET") {
+  return new NextRequest(`https://smartduka.test${pathname}`, {
+    method,
+    headers: {
+      authorization,
+      "x-marketplace-user-id": "forged-user",
+      "x-marketplace-platform-role": "SUPER_ADMIN",
+    },
+  });
+}
+
 describe("public V1 marketplace catalogue reads", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -73,5 +84,62 @@ describe("public V1 marketplace catalogue reads", () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get("x-middleware-next")).toBe("1");
+  });
+
+  it("passes an audited native Bearer request to the me route", async () => {
+    const response = await proxy(
+      bearerRequest("/api/v1/me", "Bearer firebase-id-token"),
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("x-middleware-next")).toBe("1");
+    expect(response.headers.get("x-middleware-request-authorization")).toBe(
+      "Bearer firebase-id-token",
+    );
+    expect(
+      response.headers.get("x-middleware-request-x-marketplace-user-id"),
+    ).toBeNull();
+    expect(
+      response.headers.get("x-middleware-request-x-marketplace-platform-role"),
+    ).toBeNull();
+    expect(mocks.verifyToken).not.toHaveBeenCalled();
+  });
+
+  it.each(["", "Bearer", "Bearer   ", "Basic credentials", "token-only"])(
+    "rejects malformed native authorization %j",
+    async (authorization) => {
+      const response = await proxy(
+        bearerRequest("/api/v1/me", authorization),
+      );
+
+      expect(response.status).toBe(401);
+    },
+  );
+
+  it("does not pass Bearer credentials through on non-approved routes", async () => {
+    const response = await proxy(
+      bearerRequest("/api/v1/orders", "Bearer firebase-id-token"),
+    );
+
+    expect(response.status).toBe(401);
+  });
+
+  it("preserves an existing valid browser-cookie session", async () => {
+    mocks.verifyToken.mockResolvedValue({
+      userId: "user-a",
+      email: "buyer@example.test",
+      platformRole: "CUSTOMER",
+      vendorRole: null,
+      vendorId: null,
+    });
+    const response = await proxy(
+      new NextRequest("https://smartduka.test/api/v1/me", {
+        headers: { cookie: "marketplace_access_token=valid-session" },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("x-middleware-next")).toBe("1");
+    expect(mocks.verifyToken).toHaveBeenCalledWith("valid-session");
   });
 });

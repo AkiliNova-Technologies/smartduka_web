@@ -19,6 +19,7 @@ const LEGACY_PUBLIC_API_PREFIXES = [
   "/api/vendors/public",
 ];
 const PUBLIC_WEBHOOK_PATH = "/api/webhooks/pesapal";
+const NATIVE_BEARER_ROUTES = new Set(["GET /api/v1/me"]);
 
 function normalizePathname(pathname: string): string {
   return pathname === "/" ? pathname : pathname.replace(/\/+$/, "");
@@ -59,6 +60,23 @@ function isPublicApiRequest(method: string, pathname: string): boolean {
   );
 }
 
+/**
+ * Allows an explicitly audited native API request to reach its route-level
+ * authentication guard. This only recognizes the transport scheme; the route
+ * remains responsible for verifying the token and authorizing the account.
+ */
+export function isNativeBearerPassThrough(
+  method: string,
+  pathname: string,
+  authorization: string | null,
+): boolean {
+  const normalizedPathname = normalizePathname(pathname);
+  if (!NATIVE_BEARER_ROUTES.has(`${method.toUpperCase()} ${normalizedPathname}`)) {
+    return false;
+  }
+  return /^Bearer\s+\S+$/i.test(authorization ?? "");
+}
+
 function getSanitizedRequestHeaders(request: NextRequest): Headers {
   const headers = new Headers(request.headers);
   headers.delete("x-marketplace-user-id");
@@ -89,6 +107,19 @@ export async function proxy(request: NextRequest) {
 
   // 1.6 Fully public API routes
   if (isPublicApiRequest(request.method, pathname)) {
+    return NextResponse.next({ request: { headers: getSanitizedRequestHeaders(request) } });
+  }
+
+  // Native Firebase tokens are verified by the explicitly audited route's
+  // existing server-side authentication guard. Header presence is not treated
+  // as authentication here.
+  if (
+    isNativeBearerPassThrough(
+      request.method,
+      pathname,
+      request.headers.get("authorization"),
+    )
+  ) {
     return NextResponse.next({ request: { headers: getSanitizedRequestHeaders(request) } });
   }
 
