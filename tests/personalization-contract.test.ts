@@ -32,6 +32,15 @@ describe("marketplace personalization contracts", () => {
     expect(grid).toContain("Discover products");
   });
 
+  it("keeps native personalization scoped by the verified request identity", () => {
+    const recommendations = source("src/app/api/v1/recommendations/route.ts");
+    const recent = source("src/app/api/v1/recently-viewed/route.ts");
+    expect(recommendations).toContain("getCurrentUserIdOrNull()");
+    expect(recommendations).toContain('"Cache-Control": "private, no-store"');
+    expect(recent).toContain("requireActiveUserId()");
+    expect(recent).toContain('"Cache-Control": "private, no-store"');
+  });
+
   it("uses concise, separate homepage treatments for discovery and history", () => {
     const home = source("src/app/(customer)/page.tsx");
     const grid = source("src/components/home/ProductGrid.tsx");

@@ -10,6 +10,7 @@ describe("homepage discovery data contracts", () => {
   const discovery = source("src/components/home/HomeDiscovery.tsx");
   const featured = source("src/components/marketing/featured-sections.tsx");
   const vendorCard = source("src/components/marketplace/vendor-card.tsx");
+  const mobileHome = source("src/app/api/v1/marketplace/home/route.ts");
 
   it("uses public-product eligibility and rolls the most-specific category up only once", () => {
     expect(categories).toContain('COALESCE(product."subCategoryId", product."categoryId")');
@@ -37,5 +38,12 @@ describe("homepage discovery data contracts", () => {
   it("uses balanced category discovery and a responsive featured-shop carousel", () => {
     expect(discovery).toContain("grid-cols-2 gap-3 sm:grid-cols-5 lg:grid-cols-5");
     expect(featured).toContain("<FeaturedShopsCarousel shops={shops}");
+  });
+
+  it("keeps mobile discovery on the authoritative homepage contracts", () => {
+    expect(mobileHome).toContain("MarketingService.publicFeaturedProducts()");
+    expect(mobileHome).toContain("ProductService.getDeals(4)");
+    expect(mobileHome).toContain("ProductService.getNewArrivals(4)");
+    expect(mobileHome).toContain("MarketingService.publicFeaturedShops()");
   });
 });
