@@ -151,6 +151,35 @@ describe("public V1 marketplace catalogue reads", () => {
   });
 
   it.each([
+    ["GET", "/api/v1/recommendations"],
+    ["GET", "/api/v1/recently-viewed"],
+    ["POST", "/api/v1/recently-viewed"],
+    ["GET", "/api/v1/orders"],
+    ["GET", "/api/v1/orders/order-1"],
+  ])("passes audited native customer %s requests", async (method, pathname) => {
+    const response = await proxy(
+      bearerRequest(pathname, "Bearer firebase-id-token", method),
+    );
+    expect(response.status).toBe(200);
+    expect(response.headers.get("x-middleware-next")).toBe("1");
+    expect(response.headers.get("x-middleware-request-authorization")).toBe(
+      "Bearer firebase-id-token",
+    );
+  });
+
+  it.each([
+    ["POST", "/api/v1/recommendations"],
+    ["DELETE", "/api/v1/recently-viewed"],
+    ["POST", "/api/v1/orders"],
+    ["GET", "/api/v1/orders/order-1/payments"],
+  ])("keeps unsupported native customer %s routes blocked", async (method, pathname) => {
+    const response = await proxy(
+      bearerRequest(pathname, "Bearer firebase-id-token", method),
+    );
+    expect(response.status).toBe(401);
+  });
+
+  it.each([
     ["PUT", "/api/v1/addresses/address-1"],
     ["DELETE", "/api/v1/addresses"],
     ["GET", "/api/v1/addresses-private"],
@@ -173,7 +202,7 @@ describe("public V1 marketplace catalogue reads", () => {
 
   it("does not pass Bearer credentials through on non-approved routes", async () => {
     const response = await proxy(
-      bearerRequest("/api/v1/orders", "Bearer firebase-id-token"),
+      bearerRequest("/api/v1/orders-private", "Bearer firebase-id-token"),
     );
 
     expect(response.status).toBe(401);

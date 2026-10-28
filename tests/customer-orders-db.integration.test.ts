@@ -126,7 +126,7 @@ describe.runIf(enabled).sequential("customer orders against isolated PostgreSQL"
       expect.objectContaining({ name: "Variant Jacket", variantName: "Crimson / Large", variantOptions: { color: "Crimson", size: "Large" }, quantity: 1, price: 95_000, lineTotal: 95_000, image: "/images/promotions/demo-home/accessories-desktop.webp" }),
     ]));
     expect(order!.subOrders).toEqual(expect.arrayContaining([
-      expect.objectContaining({ vendorName: "Fixture Shop 1", fulfillmentMethod: "DELIVERY", shipping: 3500, total: 263_500, deliveryAddress: "Plot 10 Acceptance Avenue, Nakawa" }),
+      expect.objectContaining({ vendorName: "Fixture Shop 1", fulfillmentMethod: "DELIVERY", shipping: 3500, total: 263_500, deliveryAddress: "Plot 10 Acceptance Avenue, Nakawa", estimatedDelivery: "Same day" }),
       expect.objectContaining({ vendorName: "Fixture Shop 2", fulfillmentMethod: "PICKUP", shipping: 0, total: 95_000, branchName: "Pickup Centre", pickupLocation: "2 Acceptance Road", pickupInstructions: "Bring the order reference and photo ID." }),
     ]));
     expect(order!.subOrders.flatMap((suborder) => suborder.paymentIntents.map((intent) => intent.status)).sort()).toEqual(["PENDING", "SUCCESSFUL"]);
