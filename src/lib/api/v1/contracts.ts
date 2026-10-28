@@ -7,6 +7,22 @@ export const productQuerySchema = z.object({
   sort: z.enum(["newest", "price_asc", "price_desc"]).optional(),
 });
 export const wishlistBodySchema = z.object({ productId: z.string().min(1).max(128) });
+const optionalAddressText = (maximum: number) => z.string().trim().max(maximum).nullable().optional();
+const customerAddressFields = {
+  label: z.string().trim().min(1).max(40),
+  recipientName: z.string().trim().min(2).max(120),
+  recipientPhone: z.string().trim().min(9).max(24).regex(/^\+?[0-9][0-9\s-]{7,22}[0-9]$/, "Enter a valid phone number."),
+  country: z.literal("Uganda"),
+  district: z.string().trim().min(2).max(120),
+  city: z.string().trim().min(2).max(120),
+  area: z.string().trim().min(2).max(160),
+  street: optionalAddressText(200), building: optionalAddressText(160),
+  landmark: z.string().trim().min(2).max(240),
+  deliveryInstructions: optionalAddressText(500),
+  isDefault: z.boolean().optional(),
+};
+export const customerAddressBodySchema = z.object(customerAddressFields).strict();
+export const customerAddressPatchSchema = z.object(customerAddressFields).partial().strict().refine((value) => Object.keys(value).length > 0, "Provide at least one field.");
 export const checkoutBodySchema = z.object({
   checkoutRequestId: z.string().min(16).max(128).regex(/^[A-Za-z0-9_-]+$/),
   items: z.array(z.object({ productId: z.string().min(1), variantId: z.string().min(1).nullable().optional(), quantity: z.number().int().positive() })).min(1),

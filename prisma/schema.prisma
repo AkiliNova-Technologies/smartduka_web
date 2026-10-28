@@ -797,6 +797,7 @@ model User {
   vendorApplications VendorApplication[]
 
   wishlistItems                      WishlistItem[]
+  deliveryAddresses                  CustomerAddress[]
   recentlyViewed                     RecentlyViewed[]
   customerOrders                     Order[]                          @relation("CustomerOrders")
   reviewsWritten                     ProductReview[]
@@ -842,6 +843,29 @@ model User {
   @@index([status])
   @@index([vendorId])
   @@index([platformRole])
+}
+
+model CustomerAddress {
+  id                   String   @id @default(uuid())
+  customerId           String
+  customer             User     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  label                String
+  recipientName        String
+  recipientPhone       String
+  country              String   @default("Uganda")
+  district             String
+  city                 String
+  area                 String
+  street               String?
+  building             String?
+  landmark             String
+  deliveryInstructions String?
+  isDefault            Boolean  @default(false)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@index([customerId, updatedAt])
+  @@index([customerId, isDefault])
 }
 
 model UserDevice {

@@ -11,6 +11,7 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:promotion-db": "node scripts/run-promotion-db-tests.mjs",
+    "test:customer-addresses-db": "node scripts/run-customer-addresses-db-tests.mjs",
     "test:fulfillment-db": "node scripts/run-fulfillment-db-tests.mjs",
     "test:customer-orders-db": "node scripts/run-customer-orders-db-tests.mjs",
     "test:revenue-entitlement-db": "node scripts/run-revenue-entitlement-db-tests.mjs",

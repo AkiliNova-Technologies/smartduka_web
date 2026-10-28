@@ -138,6 +138,28 @@ describe("public V1 marketplace catalogue reads", () => {
     }
   });
 
+  it.each([
+    ["GET", "/api/v1/addresses"],
+    ["POST", "/api/v1/addresses"],
+    ["PATCH", "/api/v1/addresses/address-1"],
+    ["DELETE", "/api/v1/addresses/address-1"],
+    ["POST", "/api/v1/addresses/address-1/default"],
+  ])("passes only audited native address %s requests", async (method, pathname) => {
+    const response = await proxy(bearerRequest(pathname, "Bearer firebase-id-token", method));
+    expect(response.status).toBe(200);
+    expect(response.headers.get("x-middleware-next")).toBe("1");
+  });
+
+  it.each([
+    ["PUT", "/api/v1/addresses/address-1"],
+    ["DELETE", "/api/v1/addresses"],
+    ["GET", "/api/v1/addresses-private"],
+    ["POST", "/api/v1/addresses/address-1/history"],
+  ])("keeps unsupported native address %s routes blocked", async (method, pathname) => {
+    const response = await proxy(bearerRequest(pathname, "Bearer firebase-id-token", method));
+    expect(response.status).toBe(401);
+  });
+
   it.each(["", "Bearer", "Bearer   ", "Basic credentials", "token-only"])(
     "rejects malformed native authorization %j",
     async (authorization) => {
