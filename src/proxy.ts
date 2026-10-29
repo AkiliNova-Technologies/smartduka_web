@@ -19,6 +19,9 @@ const LEGACY_PUBLIC_API_PREFIXES = [
   "/api/vendors/public",
 ];
 const PUBLIC_WEBHOOK_PATH = "/api/webhooks/pesapal";
+const SECRET_AUTHENTICATED_CRON_ROUTES = new Set([
+  "GET /api/cron/push-delivery",
+]);
 const NATIVE_BEARER_ROUTES = new Set([
   "GET /api/v1/me",
   "GET /api/v1/wishlist",
@@ -122,6 +125,23 @@ export function isNativeBearerPassThrough(
   return /^Bearer\s+\S+$/i.test(authorization ?? "");
 }
 
+/**
+ * Lets a narrowly scoped worker endpoint reach its own CRON_SECRET guard.
+ * Presence of a bearer value is not authentication; the route compares it
+ * with the configured secret before performing any work.
+ */
+export function isSecretAuthenticatedCronPassThrough(
+  method: string,
+  pathname: string,
+  authorization: string | null,
+): boolean {
+  const key = `${method.toUpperCase()} ${normalizePathname(pathname)}`;
+  return (
+    SECRET_AUTHENTICATED_CRON_ROUTES.has(key) &&
+    /^Bearer\s+\S+$/i.test(authorization ?? "")
+  );
+}
+
 function getSanitizedRequestHeaders(request: NextRequest): Headers {
   const headers = new Headers(request.headers);
   headers.delete("x-marketplace-user-id");
@@ -160,6 +180,16 @@ export async function proxy(request: NextRequest) {
   // as authentication here.
   if (
     isNativeBearerPassThrough(
+      request.method,
+      pathname,
+      request.headers.get("authorization"),
+    )
+  ) {
+    return NextResponse.next({ request: { headers: getSanitizedRequestHeaders(request) } });
+  }
+
+  if (
+    isSecretAuthenticatedCronPassThrough(
       request.method,
       pathname,
       request.headers.get("authorization"),
