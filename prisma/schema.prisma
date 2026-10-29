@@ -874,13 +874,20 @@ model UserDevice {
   user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   deviceId   String
   platform   DevicePlatform
-  pushToken  String         @unique
+  pushTokenEncrypted String
+  pushTokenHash      String         @unique @db.VarChar(64)
   appVersion String?
   deviceName String?
   enabled    Boolean        @default(true)
+  registrationVersion Int   @default(1)
+  tokenUpdatedAt DateTime   @default(now())
+  lastSuccessAt DateTime?
+  lastFailureAt DateTime?
+  failureCount Int          @default(0)
   lastSeenAt DateTime       @default(now())
   createdAt  DateTime       @default(now())
   updatedAt  DateTime       @updatedAt
+  nativeDeliveries NativePushDelivery[]
 
   @@unique([userId, deviceId])
   @@index([userId, enabled])
@@ -2574,12 +2581,32 @@ model PushDeliveryOutbox {
   failureCode               String?                        @db.VarChar(80)
   createdAt                 DateTime                       @default(now())
   updatedAt                 DateTime                       @updatedAt
+  nativeDeliveries          NativePushDelivery[]
 
   @@unique([announcementId, userId])
   @@unique([marketingCampaignId, targetSubscriptionId])
   @@index([status, nextAttemptAt])
   @@index([userId, status])
   @@index([targetSubscriptionId, status])
+}
+
+model NativePushDelivery {
+  id            String             @id @default(uuid())
+  outboxId      String
+  outbox        PushDeliveryOutbox @relation(fields: [outboxId], references: [id], onDelete: Cascade)
+  deviceId      String
+  device        UserDevice         @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  status        PushDeliveryStatus @default(PENDING)
+  attempts      Int                @default(0)
+  deliveredAt   DateTime?
+  lastFailureAt DateTime?
+  failureCode   String?            @db.VarChar(120)
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  @@unique([outboxId, deviceId])
+  @@index([deviceId])
+  @@index([status, updatedAt])
 }
 
 model Announcement {

@@ -8,6 +8,7 @@ import { AnnouncementPushService } from "@/services/announcement-push";
 import { MarketingPushService } from "@/services/marketing-push";
 import { resolveMarketingDestination } from "@/services/marketing-notifications";
 import { marketingConsentEligible, marketingSettingsWhere } from "@/lib/marketing-campaign-eligibility";
+import { NativePushDeliveryService, nativePushEnabled } from "@/services/native-push-delivery";
 
 const MAX_ATTEMPTS = 5;
 const BATCH_SIZE = 25;
@@ -55,7 +56,7 @@ function testDeliveryStatus(status: PushDeliveryStatus) {
 
 export class PushDeliveryOutboxService {
   static async enqueueTransactional(input: { notificationId: string; idempotencyKey: string; userId: string; title: string; message: string; actionPath?: string | null }, database: PushOutboxDatabase) {
-    if (!getWebPushConfiguration()) return null;
+    if (!getWebPushConfiguration() && !nativePushEnabled()) return null;
     return database.pushDeliveryOutbox.upsert({
       where: { notificationId: input.notificationId },
       update: {},
@@ -127,7 +128,7 @@ export class PushDeliveryOutboxService {
   static async run(now = new Date()) {
     const fanout = await AnnouncementPushService.runFanout(now);
     const marketingFanout = await MarketingPushService.runFanout(now);
-    if (!getWebPushConfiguration()) return { claimed: 0, delivered: 0, retried: 0, failed: 0, skipped: 0, disabled: true, fanout, marketingFanout };
+    if (!getWebPushConfiguration() && !nativePushEnabled()) return { claimed: 0, delivered: 0, retried: 0, failed: 0, skipped: 0, disabled: true, fanout, marketingFanout };
     await prisma.pushDeliveryOutbox.updateMany({
       where: { status: PushDeliveryStatus.PROCESSING, lockedAt: { lt: new Date(now.getTime() - STALE_LOCK_MS) } },
       data: { status: PushDeliveryStatus.RETRYING, lockedAt: null, lockToken: null, nextAttemptAt: now, failureCode: "WORKER_LOCK_EXPIRED", lastFailureAt: now },
@@ -148,7 +149,7 @@ export class PushDeliveryOutboxService {
   }
 
   private static async deliverClaim(id: string, token: string, deadline: number): Promise<"delivered" | "retried" | "failed" | "skipped"> {
-    const job = await prisma.pushDeliveryOutbox.findFirst({ where: { id, status: PushDeliveryStatus.PROCESSING, lockToken: token }, include: { announcement: true, marketingCampaign: true, user: { select: { status: true, deletedAt: true, settings: { select: { promotionalInAppNotifications: true, promotionalPushNotifications: true, shoppingRecommendations: true } }, browserPushSubscriptions: { where: { status: BrowserPushSubscriptionStatus.ACTIVE }, select: { id: true, registrationVersion: true, endpointEncrypted: true, p256dhEncrypted: true, authEncrypted: true } } } } } });
+    const job = await prisma.pushDeliveryOutbox.findFirst({ where: { id, status: PushDeliveryStatus.PROCESSING, lockToken: token }, include: { notification: { select: { eventType: true } }, announcement: true, marketingCampaign: true, user: { select: { status: true, deletedAt: true, settings: { select: { promotionalInAppNotifications: true, promotionalPushNotifications: true, shoppingRecommendations: true } }, browserPushSubscriptions: { where: { status: BrowserPushSubscriptionStatus.ACTIVE }, select: { id: true, registrationVersion: true, endpointEncrypted: true, p256dhEncrypted: true, authEncrypted: true } } } } } });
     if (!job) return "skipped";
     if (job.announcementId) {
       const valid = job.announcement?.pushEnabled && job.announcement.status === AnnouncementStatus.PUBLISHED && (!job.announcement.expiresAt || job.announcement.expiresAt > new Date()) && job.user.status === UserStatus.ACTIVE && !job.user.deletedAt && (job.announcement.contentClass !== AnnouncementContentClass.PROMOTIONAL || job.user.settings?.promotionalPushNotifications === true);
@@ -164,17 +165,25 @@ export class PushDeliveryOutboxService {
       try { await resolveMarketingDestination(campaign.destinationType, campaign.destinationReference); }
       catch { await this.finish(job.id, token, PushDeliveryStatus.SKIPPED, "MARKETING_DESTINATION_UNAVAILABLE"); return "skipped"; }
     }
+    const native = await NativePushDeliveryService.deliver(job);
     // A TEST job is bound to exactly the subscription that was ownership-checked
     // when it was enqueued. A status change or account reassignment makes it skip.
     const subscriptions = job.targetSubscriptionId
       ? job.user.browserPushSubscriptions.filter((subscription) => subscription.id === job.targetSubscriptionId && subscription.registrationVersion === job.targetSubscriptionVersion)
       : job.user.browserPushSubscriptions;
     if (!subscriptions.length) {
-      await this.finish(job.id, token, PushDeliveryStatus.SKIPPED);
+      if (native.transient) return this.retryOrFail(job.id, token, job.attempts, "NATIVE_PUSH_TRANSPORT_FAILURE");
+      if (native.delivered) { await this.finish(job.id, token, PushDeliveryStatus.DELIVERED); return "delivered"; }
+      await this.finish(job.id, token, PushDeliveryStatus.SKIPPED, "NO_VALID_SUBSCRIPTIONS");
       return "skipped";
     }
     const config = getWebPushConfiguration();
-    if (!config) return this.retryOrFail(job.id, token, job.attempts, "CONFIGURATION_UNAVAILABLE");
+    if (!config) {
+      if (native.transient) return this.retryOrFail(job.id, token, job.attempts, "NATIVE_PUSH_TRANSPORT_FAILURE");
+      if (native.delivered) { await this.finish(job.id, token, PushDeliveryStatus.DELIVERED); return "delivered"; }
+      await this.finish(job.id, token, PushDeliveryStatus.SKIPPED, "WEB_PUSH_CONFIGURATION_UNAVAILABLE");
+      return "skipped";
+    }
     webpush.setVapidDetails(config.subject, config.publicKey, config.privateKey);
     const tag = job.announcementId ? AnnouncementPushService.notificationTag(job.announcementId) : job.marketingCampaignId ? MarketingPushService.notificationTag(job.marketingCampaignId) : notificationTag(job);
     const payload = JSON.stringify({ title: job.title, body: job.message, path: safePath(job.actionPath) ?? "/notifications", ...(tag ? { tag } : {}) });
@@ -225,8 +234,8 @@ export class PushDeliveryOutboxService {
         }
       }
     }
-    if (sent) { await this.finish(job.id, token, PushDeliveryStatus.DELIVERED); return "delivered"; }
-    if (transient) return this.retryOrFail(job.id, token, job.attempts, "PUSH_TRANSPORT_FAILURE");
+    if (transient || native.transient) return this.retryOrFail(job.id, token, job.attempts, "PUSH_TRANSPORT_FAILURE");
+    if (sent || native.delivered) { await this.finish(job.id, token, PushDeliveryStatus.DELIVERED); return "delivered"; }
     await this.finish(job.id, token, PushDeliveryStatus.SKIPPED, "NO_VALID_SUBSCRIPTIONS");
     return "skipped";
   }

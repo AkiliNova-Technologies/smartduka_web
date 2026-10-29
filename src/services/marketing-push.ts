@@ -182,9 +182,10 @@ export class MarketingPushService {
         status: UserStatus.ACTIVE,
         deletedAt: null,
         settings: marketingSettingsWhere(campaign.audience, true),
-        browserPushSubscriptions: {
-          some: { status: BrowserPushSubscriptionStatus.ACTIVE },
-        },
+        OR: [
+          { browserPushSubscriptions: { some: { status: BrowserPushSubscriptionStatus.ACTIVE } } },
+          { devices: { some: { enabled: true, platform: "ANDROID" } } },
+        ],
       },
       orderBy: { id: "asc" },
       take: RECIPIENT_BATCH_SIZE,
@@ -193,6 +194,11 @@ export class MarketingPushService {
         browserPushSubscriptions: {
           where: { status: BrowserPushSubscriptionStatus.ACTIVE },
           select: { id: true, registrationVersion: true },
+        },
+        devices: {
+          where: { enabled: true, platform: "ANDROID" },
+          select: { id: true },
+          take: 1,
         },
       },
     });
@@ -239,6 +245,7 @@ export class MarketingPushService {
     user: {
       id: string;
       browserPushSubscriptions: { id: string; registrationVersion: number }[];
+      devices: { id: string }[];
     },
     now: Date,
   ) {
@@ -276,7 +283,8 @@ export class MarketingPushService {
               });
             }
             const result = await tx.pushDeliveryOutbox.createMany({
-              data: user.browserPushSubscriptions.map((subscription) => ({
+              data: [
+                ...user.browserPushSubscriptions.map((subscription) => ({
                 idempotencyKey: `push:marketing:${campaignId}:${subscription.id}:${subscription.registrationVersion}`,
                 marketingCampaignId: campaignId,
                 userId: user.id,
@@ -286,7 +294,17 @@ export class MarketingPushService {
                 title: campaign.title,
                 message: campaign.message.slice(0, 1000),
                 actionPath: campaign.destinationPath,
-              })),
+                })),
+                ...(user.devices.length ? [{
+                  idempotencyKey: `push:marketing:${campaignId}:${user.id}:native`,
+                  marketingCampaignId: campaignId,
+                  userId: user.id,
+                  kind: PushDeliveryKind.MARKETING,
+                  title: campaign.title,
+                  message: campaign.message.slice(0, 1000),
+                  actionPath: campaign.destinationPath,
+                }] : []),
+              ],
               skipDuplicates: true,
             });
             return { eligible: true, queued: result.count };

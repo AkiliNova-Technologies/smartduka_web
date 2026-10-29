@@ -51,7 +51,7 @@ export class AnnouncementPushService {
       await this.finishInvalid(id, token, AnnouncementPushDispatchStatus.EXPIRED);
       return { processed: 0, queued: 0, completed: true };
     }
-    const users = await prisma.user.findMany({ where: { id: dispatch.cursorUserId ? { gt: dispatch.cursorUserId } : undefined, status: UserStatus.ACTIVE, deletedAt: null, ...audienceWhere(announcement.audience), browserPushSubscriptions: { some: { status: BrowserPushSubscriptionStatus.ACTIVE } }, ...(announcement.contentClass === AnnouncementContentClass.PROMOTIONAL ? { settings: { promotionalPushNotifications: true } } : {}) }, orderBy: { id: "asc" }, take: RECIPIENT_BATCH_SIZE, select: { id: true } });
+    const users = await prisma.user.findMany({ where: { id: dispatch.cursorUserId ? { gt: dispatch.cursorUserId } : undefined, status: UserStatus.ACTIVE, deletedAt: null, AND: [audienceWhere(announcement.audience), { OR: [{ browserPushSubscriptions: { some: { status: BrowserPushSubscriptionStatus.ACTIVE } } }, { devices: { some: { enabled: true, platform: "ANDROID" } } }] }], ...(announcement.contentClass === AnnouncementContentClass.PROMOTIONAL ? { settings: { promotionalPushNotifications: true } } : {}) }, orderBy: { id: "asc" }, take: RECIPIENT_BATCH_SIZE, select: { id: true } });
     if (!users.length) {
       await prisma.announcementPushDispatch.updateMany({ where: { id, lockToken: token }, data: { status: AnnouncementPushDispatchStatus.COMPLETED, completedAt: now, lockedAt: null, lockToken: null } });
       return { processed: 0, queued: 0, completed: true };
