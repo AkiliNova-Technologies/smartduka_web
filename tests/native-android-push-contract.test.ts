@@ -17,8 +17,9 @@ describe("native Android push contract", () => {
     const schema = read("prisma/schema.prisma");
     const delivery = read("src/services/native-push-delivery.ts");
     expect(schema).toContain("@@unique([outboxId, deviceId])");
-    expect(delivery).toContain("installation-id-not-registered");
-    expect(delivery).toContain("fid: decryptPushSubscriptionValue");
+    expect(delivery).toContain("registration-token-not-registered");
+    expect(delivery).toContain("token: decryptPushSubscriptionValue");
+    expect(delivery).not.toContain("fid: decryptPushSubscriptionValue");
     expect(delivery).toContain("enabled: invalid ? false : undefined");
     expect(delivery).toContain('version: "1"');
   });

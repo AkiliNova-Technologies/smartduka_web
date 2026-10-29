@@ -9,7 +9,6 @@ const transientCodes = new Set([
   "messaging/unknown-error",
 ]);
 const invalidCodes = new Set([
-  "messaging/installation-id-not-registered",
   "messaging/invalid-registration-token",
   "messaging/registration-token-not-registered",
   "messaging/mismatched-credential",
@@ -61,7 +60,7 @@ export class NativePushDeliveryService {
         const event = job.notification?.eventType ?? "";
         const channelId = job.kind === "MARKETING" ? "mwezora_offers" : event.startsWith("ORDER_") ? "mwezora_orders" : event.startsWith("PAYMENT_") ? "mwezora_payments" : "mwezora_account";
         await adminMessaging.send({
-          fid: decryptPushSubscriptionValue(device.pushTokenEncrypted),
+          token: decryptPushSubscriptionValue(device.pushTokenEncrypted),
           notification: { title: job.title, body: job.message },
           data: {
             version: "1",
