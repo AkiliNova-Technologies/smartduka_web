@@ -1,9 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { NotificationWorkerService } from "@/services/notification-worker";
 
-export const dynamic = "force-dynamic";
-
-export function scheduledNotificationWorkerEnabled() {
+function scheduledNotificationWorkerEnabled() {
   return process.env.SCHEDULED_NOTIFICATION_WORKER_ENABLED === "true";
 }
 
