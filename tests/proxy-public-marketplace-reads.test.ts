@@ -156,6 +156,11 @@ describe("public V1 marketplace catalogue reads", () => {
     ["POST", "/api/v1/recently-viewed"],
     ["GET", "/api/v1/orders"],
     ["GET", "/api/v1/orders/order-1"],
+    ["GET", "/api/v1/notifications"],
+    ["POST", "/api/v1/notifications/read-all"],
+    ["PATCH", "/api/v1/notifications/personal-1/read"],
+    ["PATCH", "/api/v1/notifications/announcement%3Aa/unread"],
+    ["DELETE", "/api/v1/notifications/marketing%3Aa"],
   ])("passes audited native customer %s requests", async (method, pathname) => {
     const response = await proxy(
       bearerRequest(pathname, "Bearer firebase-id-token", method),
@@ -172,6 +177,11 @@ describe("public V1 marketplace catalogue reads", () => {
     ["DELETE", "/api/v1/recently-viewed"],
     ["POST", "/api/v1/orders"],
     ["GET", "/api/v1/orders/order-1/payments"],
+    ["POST", "/api/v1/notifications"],
+    ["GET", "/api/v1/notifications/personal-1"],
+    ["PATCH", "/api/v1/notifications/personal-1"],
+    ["DELETE", "/api/v1/notifications/read-all"],
+    ["PATCH", "/api/v1/notifications/personal-1/read/history"],
   ])("keeps unsupported native customer %s routes blocked", async (method, pathname) => {
     const response = await proxy(
       bearerRequest(pathname, "Bearer firebase-id-token", method),

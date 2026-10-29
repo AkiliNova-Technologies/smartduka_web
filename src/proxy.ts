@@ -29,6 +29,8 @@ const NATIVE_BEARER_ROUTES = new Set([
   "GET /api/v1/recently-viewed",
   "POST /api/v1/recently-viewed",
   "GET /api/v1/orders",
+  "GET /api/v1/notifications",
+  "POST /api/v1/notifications/read-all",
 ]);
 
 function normalizePathname(pathname: string): string {
@@ -94,11 +96,19 @@ export function isNativeBearerPassThrough(
   const orderDetail =
     normalizedMethod === "GET" &&
     /^\/api\/v1\/orders\/[^/]+$/.test(normalizedPathname);
+  const notificationItem =
+    normalizedMethod === "DELETE" &&
+    /^\/api\/v1\/notifications\/[^/]+$/.test(normalizedPathname);
+  const notificationReadState =
+    normalizedMethod === "PATCH" &&
+    /^\/api\/v1\/notifications\/[^/]+\/(read|unread)$/.test(normalizedPathname);
   if (
     !wishlistDelete &&
     !addressItem &&
     !addressDefault &&
     !orderDetail &&
+    !notificationItem &&
+    !notificationReadState &&
     !NATIVE_BEARER_ROUTES.has(`${normalizedMethod} ${normalizedPathname}`)
   ) {
     return false;
