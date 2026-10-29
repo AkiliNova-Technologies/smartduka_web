@@ -37,7 +37,7 @@ describe("notification worker scheduling", () => {
     expect(config.crons).toEqual([
       {
         path: "/api/cron/push-delivery",
-        schedule: "*/5 * * * *",
+        schedule: "0 6 * * *",
       },
     ]);
   });

@@ -3,6 +3,10 @@ import { NotificationWorkerService } from "@/services/notification-worker";
 
 export const dynamic = "force-dynamic";
 
+export function scheduledNotificationWorkerEnabled() {
+  return process.env.SCHEDULED_NOTIFICATION_WORKER_ENABLED === "true";
+}
+
 function isAuthorized(request: Request): boolean {
   const secret = process.env.CRON_SECRET?.trim();
   if (!secret) return false;
@@ -19,6 +23,13 @@ export async function GET(request: Request) {
     return Response.json(
       { error: { code: "UNAUTHORIZED", message: "Unauthorized." } },
       { status: 401, headers: { "Cache-Control": "no-store" } },
+    );
+  }
+
+  if (!scheduledNotificationWorkerEnabled()) {
+    return Response.json(
+      { data: { disabled: true } },
+      { headers: { "Cache-Control": "no-store" } },
     );
   }
 

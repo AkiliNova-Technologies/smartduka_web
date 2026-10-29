@@ -125,6 +125,90 @@ export class PushDeliveryOutboxService {
     return { requestId: input.requestId, status: testDeliveryStatus(job.status) };
   }
 
+  /**
+   * Creates and claims only a fixed native test job owned by the authenticated
+   * account. It intentionally never scans or processes the shared backlog.
+   */
+  static async runIsolatedNativeTest(input: {
+    userId: string;
+    requestId: string;
+  }) {
+    if (!nativePushEnabled()) {
+      throw new PushTestDeliveryError(
+        "Native push delivery is unavailable in this environment.",
+        "UNAVAILABLE",
+      );
+    }
+
+    const devices = await prisma.userDevice.count({
+      where: {
+        userId: input.userId,
+        enabled: true,
+        platform: "ANDROID",
+        user: { status: UserStatus.ACTIVE, deletedAt: null },
+      },
+    });
+    if (!devices) {
+      throw new PushTestDeliveryError(
+        "This account does not have an active Android device.",
+        "NO_ACTIVE_SUBSCRIPTION",
+      );
+    }
+
+    const idempotencyKey = `push:native-test:${input.userId}:${input.requestId}`;
+    const job = await prisma.pushDeliveryOutbox.upsert({
+      where: { idempotencyKey },
+      update: {},
+      create: {
+        idempotencyKey,
+        userId: input.userId,
+        kind: PushDeliveryKind.TEST,
+        title: testTitle,
+        message: testMessage,
+        actionPath: testPath,
+      },
+      select: { id: true, userId: true, kind: true },
+    });
+    if (job.userId !== input.userId || job.kind !== PushDeliveryKind.TEST) {
+      throw new PushTestDeliveryError(
+        "This test request conflicts with another delivery.",
+        "CONFLICT",
+      );
+    }
+
+    const now = new Date();
+    const token = randomUUID();
+    const claimed = await prisma.pushDeliveryOutbox.updateMany({
+      where: {
+        id: job.id,
+        userId: input.userId,
+        kind: PushDeliveryKind.TEST,
+        status: {
+          in: [PushDeliveryStatus.PENDING, PushDeliveryStatus.RETRYING],
+        },
+        nextAttemptAt: { lte: now },
+      },
+      data: {
+        status: PushDeliveryStatus.PROCESSING,
+        lockedAt: now,
+        lockToken: token,
+        attempts: { increment: 1 },
+      },
+    });
+    if (claimed.count) {
+      await this.deliverClaim(job.id, token, Date.now() + INVOCATION_BUDGET_MS);
+    }
+
+    const current = await prisma.pushDeliveryOutbox.findFirstOrThrow({
+      where: { id: job.id, userId: input.userId, kind: PushDeliveryKind.TEST },
+      select: { status: true },
+    });
+    return {
+      requestId: input.requestId,
+      status: testDeliveryStatus(current.status),
+    };
+  }
+
   static async run(now = new Date()) {
     const fanout = await AnnouncementPushService.runFanout(now);
     const marketingFanout = await MarketingPushService.runFanout(now);
@@ -168,7 +252,9 @@ export class PushDeliveryOutboxService {
     const native = await NativePushDeliveryService.deliver(job);
     // A TEST job is bound to exactly the subscription that was ownership-checked
     // when it was enqueued. A status change or account reassignment makes it skip.
-    const subscriptions = job.targetSubscriptionId
+    const subscriptions = job.kind === PushDeliveryKind.TEST && !job.targetSubscriptionId
+      ? []
+      : job.targetSubscriptionId
       ? job.user.browserPushSubscriptions.filter((subscription) => subscription.id === job.targetSubscriptionId && subscription.registrationVersion === job.targetSubscriptionVersion)
       : job.user.browserPushSubscriptions;
     if (!subscriptions.length) {

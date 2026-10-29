@@ -11,6 +11,7 @@ import { GET } from "@/app/api/cron/push-delivery/route";
 describe("push delivery cron route", () => {
   beforeEach(() => {
     vi.stubEnv("CRON_SECRET", "push-worker-test-secret");
+    vi.stubEnv("SCHEDULED_NOTIFICATION_WORKER_ENABLED", "true");
     run.mockReset();
   });
 
@@ -53,6 +54,20 @@ describe("push delivery cron route", () => {
       },
     });
     expect(run).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps scheduled backlog processing disabled until explicitly approved", async () => {
+    vi.stubEnv("SCHEDULED_NOTIFICATION_WORKER_ENABLED", "false");
+
+    const response = await GET(
+      new Request("https://mwezora.test/api/cron/push-delivery", {
+        headers: { authorization: "Bearer push-worker-test-secret" },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ data: { disabled: true } });
+    expect(run).not.toHaveBeenCalled();
   });
 
   it("returns a sanitized failure without exposing transport details", async () => {

@@ -14,4 +14,11 @@ export class NotificationWorkerService {
 
     return { announcements, marketing, push };
   }
+
+  static async runIsolatedNativeTest(input: {
+    userId: string;
+    requestId: string;
+  }) {
+    return PushDeliveryOutboxService.runIsolatedNativeTest(input);
+  }
 }
