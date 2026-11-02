@@ -22,11 +22,56 @@ export class VendorMobileInsightsService {
   }
 
   static async analytics(period: "TODAY" | "7D" | "30D") {
-    const context = await requireVendorContext("vendor:view_orders");
-    const orders = await prisma.subOrder.findMany({ where: { vendorId: context.vendorId, status: "DELIVERED", order: { paymentStatus: "COMPLETED" }, createdAt: { gte: rangeStart(period) } }, select: { vendorTotal: true, items: { select: { quantity: true, productId: true, productNameSnapshot: true } } } });
-    const revenue = orders.reduce((sum, order) => sum + Number(order.vendorTotal), 0);
+    const context = await requireVendorContext("vendor:view_ledger");
+    const now = new Date();
+    const kampala = new Date(now.getTime() + 3 * 3600000);
+    const midnight = Date.UTC(kampala.getUTCFullYear(), kampala.getUTCMonth(), kampala.getUTCDate()) - 3 * 3600000;
+    const days = period === "TODAY" ? 1 : period === "7D" ? 7 : 30;
+    const currentStart = new Date(midnight - (days - 1) * 86400000);
+    const previousStart = new Date(currentStart.getTime() - days * 86400000);
+    const intents = await prisma.paymentIntent.findMany({
+      where: { vendorId: context.vendorId, purpose: "MARKETPLACE_PURCHASE",
+        status: "SUCCESSFUL", confirmedAt: { gte: previousStart, lte: now },
+        subOrder: { status: "DELIVERED" } },
+      select: { subOrderId: true, confirmedAt: true, amount: true,
+        subOrder: { select: {
+          items: { select: { quantity: true, productId: true, productNameSnapshot: true } },
+          refunds: { where: { status: "COMPLETED" }, select: { amount: true } },
+        } },
+      },
+    });
+    const summarize = (from: Date, to: Date) => {
+      const matches = intents.filter((i) => i.confirmedAt && i.confirmedAt >= from && i.confirmedAt < to);
+      const orders = new Map(matches.map((i) => [i.subOrderId, i]));
+      const gross = matches.reduce((sum, i) => sum + Number(i.amount), 0);
+      const refunds = [...orders.values()].reduce((sum, i) => sum +
+        i.subOrder.refunds.reduce((value, refund) => value + Number(refund.amount), 0), 0);
+      const revenue = Math.max(0, gross - refunds);
+      const unitsSold = [...orders.values()].reduce((sum, i) => sum +
+        i.subOrder.items.reduce((value, item) => value + item.quantity, 0), 0);
+      return { revenue, orders: orders.size, unitsSold,
+        averageOrderValue: orders.size ? revenue / orders.size : 0 };
+    };
+    const current = summarize(currentStart, new Date(now.getTime() + 1));
+    const previous = summarize(previousStart, currentStart);
     const byProduct = new Map<string, { productId: string; name: string; unitsSold: number }>();
-    for (const order of orders) for (const item of order.items) { const current = byProduct.get(item.productId) ?? { productId: item.productId, name: item.productNameSnapshot ?? "Product", unitsSold: 0 }; current.unitsSold += item.quantity; byProduct.set(item.productId, current); }
-    return { period, revenue, orders: orders.length, unitsSold: [...byProduct.values()].reduce((sum, item) => sum + item.unitsSold, 0), averageOrderValue: orders.length ? revenue / orders.length : 0, topProducts: [...byProduct.values()].sort((a, b) => b.unitsSold - a.unitsSold || a.name.localeCompare(b.name)).slice(0, 5) };
+    const seen = new Set<string>();
+    for (const intent of intents) {
+      if (!intent.confirmedAt || intent.confirmedAt < currentStart || seen.has(intent.subOrderId)) continue;
+      seen.add(intent.subOrderId);
+      for (const item of intent.subOrder.items) {
+        const product = byProduct.get(item.productId) ??
+          { productId: item.productId, name: item.productNameSnapshot ?? "Product", unitsSold: 0 };
+        product.unitsSold += item.quantity;
+        byProduct.set(item.productId, product);
+      }
+    }
+    const [cancelledOrders, refundedOrders] = await Promise.all([
+      prisma.subOrder.count({ where: { vendorId: context.vendorId, status: "CANCELLED", createdAt: { gte: currentStart } } }),
+      prisma.subOrder.count({ where: { vendorId: context.vendorId, status: "REFUNDED", createdAt: { gte: currentStart } } }),
+    ]);
+    return { period, ...current, previous, cancelledOrders, refundedOrders,
+      revenueBasis: "confirmed_vendor_payments_less_completed_refunds",
+      topProducts: [...byProduct.values()].sort((a, b) => b.unitsSold - a.unitsSold || a.name.localeCompare(b.name)).slice(0, 5) };
   }
 }
