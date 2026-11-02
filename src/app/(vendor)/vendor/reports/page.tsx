@@ -170,7 +170,7 @@ export default function VendorReportsPage() {
             color: "text-emerald-500 bg-emerald-500/5",
           },
           {
-            title: "SmartDuka Marketplace Split",
+            title: "Mezora Marketplace Split",
             value: `UGX ${(totalVolume * 0.05).toLocaleString()}`,
             desc: "Fixed 5% multi-vendor platform commission",
 

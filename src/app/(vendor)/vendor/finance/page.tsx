@@ -47,7 +47,7 @@ export default function VendorFinancePage() {
 
     {error && <div role="alert" className="flex items-center justify-between gap-3 rounded-xl border border-rose-500/20 bg-rose-500/5 p-4 text-sm text-rose-700 dark:text-rose-400"><span>{error}</span><Button variant="outline" size="sm" onClick={() => void refresh()}>Try again</Button></div>}
 
-    <section aria-labelledby="balance-overview-heading" className="space-y-4"><div><h2 id="balance-overview-heading" className="text-lg font-semibold tracking-tight text-foreground">Balance overview</h2><p className="mt-1 text-sm text-muted-foreground">Balances are calculated using SmartDuka’s current payout rules.</p></div>{loading || !summary ? <BalanceSkeleton /> : <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <section aria-labelledby="balance-overview-heading" className="space-y-4"><div><h2 id="balance-overview-heading" className="text-lg font-semibold tracking-tight text-foreground">Balance overview</h2><p className="mt-1 text-sm text-muted-foreground">Balances are calculated using Mezora’s current payout rules.</p></div>{loading || !summary ? <BalanceSkeleton /> : <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <FinanceCard label="Available" value={formatUgx(summary.balances.available)} description="Eligible for a withdrawal request." icon={Wallet} primary />
       <FinanceCard label="Pending" value={formatUgx(summary.balances.pending)} description="Earnings not yet available for withdrawal." icon={Clock3} />
       <FinanceCard label="Reserved" value={formatUgx(summary.balances.reserved)} description="Held for active withdrawal requests." icon={Landmark} />

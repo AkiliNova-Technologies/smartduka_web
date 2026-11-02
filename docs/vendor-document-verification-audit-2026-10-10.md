@@ -4,7 +4,7 @@
 
 The admin vendor details and shop-verification review interfaces now use the existing `Document`, `VendorDocument`, and `ShopVerificationApplication` records. No duplicate verification workflow or file record was introduced. A submission-reference table records which existing documents were reviewed for each application.
 
-Mwezora is **not declared production-ready** by this report. Engineering gates pass, but live MTN payment routing remains subject to external provider certification and confirmation. Live routing was not enabled.
+Mezora is **not declared production-ready** by this report. Engineering gates pass, but live MTN payment routing remains subject to external provider certification and confirmation. Live routing was not enabled.
 
 ## Root causes
 

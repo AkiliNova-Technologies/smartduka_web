@@ -10,7 +10,7 @@ import { VendorSubscriptionService } from "@/services/vendor-subscriptions";
 const terminal = new Set<PlatformPaymentIntentStatus>(["FAILED", "CANCELLED", "EXPIRED", "REVERSED"]);
 const platformMtnEnvironment = (): NodeJS.ProcessEnv => ({ ...process.env, MTN_MOMO_ENVIRONMENT: process.env.PLATFORM_MTN_ENVIRONMENT, MTN_MOMO_BASE_URL: process.env.PLATFORM_MTN_BASE_URL, MTN_MOMO_COLLECTION_SUBSCRIPTION_KEY: process.env.PLATFORM_MTN_COLLECTION_SUBSCRIPTION_KEY, MTN_MOMO_API_USER: process.env.PLATFORM_MTN_API_USER, MTN_MOMO_API_KEY: process.env.PLATFORM_MTN_API_KEY, MTN_MOMO_TARGET_ENVIRONMENT: process.env.PLATFORM_MTN_TARGET_ENVIRONMENT, MTN_SANDBOX_COLLECTION_TESTING_ENABLED: process.env.PLATFORM_MTN_SANDBOX_TESTING_ENABLED, MTN_SANDBOX_TEST_CURRENCY: "UGX" });
 
-/** Vendor-to-SmartDuka payment boundary. It never reads marketplace PaymentIntent. */
+/** Vendor-to-Mezora payment boundary. It never reads marketplace PaymentIntent. */
 export class PlatformPaymentService {
   static readiness() {
     const configured = platformRevenueConfig.platformMtnConfigured && Boolean(process.env.PLATFORM_MTN_BASE_URL && process.env.PLATFORM_MTN_COLLECTION_SUBSCRIPTION_KEY && process.env.PLATFORM_MTN_API_USER && process.env.PLATFORM_MTN_API_KEY);

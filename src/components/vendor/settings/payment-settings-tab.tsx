@@ -184,7 +184,7 @@ export function PaymentSettingsTab() {
           <h2 className="text-lg font-semibold">Payment accounts</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             Customer payments go directly to your verified merchant account.
-            Mwezora does not hold your sales funds.
+            Mezora does not hold your sales funds.
           </p>
         </header>
         {error && (

@@ -222,7 +222,7 @@ export default function SettingsContent() {
                       {displayName}
                     </p>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      Manage the contact details used across your Mwezora
+                      Manage the contact details used across your Mezora
                       account.
                     </p>
                   </div>
@@ -335,7 +335,7 @@ export default function SettingsContent() {
                 <Card className="mt-4">
                   <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                      <p className="text-sm font-medium">Sign out of Mwezora</p>
+                      <p className="text-sm font-medium">Sign out of Mezora</p>
                       <p className="mt-1 text-xs text-muted-foreground">
                         You’ll need to sign in again to access your account.
                       </p>
@@ -389,7 +389,7 @@ export default function SettingsContent() {
                 <CardHeader>
                   <CardTitle>Notification preferences</CardTitle>
                   <CardDescription>
-                    Choose which optional updates appear in your Mwezora
+                    Choose which optional updates appear in your Mezora
                     notification center.
                   </CardDescription>
                 </CardHeader>
@@ -421,7 +421,7 @@ export default function SettingsContent() {
                         id="promotional-notifications"
                         icon={Sparkles}
                         title="Offers and promotions"
-                        description="Discover marketplace offers and campaigns in Mwezora."
+                        description="Discover marketplace offers and campaigns in Mezora."
                         checked={settings.promotionalInAppNotifications}
                         disabled={settingsSaving}
                         onCheckedChange={(promotionalInAppNotifications) =>
@@ -453,7 +453,7 @@ export default function SettingsContent() {
                         title="Shopping recommendations"
                         description={
                           settings.promotionalInAppNotifications
-                            ? "Receive eligible product and shop discovery campaigns in Mwezora."
+                            ? "Receive eligible product and shop discovery campaigns in Mezora."
                             : "Enable offers and promotions first. Recommendations remain off until then."
                         }
                         checked={settings.shoppingRecommendations}
@@ -487,7 +487,7 @@ export default function SettingsContent() {
               <SectionTitle
                 icon={Palette}
                 title="Appearance"
-                description="Choose how Mwezora looks. Your choices follow you when you sign in."
+                description="Choose how Mezora looks. Your choices follow you when you sign in."
               />
               <AppearanceSettings />
             </section>

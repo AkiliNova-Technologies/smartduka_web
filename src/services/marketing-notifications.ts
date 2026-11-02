@@ -46,7 +46,7 @@ const clean = (value: unknown, max: number, label: string) => { const result = t
 const optionalDate = (value: string | null | undefined, label: string) => { if (!value) return null; const parsed = new Date(value); if (Number.isNaN(parsed.valueOf())) throw new MarketingNotificationError(`${label} is invalid.`); return parsed; };
 
 export async function resolveMarketingDestination(type: MarketingDestinationType, reference?: string | null) {
-  if (type === MarketingDestinationType.HOME) return { reference: null, path: "/", label: "Mwezora homepage" };
+  if (type === MarketingDestinationType.HOME) return { reference: null, path: "/", label: "Mezora homepage" };
   if (type === MarketingDestinationType.FEATURED_SECTION) {
     const sections: Record<string, { path: string; label: string }> = { DEALS: { path: "/deals", label: "Deals" }, NEW_ARRIVALS: { path: "/new-arrivals", label: "New arrivals" }, FEATURED_PRODUCTS: { path: "/?section=featured-products", label: "Featured products" }, FEATURED_SHOPS: { path: "/?section=featured-shops", label: "Featured shops" } };
     const section = reference ? sections[reference] : null; if (!section) throw new MarketingNotificationError("Choose a supported marketplace section."); return { reference, ...section };
@@ -67,7 +67,7 @@ async function validated(input: MarketingCampaignInput, now = new Date()) {
   if (expiresAt && expiresAt <= now) throw new MarketingNotificationError("Expiration must be in the future.");
   const destination = await resolveMarketingDestination(input.destinationType, input.destinationReference);
   const imageUrl = input.imageUrl?.trim() || null;
-  if (imageUrl && (!imageUrl.startsWith("/") || imageUrl.startsWith("//") || imageUrl.length > 1000)) throw new MarketingNotificationError("Campaign imagery must use a safe Mwezora asset path.");
+  if (imageUrl && (!imageUrl.startsWith("/") || imageUrl.startsWith("//") || imageUrl.length > 1000)) throw new MarketingNotificationError("Campaign imagery must use a safe Mezora asset path.");
   return { name: clean(input.name, 160, "Campaign name"), title: clean(input.title, 160, "Notification title"), message: clean(input.message, 2000, "Notification message"), category: input.category, audience: input.audience, destinationType: input.destinationType, destinationReference: destination.reference, destinationPath: destination.path, imageUrl, pushEnabled: input.pushEnabled === true, scheduledAt, expiresAt };
 }
 

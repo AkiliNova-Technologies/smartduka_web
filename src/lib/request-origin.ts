@@ -1,6 +1,6 @@
 import { AuthenticationRequiredError } from "@/lib/auth/session";
 
-/** Browser mutations using the session cookie must originate from this Mwezora origin. */
+/** Browser mutations using the session cookie must originate from this Mezora origin. */
 export function assertSameOrigin(request: Request) {
   const origin = request.headers.get("origin");
   if (!origin) return;
@@ -12,7 +12,7 @@ export function assertSameOrigin(request: Request) {
     expected = `${protocol}://${host}`;
   } catch { throw new AuthenticationRequiredError("Unable to validate request origin."); }
   if (new URL(origin).origin !== expected) {
-    const error = new Error("This request must originate from Mwezora.");
+    const error = new Error("This request must originate from Mezora.");
     Object.assign(error, { code: "FORBIDDEN" });
     throw error;
   }

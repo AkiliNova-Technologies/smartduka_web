@@ -248,7 +248,7 @@ export function FeaturedRankingList({
         <IllustratedEmptyState
           illustration={emptyIllustration}
           title={`No featured ${kind}s`}
-          description={`Choose ${kind}s you want Mwezora to highlight.`}
+          description={`Choose ${kind}s you want Mezora to highlight.`}
           action={{
             label: `Add featured ${singular}`,
             onClick: () => setDialogOpen(true),
@@ -295,7 +295,7 @@ export function FeaturedRankingList({
                   }
                   description={
                     kind === "shop"
-                      ? "Select a shop to preview how customers will discover it on the Mwezora homepage."
+                      ? "Select a shop to preview how customers will discover it on the Mezora homepage."
                       : "Select a product to preview its customer-facing card."
                   }
                 />

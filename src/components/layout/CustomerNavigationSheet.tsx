@@ -25,7 +25,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useWorkspaceAccess } from "@/hooks/use-workspace-access";
 import { isRouteActive } from "@/components/layout/nav-utils";
 import { NotificationsSheet } from "@/components/notifications/NotificationsSheet";
-import { MwezoraLogo } from "@/components/brand/MwezoraLogo";
+import { MezoraLogo } from "@/components/brand/MezoraLogo";
 
 import {
   Sheet,
@@ -81,7 +81,7 @@ export function CustomerNavigationSheet({
         aria-describedby="customer-navigation-description">
         <SheetHeader className="border-b px-5 py-4 pr-14">
           <SheetTitle className="flex items-center text-foreground">
-            <MwezoraLogo variant="horizontal" size="sm" label="Mwezora" />
+            <MezoraLogo variant="horizontal" size="sm" label="Mezora" />
           </SheetTitle>
           <SheetDescription
             id="customer-navigation-description"
@@ -113,7 +113,7 @@ export function CustomerNavigationSheet({
               </Link>
             ) : (
               <div className="mb-5 rounded-lg border bg-muted/30 p-3">
-                <p className="text-sm font-medium">Welcome to Mwezora</p>
+                <p className="text-sm font-medium">Welcome to Mezora</p>
                 <div className="mt-3 flex gap-2">
                   <Link
                     href="/login"

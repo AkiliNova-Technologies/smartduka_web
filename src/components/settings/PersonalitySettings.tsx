@@ -19,7 +19,7 @@ export function PersonalitySettings() {
     <section className="mt-6 border-t pt-6" aria-labelledby="personality-heading">
       <div>
         <h3 id="personality-heading" className="text-sm font-medium">Platform personality</h3>
-        <p className="mt-1 text-xs text-muted-foreground">Choose the tone Mwezora uses for friendly, noncritical messages.</p>
+        <p className="mt-1 text-xs text-muted-foreground">Choose the tone Mezora uses for friendly, noncritical messages.</p>
       </div>
       <div className="mt-4 grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Platform personality">
         {PLATFORM_PERSONALITIES.map((option) => {

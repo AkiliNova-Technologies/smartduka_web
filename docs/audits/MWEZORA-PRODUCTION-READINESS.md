@@ -1,4 +1,4 @@
-# Mwezora production readiness assessment
+# Mezora production readiness assessment
 
 Overall decision: **NOT READY**. Customer payment production routing is blocked, the automated baseline is red, and core operational controls lack runtime evidence.
 

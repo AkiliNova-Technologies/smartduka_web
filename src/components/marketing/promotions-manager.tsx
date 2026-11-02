@@ -194,7 +194,7 @@ export function PromotionsManager() {
               <MarketingPreviewShell>
                 <MarketingPreviewEmpty
                   title="Your next featured story starts here"
-                  description="Select a promotion to preview how it appears on the Mwezora homepage."
+                  description="Select a promotion to preview how it appears on the Mezora homepage."
                 />
               </MarketingPreviewShell>
             )}

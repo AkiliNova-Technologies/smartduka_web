@@ -7,9 +7,9 @@ import manifest from "@/app/manifest";
 const source = (file: string) =>
   readFileSync(resolve(process.cwd(), file), "utf8");
 
-describe("Mwezora customer-facing brand", () => {
+describe("Mezora customer-facing brand", () => {
   it("centralizes the public identity and points to supplied assets", () => {
-    expect(brand.name).toBe("Mwezora");
+    expect(brand.name).toBe("Mezora");
     expect(brand.tagline).toBe("Discover Something Wonderful");
     for (const path of [...Object.values(brand.logo), ...Object.values(brand.appIcons)]) {
       expect(path.startsWith("/")).toBe(true);
@@ -25,17 +25,17 @@ describe("Mwezora customer-facing brand", () => {
     expect(component).toContain("${brand.name} marketplace home");
     expect(component).toContain('href="/"');
     expect(component).toContain("brand.logo.adaptive");
-    // Header uses MwezoraLogoLink — symbol on mobile, horizontal on desktop
-    expect(header).toContain('variant="symbol"');
+    // Header uses the responsive Mezora horizontal wordmark.
+    expect(header).toContain('variant="horizontal"');
     expect(header).toContain('className="hidden md:inline-flex"');
-    // Footer uses MwezoraLogoLink for adaptive two-tone branding
-    expect(footer).toContain("<MwezoraLogoLink");
+    // Footer uses MezoraLogoLink for adaptive two-tone branding
+    expect(footer).toContain("<MezoraLogoLink");
     expect(footer).toContain("{brand.name}. All Rights Reserved");
   });
 
   it("keeps logo coloring theme-aware without changing accent preferences", () => {
     const component = source("src/components/brand/brand.tsx");
-    const logoComponent = source("src/components/brand/MwezoraLogo.tsx");
+    const logoComponent = source("src/components/brand/MezoraLogo.tsx");
     // Legacy BrandLogo still uses maskImage technique for single-colour use cases
     expect(component).toContain("maskImage");
     expect(component).toContain("bg-current");
@@ -48,15 +48,15 @@ describe("Mwezora customer-facing brand", () => {
   });
 
   it("brands authentication, account appearance, metadata, and the PWA", () => {
-    expect(source("src/app/login/page.tsx")).toContain("<MwezoraLogoLink");
-    expect(source("src/app/register/page.tsx")).toContain("<MwezoraLogoLink");
-    expect(source("src/components/login-form.tsx")).toContain("Mwezora");
-    expect(source("src/components/register-form.tsx")).toContain("Mwezora");
-    expect(source("src/app/(customer)/settings/settings-content.tsx")).toContain("Mwezora");
+    expect(source("src/app/login/page.tsx")).toContain("<MezoraLogoLink");
+    expect(source("src/app/register/page.tsx")).toContain("<MezoraLogoLink");
+    expect(source("src/components/login-form.tsx")).toContain("Mezora");
+    expect(source("src/components/register-form.tsx")).toContain("Mezora");
+    expect(source("src/app/(customer)/settings/settings-content.tsx")).toContain("Mezora");
     expect(source("src/app/layout.tsx")).toContain("openGraph");
     expect(source("src/app/layout.tsx")).toContain("twitter");
-    expect(manifest().short_name).toBe("Mwezora");
-    expect(manifest().name).toBe("Mwezora");
+    expect(manifest().short_name).toBe("Mezora");
+    expect(manifest().name).toBe("Mezora");
     expect(manifest().background_color).toBe("#FAF7F2");
     expect(manifest().icons?.some((icon) => icon.purpose === "maskable" && icon.sizes === "512x512")).toBe(true);
     expect(manifest().icons?.every((icon) => existsSync(resolve(process.cwd(), "public", icon.src.slice(1))))).toBe(true);
@@ -84,7 +84,7 @@ describe("Mwezora customer-facing brand", () => {
   });
 
   it("uses inline SVG logo component for adaptive two-tone accent coloring", () => {
-    const logoComponent = source("src/components/brand/MwezoraLogo.tsx");
+    const logoComponent = source("src/components/brand/MezoraLogo.tsx");
     // Component must not use external SVG img references for the adaptive logo
     expect(logoComponent).not.toContain('src="/mwezora');
     // Must embed the bag geometry inline (handle arch path)
@@ -95,7 +95,7 @@ describe("Mwezora customer-facing brand", () => {
     expect(logoComponent).toContain("--mwezora-logo-foreground");
     // Must be a client component to use useId
     expect(logoComponent).toContain('"use client"');
-    // MwezoraLogoLink must navigate to marketplace home
+    // MezoraLogoLink must navigate to marketplace home
     expect(logoComponent).toContain('href = "/"');
   });
 });

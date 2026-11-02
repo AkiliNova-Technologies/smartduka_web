@@ -11,7 +11,7 @@ type Tx = Prisma.TransactionClient;
 export class PlatformPaymentReconciliationService {
   private static async applySubscriptionPayment(tx: Tx, intent: {
     id: string; vendorId: string; amount: Prisma.Decimal; currency: string;
-    platformRevenueOrder: { id: string; subscriptionBillingIntent: null | { id: string; subscriptionId: string; lifecycleIntentId: string | null; planVersionId: string; purpose: "INITIAL_SUBSCRIPTION" | "RENEWAL" | "SCHEDULED_PLAN_CHANGE"; expiresAt: Date; merchantDestinationHash: string; paidPeriod: { id: string } | null; subscription: { id: string; status: string; currentPeriodEnd: Date | null }; planVersion: { id: string; planId: string; planCode: string } } };
+    platformRevenueOrder: { id: string; subscriptionBillingIntent: null | { id: string; subscriptionId: string; lifecycleIntentId: string | null; planVersionId: string; purpose: "INITIAL_SUBSCRIPTION" | "RENEWAL" | "SCHEDULED_PLAN_CHANGE"; billingCycle: "MONTHLY" | "QUARTERLY" | "YEARLY"; expiresAt: Date; merchantDestinationHash: string; paidPeriod: { id: string } | null; subscription: { id: string; status: string; currentPeriodEnd: Date | null }; planVersion: { id: string; planId: string; planCode: string } } };
   }, now: Date) {
     const billing = intent.platformRevenueOrder.subscriptionBillingIntent;
     if (!billing) return null;
@@ -29,11 +29,12 @@ export class PlatformPaymentReconciliationService {
     const latest = await tx.subscriptionPaidPeriod.findFirst({ where: { subscriptionId: billing.subscriptionId, status: { in: ["ACTIVE", "SCHEDULED"] } }, orderBy: { periodEnd: "desc" } });
     const candidates = [now, billing.subscription.currentPeriodEnd, latest?.periodEnd].filter((value): value is Date => Boolean(value));
     const periodStart = new Date(Math.max(...candidates.map(value => value.getTime())));
-    const periodEnd = VendorSubscriptionService.addMonth(periodStart);
+    if (billing.billingCycle === "QUARTERLY") throw new Error("Quarterly subscription billing is not supported.");
+    const periodEnd = VendorSubscriptionService.periodEnd(periodStart, billing.billingCycle);
     const future = periodStart > now;
-    const period = await tx.subscriptionPaidPeriod.create({ data: { vendorId: intent.vendorId, subscriptionId: billing.subscriptionId, billingIntentId: billing.id, paymentIntentId: intent.id, planVersionId: billing.planVersionId, status: future ? "SCHEDULED" : "ACTIVE", periodStart, periodEnd, amount: intent.amount, currency: intent.currency, activatedAt: future ? null : now } });
+    const period = await tx.subscriptionPaidPeriod.create({ data: { vendorId: intent.vendorId, subscriptionId: billing.subscriptionId, billingIntentId: billing.id, paymentIntentId: intent.id, planVersionId: billing.planVersionId, billingCycle: billing.billingCycle, status: future ? "SCHEDULED" : "ACTIVE", periodStart, periodEnd, amount: intent.amount, currency: intent.currency, activatedAt: future ? null : now } });
     if (!future) {
-      await tx.vendorSubscription.update({ where: { id: billing.subscriptionId }, data: { planId: billing.planVersion.planId, planVersionId: billing.planVersionId, status: "ACTIVE", startedAt: periodStart, currentPeriodStart: periodStart, currentPeriodEnd: periodEnd, cancelledAt: null, gracePeriodEndsAt: null } });
+      await tx.vendorSubscription.update({ where: { id: billing.subscriptionId }, data: { planId: billing.planVersion.planId, planVersionId: billing.planVersionId, billingCycle: billing.billingCycle, status: "ACTIVE", startedAt: periodStart, currentPeriodStart: periodStart, currentPeriodEnd: periodEnd, cancelledAt: null, gracePeriodEndsAt: null } });
       await tx.subscriptionBillingIntent.update({ where: { id: billing.id }, data: { activatedAt: now } });
       if (lifecycle) await tx.subscriptionLifecycleIntent.update({ where: { id: lifecycle.id }, data: { status: "APPLIED", appliedAt: now } });
     }

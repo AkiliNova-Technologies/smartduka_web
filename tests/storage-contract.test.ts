@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { STORAGE_BUCKETS, STORAGE_UPLOAD_RULES, legacyUploadPurpose } from "@/lib/supabase/storage-contract";
 
-describe("SmartDuka Storage contract", () => {
+describe("Mezora Storage contract", () => {
   it("has exactly one public media bucket and one private KYC bucket", () => {
     expect(STORAGE_BUCKETS).toEqual({ MARKETPLACE_MEDIA: "marketplace-media", KYC_DOCUMENTS: "kyc-documents" });
     expect(STORAGE_UPLOAD_RULES["kyc-document"].isPublic).toBe(false);

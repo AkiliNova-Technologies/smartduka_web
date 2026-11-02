@@ -4,7 +4,7 @@ Status: architecture only; no implementation, migration, seed, data or payment a
 
 ## Executive decision
 
-Mwezora should extend the existing `SubscriptionPlan` → `VendorSubscription` → `PlatformRevenueOrder` → `PlatformPaymentIntent` architecture. It must not create another billing system. Customer purchases remain zero-commission and direct-to-vendor; vendor subscriptions remain vendor-to-Mwezora platform revenue.
+Mezora should extend the existing `SubscriptionPlan` → `VendorSubscription` → `PlatformRevenueOrder` → `PlatformPaymentIntent` architecture. It must not create another billing system. Customer purchases remain zero-commission and direct-to-vendor; vendor subscriptions remain vendor-to-Mezora platform revenue.
 
 Confirmed commercial facts:
 

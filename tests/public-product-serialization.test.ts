@@ -13,7 +13,7 @@ const containsDecimal = (value: unknown): boolean => {
 
 describe("public product serializers", () => {
   const record = {
-    id: "product-1", name: "Decimal-safe shirt", slug: "decimal-safe-shirt", brand: "SmartDuka", description: "A shirt",
+    id: "product-1", name: "Decimal-safe shirt", slug: "decimal-safe-shirt", brand: "Mezora", description: "A shirt",
     basePrice: new Decimal("12000.50"), compareAtPrice: new Decimal("15000"), inventoryCount: 7, sku: "SHIRT-1", status: "PUBLISHED",
     sizes: ["M"], colors: ["Blue"], specs: [{ name: "Fabric", value: "Cotton" }], tags: ["new"], createdAt: new Date("2026-01-01T00:00:00.000Z"),
     images: [{ id: "image-1", url: "https://example.com/shirt.jpg", isFeatured: true }],

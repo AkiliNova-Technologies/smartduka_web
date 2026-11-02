@@ -40,7 +40,7 @@ describe("shop moderation cross-surface regression contract", () => {
     const payment = source("src/services/payment-eligibility.ts");
     expect(checkout).toContain("commissionRate: ZERO");
     expect(checkout).toContain("paymentAccounts");
-    expect(payment).toContain("active vendor, never SmartDuka");
+    expect(payment).toContain("active vendor, never Mezora");
     expect(source("src/services/platform-payment.ts")).toContain("platformRevenueOrder");
   });
 });

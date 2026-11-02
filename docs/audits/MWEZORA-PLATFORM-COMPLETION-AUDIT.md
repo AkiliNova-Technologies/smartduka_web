@@ -1,11 +1,11 @@
-# Mwezora platform completion audit
+# Mezora platform completion audit
 
 Audit date: 2026-10-18  
 Scope: repository at commit `9f1840e`; source-only/read-only audit, with verification commands that do not contact production or payment providers.
 
 ## Executive summary
 
-Mwezora is a broad, late-stage marketplace implementation, but it is **not production ready**. The catalogue, multi-vendor checkout calculation, authoritative vendor membership, order/inventory transactions, shop verification, subscriptions, advertising reservations, in-app notifications, browser-push outbox, admin workspaces, PWA shell, and Mobile API V1 all have meaningful implementations. The repository is materially beyond a prototype.
+Mezora is a broad, late-stage marketplace implementation, but it is **not production ready**. The catalogue, multi-vendor checkout calculation, authoritative vendor membership, order/inventory transactions, shop verification, subscriptions, advertising reservations, in-app notifications, browser-push outbox, admin workspaces, PWA shell, and Mobile API V1 all have meaningful implementations. The repository is materially beyond a prototype.
 
 Launch is nevertheless blocked by payment-provider qualification and several operational gaps. Customer MTN payment initiation is deliberately sandbox-only and throws outside sandbox; Airtel is an unavailable adapter. Consequently, direct customer-to-vendor settlement is architecturally preserved but not production verified. Platform MTN charging for subscriptions/advertising is separately gated and disabled by default. No deployment scheduler, production health endpoint, external error monitoring, or structured logging integration is present. Backup guidance exists, but no successful restore evidence is in the repository.
 
@@ -98,7 +98,7 @@ Real OS-level delivery is **unknown** for transactional, announcement and market
 
 The manifest, install icons/maskable icons, theme colors, offline page, service worker registration/caching and push click handler exist (`src/app/manifest.ts`, `public/sw.js`, `public/offline.html`). Responsive customer/vendor/admin layouts and shared shadcn/Radix components are widespread. Mobile V1 covers auth/profile, home, catalogue/search, shops, wishlist, checkout/orders/payment status, notifications/push, reports, uploads, and vendor operations (`src/app/api/v1`, `src/lib/api/v1/contracts.ts`). No Flutter code exists in this repository; any Flutter client requires a separate repository audit.
 
-Design consistency is partial: three current contract failures demonstrate drift in verification button composition, expected mobile symbol branding, and notification sheet sizing. Legacy SmartDuka text/storage/API names remain in user-visible vendor/admin copy and internals (`src/app/(vendor)/vendor/products/VendorProductsClient.tsx:209`, `src/app/(admin)/admin/revenue/page.tsx:241`, `src/app/api/v1/README.md:1`, `src/providers/UserDataProvider.tsx:270-277`). Direct `fetch` logic remains in some page components, contrary to the repository boundary rule (for example `src/app/(admin)/admin/finance/payments/page.tsx:20-24`).
+Design consistency is partial: three current contract failures demonstrate drift in verification button composition, expected mobile symbol branding, and notification sheet sizing. Legacy Mezora text/storage/API names remain in user-visible vendor/admin copy and internals (`src/app/(vendor)/vendor/products/VendorProductsClient.tsx:209`, `src/app/(admin)/admin/revenue/page.tsx:241`, `src/app/api/v1/README.md:1`, `src/providers/UserDataProvider.tsx:270-277`). Direct `fetch` logic remains in some page components, contrary to the repository boundary rule (for example `src/app/(admin)/admin/finance/payments/page.tsx:20-24`).
 
 ## Security findings
 

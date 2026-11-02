@@ -16,7 +16,7 @@ export function PwaManager() {
     const worker = registration.waiting;
     if (!worker || promptedWorkerRef.current === worker || dirtyFormRef.current || CRITICAL_PATHS.some((path) => pathname.startsWith(path))) return;
     promptedWorkerRef.current = worker;
-    toast.info("A new version of Mwezora is available.", {
+    toast.info("A new version of Mezora is available.", {
       duration: Infinity,
       action: {
         label: "Update now",

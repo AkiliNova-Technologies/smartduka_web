@@ -65,7 +65,7 @@ test.describe("authenticated P3D marketing push acceptance", () => {
   test("loads the authenticated admin composer with push off and displays persisted delivery status", async ({ page }) => {
     await login(page, "admin");
     await page.getByRole("tab", { name: "Marketing" }).click();
-    await expect(page.getByText("Fresh finds on Mwezora").first()).toBeVisible();
+    await expect(page.getByText("Fresh finds on Mezora").first()).toBeVisible();
     await expect(page.getByText(/evaluated .* eligible .* queued .* accepted/).first()).toBeVisible();
     await page.getByRole("button", { name: "Create campaign" }).click();
     await expect(page.getByRole("heading", { name: "Create marketing campaign" })).toBeVisible();

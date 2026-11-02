@@ -28,6 +28,8 @@ const NATIVE_BEARER_ROUTES = new Set([
   "POST /api/v1/wishlist",
   "GET /api/v1/addresses",
   "POST /api/v1/addresses",
+  "POST /api/v1/checkout",
+  "POST /api/v1/checkout/preview",
   "GET /api/v1/recommendations",
   "GET /api/v1/recently-viewed",
   "POST /api/v1/recently-viewed",
@@ -101,6 +103,12 @@ export function isNativeBearerPassThrough(
   const orderDetail =
     normalizedMethod === "GET" &&
     /^\/api\/v1\/orders\/[^/]+$/.test(normalizedPathname);
+  const orderPayment =
+    normalizedMethod === "POST" &&
+    /^\/api\/v1\/orders\/[^/]+\/payments$/.test(normalizedPathname);
+  const orderPaymentStatus =
+    normalizedMethod === "GET" &&
+    /^\/api\/v1\/orders\/[^/]+\/payment-status$/.test(normalizedPathname);
   const notificationItem =
     ["GET", "DELETE"].includes(normalizedMethod) &&
     /^\/api\/v1\/notifications\/[^/]+$/.test(normalizedPathname);
@@ -115,6 +123,8 @@ export function isNativeBearerPassThrough(
     !addressItem &&
     !addressDefault &&
     !orderDetail &&
+    !orderPayment &&
+    !orderPaymentStatus &&
     !notificationItem &&
     !notificationReadState &&
     !deviceDelete &&

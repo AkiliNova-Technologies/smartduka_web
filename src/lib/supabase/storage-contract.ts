@@ -1,4 +1,4 @@
-/** Canonical, audited SmartDuka Storage buckets. */
+/** Canonical, audited Mezora Storage buckets. */
 export const STORAGE_BUCKETS = {
   MARKETPLACE_MEDIA: "marketplace-media",
   KYC_DOCUMENTS: "kyc-documents",

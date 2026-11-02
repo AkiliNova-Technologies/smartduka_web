@@ -7,7 +7,7 @@ export type VendorEntitlementSnapshotDto = {
   source: "TRIAL" | "SUBSCRIPTION" | "LEGACY_SUBSCRIPTION" | "NONE";
   subscriptionStatus: string | null;
   trialStatus: string | null;
-  plan: { code: "STARTER" | "GROWTH" | "PREMIUM"; historicalCode: string; version: number | null; legacy: boolean } | null;
+  plan: { code: "STARTER" | "GROWTH" | "PREMIUM" | "ENTERPRISE"; historicalCode: string; version: number | null; legacy: boolean } | null;
   limits: Record<EntitlementResource, number | null> & { ACTIVE_PRODUCTS_SAFETY_CEILING: number | null };
   usage: Record<EntitlementResource, number>;
   capabilities: Record<string, boolean>;

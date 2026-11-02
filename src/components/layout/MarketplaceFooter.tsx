@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { CookieSettingsButton } from "@/components/legal/cookie-consent";
-import { MwezoraLogoLink } from "@/components/brand/MwezoraLogo";
+import { MezoraLogoLink } from "@/components/brand/MezoraLogo";
 import { brand } from "@/config/brand";
 
 const groups = [
@@ -43,12 +43,12 @@ export function MarketplaceFooter() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-2 gap-x-5 gap-y-8 sm:grid-cols-3 lg:grid-cols-[minmax(0,1.7fr)_repeat(5,minmax(0,1fr))] lg:gap-7">
           <section className="col-span-2 max-w-sm sm:col-span-3 lg:col-span-1" aria-labelledby="footer-brand">
-            {/* MwezoraLogoLink provides the two-tone live accent. */}
-            <MwezoraLogoLink
+            {/* MezoraLogoLink provides the two-tone live accent. */}
+            <MezoraLogoLink
               id="footer-brand"
               variant="horizontal"
               size="md"
-              label="Mwezora marketplace home"
+              label="Mezora marketplace home"
               linkClassName="text-foreground"
             />
             <p className="mt-3 text-sm font-medium leading-6 text-foreground">

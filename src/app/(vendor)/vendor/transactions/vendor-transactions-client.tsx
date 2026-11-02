@@ -408,7 +408,7 @@ function VendorTransactionDetailsSheet({
             </Button>
             <p className="text-xs text-muted-foreground">
               This is a read-only payment activity view. Payment status and
-              provider checks are managed by SmartDuka.
+              provider checks are managed by Mezora.
             </p>
           </div>
         )}

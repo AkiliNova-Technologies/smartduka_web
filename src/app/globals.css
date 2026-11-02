@@ -166,8 +166,8 @@ html.dark[data-accent="coral"] { --primary: oklch(0.74 0.15 35); --primary-foreg
 [data-accent-swatch="teal"] .accent-swatch { background: oklch(0.53 0.13 205); }
 [data-accent-swatch="coral"] .accent-swatch { background: oklch(0.59 0.18 35); }
 
-/* ── Mwezora logo color tokens ─────────────────────────────────────────────
-   These two variables power MwezoraLogo's two-tone color system.
+/* ── Mezora logo color tokens ─────────────────────────────────────────────
+   These two variables power MezoraLogo's two-tone color system.
    --mwezora-logo-accent      → shopping bag + "zora"  (follows --primary)
    --mwezora-logo-foreground  → "Mwe"                  (follows --foreground)
 

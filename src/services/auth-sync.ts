@@ -24,7 +24,7 @@ function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
 }
 
-/** Resolves Firebase's immutable UID to a SmartDuka user. Email is profile data,
+/** Resolves Firebase's immutable UID to a Mezora user. Email is profile data,
  * and can only establish a missing legacy mapping when Firebase has verified it. */
 export async function synchronizeFirebaseIdentity(identity: FirebaseIdentity) {
   const email = normalizeEmail(identity.email);

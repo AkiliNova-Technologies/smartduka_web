@@ -41,7 +41,7 @@ async function assertSafeTarget() {
 
 async function campaign(input: { pushEnabled?: boolean; status?: AnnouncementStatus; audience?: MarketingNotificationAudience; publishedAt?: Date | null; scheduledAt?: Date | null; expiresAt?: Date | null } = {}) {
   return prisma.marketingNotificationCampaign.create({ data: {
-    name: `${marker} campaign`, title: "Fresh finds on Mwezora", message: "Explore new arrivals from shops you may like.",
+    name: `${marker} campaign`, title: "Fresh finds on Mezora", message: "Explore new arrivals from shops you may like.",
     category: MarketingNotificationCategory.OFFERS,
     audience: input.audience ?? MarketingNotificationAudience.PROMOTIONAL_OPT_IN,
     destinationType: MarketingDestinationType.HOME,
@@ -100,7 +100,7 @@ describe.skipIf(!enabled).sequential("P3D marketing push against isolated Postgr
   });
 
   it("publishes durable intent and creates one job per active owned subscription with one frequency reservation", async () => {
-    const draft = await MarketingNotificationService.create({ name: `${marker} publication`, title: "Fresh finds", message: "Explore Mwezora offers.", category: MarketingNotificationCategory.OFFERS, audience: MarketingNotificationAudience.PROMOTIONAL_OPT_IN, destinationType: MarketingDestinationType.HOME, pushEnabled: true });
+    const draft = await MarketingNotificationService.create({ name: `${marker} publication`, title: "Fresh finds", message: "Explore Mezora offers.", category: MarketingNotificationCategory.OFFERS, audience: MarketingNotificationAudience.PROMOTIONAL_OPT_IN, destinationType: MarketingDestinationType.HOME, pushEnabled: true });
     expect(await prisma.marketingPushDispatch.count({ where: { campaignId: draft.id } })).toBe(0);
     await MarketingNotificationService.publish(draft.id);
     expect(await prisma.marketingPushDispatch.findUnique({ where: { campaignId: draft.id } })).toMatchObject({ status: AnnouncementPushDispatchStatus.PENDING, cursorUserId: null });
@@ -168,7 +168,7 @@ describe.skipIf(!enabled).sequential("P3D marketing push against isolated Postgr
     await prisma.user.update({ where: { id: ids.customerA }, data: { status: UserStatus.SUSPENDED } });
     const result = await PushDeliveryOutboxService.run();
     expect(result.skipped).toBeGreaterThanOrEqual(2);
-    expect(transport.send.mock.calls.filter((call) => String(call[1]).includes("Fresh finds on Mwezora"))).toHaveLength(0);
+    expect(transport.send.mock.calls.filter((call) => String(call[1]).includes("Fresh finds on Mezora"))).toHaveLength(0);
     await prisma.user.update({ where: { id: ids.customerA }, data: { status: UserStatus.ACTIVE } });
   });
 

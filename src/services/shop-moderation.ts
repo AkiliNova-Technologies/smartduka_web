@@ -124,7 +124,7 @@ export class ShopModerationService {
           REJECT: { type: "ERROR", title: "Seller application needs attention", message: reason ? `Your seller application was not approved: ${reason}` : "Your seller application was not approved. Review your application for details." },
           SUSPEND: { type: "WARNING", title: "Shop suspended", message: reason || "Your shop has been temporarily suspended." },
           RESTORE: { type: "SUCCESS", title: "Shop restored", message: "Your shop has been restored and eligible listings are public again." },
-          BAN: { type: "ERROR", title: "Shop banned", message: reason || "Your shop is no longer permitted to operate on Mwezora." },
+          BAN: { type: "ERROR", title: "Shop banned", message: reason || "Your shop is no longer permitted to operate on Mezora." },
         };
         await tx.notification.create({ data: {
           vendorId,

@@ -16,8 +16,8 @@ describe("cross-platform PWA compliance", () => {
     const value = manifest();
     expect(value).toMatchObject({
       id: "/",
-      name: "Mwezora",
-      short_name: "Mwezora",
+      name: "Mezora",
+      short_name: "Mezora",
       start_url: "/",
       scope: "/",
       display: "standalone",

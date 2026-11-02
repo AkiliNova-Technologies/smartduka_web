@@ -32,7 +32,7 @@ export default function ProductsPage({ searchParams }: ProductsPageProps) {
   return (
     <PageContainer className="py-6 sm:py-8 lg:py-10">
       <div className="space-y-6">
-        <PageHeader title="Browse products" description="Browse products from local shops on Mwezora." />
+        <PageHeader title="Browse products" description="Browse products from local shops on Mezora." />
         <div className="md:hidden"><Suspense fallback={<MarketplaceSearchFallback />}><MarketplaceSearch /></Suspense></div>
         <Suspense fallback={<ProductsResultsFallback />}><ProductsRuntime searchParams={searchParams} /></Suspense>
       </div>

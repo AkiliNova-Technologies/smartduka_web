@@ -1,6 +1,6 @@
 # PWA Web Push deployment
 
-Mwezora's in-app notification records remain authoritative. Browser push is a best-effort secondary channel processed from the PostgreSQL outbox by the authenticated platform cron endpoint.
+Mezora's in-app notification records remain authoritative. Browser push is a best-effort secondary channel processed from the PostgreSQL outbox by the authenticated platform cron endpoint.
 
 Set these deployment secrets before turning it on:
 

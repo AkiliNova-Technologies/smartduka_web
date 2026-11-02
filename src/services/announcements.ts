@@ -55,7 +55,7 @@ function validated(input: AnnouncementInput, now = new Date()) {
   if (scheduledAt && expiresAt && expiresAt <= scheduledAt) throw new AnnouncementError("Expiration must be after publication.");
   if (expiresAt && expiresAt <= now) throw new AnnouncementError("Expiration must be in the future.");
   const destination = input.destination?.trim() ? safeNotificationPath(input.destination) : null;
-  if (input.destination?.trim() && !destination) throw new AnnouncementError("Destination must be a safe internal Mwezora path.");
+  if (input.destination?.trim() && !destination) throw new AnnouncementError("Destination must be a safe internal Mezora path.");
   if (!Object.values(AnnouncementCategory).includes(input.category)) throw new AnnouncementError("Choose a valid category.");
   if (!Object.values(AnnouncementPriority).includes(input.priority)) throw new AnnouncementError("Choose a valid priority.");
   if (!Object.values(AnnouncementAudience).includes(input.audience)) throw new AnnouncementError("Choose a valid audience.");

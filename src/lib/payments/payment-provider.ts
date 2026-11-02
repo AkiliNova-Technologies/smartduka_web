@@ -41,7 +41,10 @@ export class PaymentProviderRegistry {
     const configured = provider === "MTN_MOMO"
       ? Boolean(environment.MTN_MOMO_BASE_URL && environment.MTN_MOMO_COLLECTION_SUBSCRIPTION_KEY && environment.MTN_MOMO_API_USER && environment.MTN_MOMO_API_KEY)
       : provider === "AIRTEL_MONEY"
-        ? Boolean(environment.AIRTEL_MONEY_BASE_URL && environment.AIRTEL_MONEY_CLIENT_ID && environment.AIRTEL_MONEY_CLIENT_SECRET)
+        // Credentials alone are not a usable contract. The adapter remains a
+        // deliberate unavailable stub until direct-vendor initiation and
+        // authenticated status polling have been implemented and qualified.
+        ? false
         : false;
     const sandboxTechnicalTesting = provider === "MTN_MOMO" && environmentName === "sandbox" && environment.MTN_SANDBOX_COLLECTION_TESTING_ENABLED?.toLowerCase() === "true";
     // Customer-facing payments always require proven direct vendor routing.

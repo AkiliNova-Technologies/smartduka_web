@@ -1,7 +1,7 @@
 /**
- * brand.tsx — Mwezora brand component library.
+ * brand.tsx — Mezora brand component library.
  *
- * Primary export for live-theme-reactive branding: MwezoraLogoLink.
+ * Primary export for live-theme-reactive branding: MezoraLogoLink.
  * Also re-exports legacy BrandLogo / BrandLink for backwards compat
  * with tests and any callers not yet migrated.
  *
@@ -17,16 +17,16 @@ import Link from "next/link";
 import { brand } from "@/config/brand";
 import { cn } from "@/lib/utils";
 import {
-  MwezoraLogo,
-  MwezoraLogoLink,
-  type MwezoraLogoProps,
-  type MwezoraLogoLinkProps,
-} from "@/components/brand/MwezoraLogo";
+  MezoraLogo,
+  MezoraLogoLink,
+  type MezoraLogoProps,
+  type MezoraLogoLinkProps,
+} from "@/components/brand/MezoraLogo";
 
-// ─── Re-export MwezoraLogo family ────────────────────────────────────────────
+// ─── Re-export MezoraLogo family ────────────────────────────────────────────
 
-export { MwezoraLogo, MwezoraLogoLink };
-export type { MwezoraLogoProps, MwezoraLogoLinkProps };
+export { MezoraLogo, MezoraLogoLink };
+export type { MezoraLogoProps, MezoraLogoLinkProps };
 
 // ─── Legacy helpers (mask-based, single-colour) ───────────────────────────────
 //
@@ -39,7 +39,7 @@ export type { MwezoraLogoProps, MwezoraLogoLinkProps };
 //   • The mwezora-brand-contract test assertions
 //   • Any component that imports them directly
 //
-// New code should prefer <MwezoraLogoLink> or <MwezoraLogo>.
+// New code should prefer <MezoraLogoLink> or <MezoraLogo>.
 
 type BrandImageProps = {
   className?: string;

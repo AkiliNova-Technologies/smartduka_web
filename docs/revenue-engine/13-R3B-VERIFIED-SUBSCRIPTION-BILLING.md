@@ -4,7 +4,7 @@ Status: implemented against the existing platform-revenue and MTN collection bou
 
 ## Existing architecture and domain separation
 
-Mwezora already has two deliberately separate payment domains. Marketplace `PaymentIntent` records represent customer purchases routed to verified vendor merchant accounts. `PlatformRevenueOrder` and `PlatformPaymentIntent` represent vendor-to-Mwezora revenue, including subscriptions. R3B reuses the second domain and does not read or mutate customer settlement records, introduce commissions, or share provider intents between domains.
+Mezora already has two deliberately separate payment domains. Marketplace `PaymentIntent` records represent customer purchases routed to verified vendor merchant accounts. `PlatformRevenueOrder` and `PlatformPaymentIntent` represent vendor-to-Mezora revenue, including subscriptions. R3B reuses the second domain and does not read or mutate customer settlement records, introduce commissions, or share provider intents between domains.
 
 The flow is: owner creates a server-priced subscription revenue order and `SubscriptionBillingIntent`; the existing `PlatformPaymentService` persists a platform intent before making an MTN sandbox RequestToPay; HTTP 202 is stored as `PENDING`; the existing reconciliation worker polls through platform MTN credentials; only a trusted final `SUCCESSFUL` observation can atomically create a `SubscriptionPaidPeriod` and activate or schedule access.
 

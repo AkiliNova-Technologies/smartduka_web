@@ -38,7 +38,7 @@ export class BrowserPushSubscriptionService {
     const endpointHash = hashPushEndpoint(input.endpoint);
     const existing = await prisma.browserPushSubscription.findUnique({ where: { endpointHash }, select: { id: true, userId: true, status: true } });
     if (existing && existing.userId !== userId && existing.status === BrowserPushSubscriptionStatus.ACTIVE) {
-      throw new BrowserPushSubscriptionError("This browser is already enabled for another Mwezora account. Sign out there or disable notifications before enabling them here.", "OWNERSHIP_CONFLICT");
+      throw new BrowserPushSubscriptionError("This browser is already enabled for another Mezora account. Sign out there or disable notifications before enabling them here.", "OWNERSHIP_CONFLICT");
     }
     const data = {
       userId,

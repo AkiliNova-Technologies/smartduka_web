@@ -1,4 +1,4 @@
-# Mwezora feature and module matrix
+# Mezora feature and module matrix
 
 Definitions: **Implemented** means meaningful code/core workflow exists. **Partial** means a required workflow or validation remains. **Blocked** means an external provider/environment is required. **Missing** means no meaningful implementation was found. **Production ready** is reserved for implementation plus security, end-to-end and operational evidence; no major domain currently meets that bar.
 
@@ -40,7 +40,7 @@ Definitions: **Implemented** means meaningful code/core workflow exists. **Parti
 | Test-data cleanup | Implemented with safeguards | cleanup services/models | admin cleanup routes; safety/worker tests | Isolated operational rehearsal only |
 | Mobile API V1 | Broadly implemented | `src/app/api/v1`, contracts/services | V1 route tests | Flutter/external app separate audit; client contract regression run |
 | PWA/offline/install | Implemented core | `manifest.ts`, `sw.js`, icons/offline | PWA tests | Lighthouse/install acceptance on Android/iOS; real push |
-| Design system/branding | Partial | `src/components/ui`, brand components, CSS | contract tests | 3 UI contract failures; remove user-facing SmartDuka remnants |
+| Design system/branding | Partial | `src/components/ui`, brand components, CSS | contract tests | 3 UI contract failures; remove user-facing Mezora remnants |
 | Deployment/operations | Partial/not ready | Next config, env example, runbooks | build scripts | Scheduler, health, monitoring, logs, rollback, restore evidence |
 
 ## External integrations

@@ -23,7 +23,7 @@ const messages: MessageCatalog = {
     LOVELY: "Welcome back, lovely!",
     ELEGANT: "Welcome back. Discover something extraordinary.",
     PLAYFUL: "Hey there! Ready for your next favourite find? ✨",
-    CLASSIC: "Welcome back to Mwezora.",
+    CLASSIC: "Welcome back to Mezora.",
   },
   "cart.empty.title": {
     LOVELY: "Your lovely finds are waiting",
@@ -98,10 +98,10 @@ const messages: MessageCatalog = {
     CLASSIC: "No products available yet",
   },
   "discovery.empty.description": {
-    LOVELY: "Beautiful products from Mwezora shops will appear here.",
-    ELEGANT: "Products from Mwezora shops will appear here shortly.",
+    LOVELY: "Beautiful products from Mezora shops will appear here.",
+    ELEGANT: "Products from Mezora shops will appear here shortly.",
     PLAYFUL: "Check back soon for something new to discover.",
-    CLASSIC: "Products from Mwezora shops will appear here.",
+    CLASSIC: "Products from Mezora shops will appear here.",
   },
 };
 

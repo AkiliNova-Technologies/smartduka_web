@@ -26,7 +26,7 @@ function notification(status: ShopVerificationStatus, publicId: string) {
     PENDING: ["Verification application received", "Your shop verification application has been received.", "INFO"],
     UNDER_REVIEW: ["Verification under review", "Your shop verification application is now under review.", "INFO"],
     NEEDS_INFORMATION: ["Information needed", "We need additional information to continue verifying your shop.", "WARNING"],
-    VERIFIED: ["Shop verified", "Your shop has been verified by Mwezora.", "SUCCESS"],
+    VERIFIED: ["Shop verified", "Your shop has been verified by Mezora.", "SUCCESS"],
     REJECTED: ["Verification not approved", "Your shop verification application was not approved. Review the details and update your information before reapplying.", "WARNING"],
     SUSPENDED: ["Verification suspended", "Your shop verification status has been temporarily suspended.", "WARNING"],
     REVOKED: ["Verification revoked", "Your shop verification status has been revoked.", "WARNING"],

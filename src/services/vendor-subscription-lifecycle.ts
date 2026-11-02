@@ -2,7 +2,7 @@ import { Prisma, VendorTrialStatus, type SubscriptionLifecycleIntentType } from 
 import { prisma } from "@/lib/prisma/client";
 import { requireVendorContext, VendorAuthorizationError } from "@/lib/auth/vendor-context";
 import { requireAdminContext } from "@/lib/auth/admin-context";
-import { REVENUE_POLICY_VERSION, TRIAL_POLICY } from "@/lib/revenue/entitlement-policy";
+import { APPROVED_PLAN_DEFINITIONS, REVENUE_POLICY_VERSION, TRIAL_POLICY, planPriceUgx, type PaidBillingInterval } from "@/lib/revenue/entitlement-policy";
 
 type Tx = Prisma.TransactionClient;
 const DAY = 86_400_000;
@@ -70,7 +70,7 @@ export class VendorSubscriptionLifecycleService {
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   }
 
-  static async requestPlanChange(planCode: string, idempotencyKey: string, now = new Date()) {
+  static async requestPlanChange(planCode: string, idempotencyKey: string, now = new Date(), billingInterval?: PaidBillingInterval) {
     const context = await ownerContext();
     return prisma.$transaction(async rawTx => {
       const tx = rawTx as unknown as Tx;
@@ -80,12 +80,16 @@ export class VendorSubscriptionLifecycleService {
       if (subscription.status === "CANCELLED") throw new VendorSubscriptionLifecycleError("Cancel the period-end cancellation before changing plans.", "SUBSCRIPTION_CANCELLED");
       const requested = await tx.subscriptionPlan.findFirst({ where: { code: planCode, isActive: true }, include: { versions: { where: { publicationStatus: "PUBLISHED", effectiveAt: { lte: now } }, orderBy: [{ effectiveAt: "desc" }, { version: "desc" }], take: 1 } } });
       const version = requested?.versions[0]; if (!requested || !version) throw new VendorSubscriptionLifecycleError("The requested plan is unavailable.", "PLAN_UNAVAILABLE");
-      if (requested.id === subscription.planId && version.id === subscription.planVersionId) throw new VendorSubscriptionLifecycleError("This is already the effective plan.", "PLAN_ALREADY_ACTIVE");
-      const type: SubscriptionLifecycleIntentType = Number(version.monthlyPriceUgx) > Number(subscription.planVersion?.monthlyPriceUgx ?? subscription.plan.price) ? "UPGRADE" : "DOWNGRADE";
+      const requestedInterval = billingInterval ?? (subscription.billingCycle as PaidBillingInterval);
+      if (requested.id === subscription.planId && version.id === subscription.planVersionId && requestedInterval === subscription.billingCycle) throw new VendorSubscriptionLifecycleError("This is already the effective plan and billing interval.", "PLAN_ALREADY_ACTIVE");
+      const requestedPolicy = APPROVED_PLAN_DEFINITIONS[planCode as keyof typeof APPROVED_PLAN_DEFINITIONS];
+      const currentPolicy = APPROVED_PLAN_DEFINITIONS[(subscription.planVersion?.planCode ?? subscription.plan.code) as keyof typeof APPROVED_PLAN_DEFINITIONS];
+      if (!requestedPolicy || !currentPolicy) throw new VendorSubscriptionLifecycleError("The requested plan is unavailable.", "PLAN_UNAVAILABLE");
+      const type: SubscriptionLifecycleIntentType = planPriceUgx(requestedPolicy, requestedInterval) > planPriceUgx(currentPolicy, subscription.billingCycle as PaidBillingInterval) ? "UPGRADE" : "DOWNGRADE";
       const previous = await tx.subscriptionLifecycleIntent.findFirst({ where: { vendorId: context.vendorId, type: { in: ["UPGRADE", "DOWNGRADE"] }, status: "PENDING" } });
       if (previous) { await tx.subscriptionLifecycleIntent.update({ where: { id: previous.id }, data: { status: "CANCELLED", cancelledAt: now } }); await audit(tx, { vendorId: context.vendorId, userId: context.user.id, action: "PLAN_CHANGE_CANCELLED", entity: "SubscriptionLifecycleIntent", entityId: previous.id, values: { replaced: true } }); }
-      const intent = await tx.subscriptionLifecycleIntent.create({ data: { vendorId: context.vendorId, subscriptionId: subscription.id, type, requestedPlanId: requested.id, requestedPlanVersionId: version.id, effectiveAt: subscription.currentPeriodEnd!, idempotencyKey, requestedById: context.user.id } });
-      await audit(tx, { vendorId: context.vendorId, userId: context.user.id, action: "PLAN_CHANGE_REQUESTED", entity: "SubscriptionLifecycleIntent", entityId: intent.id, values: { type, planCode, effectiveAt: intent.effectiveAt.toISOString() } });
+      const intent = await tx.subscriptionLifecycleIntent.create({ data: { vendorId: context.vendorId, subscriptionId: subscription.id, type, requestedPlanId: requested.id, requestedPlanVersionId: version.id, requestedBillingCycle: requestedInterval, effectiveAt: subscription.currentPeriodEnd!, idempotencyKey, requestedById: context.user.id } });
+      await audit(tx, { vendorId: context.vendorId, userId: context.user.id, action: "PLAN_CHANGE_REQUESTED", entity: "SubscriptionLifecycleIntent", entityId: intent.id, values: { type, planCode, billingInterval: requestedInterval, effectiveAt: intent.effectiveAt.toISOString() } });
       return intent;
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   }

@@ -373,7 +373,7 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
             <p className="mt-4 text-xs leading-5 text-muted-foreground">
               {paid} of {order.subOrders.length} seller payments confirmed. Each
               seller is paid directly to their verified merchant account;
-              Mwezora does not hold your funds.
+              Mezora does not hold your funds.
             </p>
           </div>
         </aside>

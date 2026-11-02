@@ -9,7 +9,7 @@ import { Suspense } from "react";
 import { connection } from "next/server";
 
 export default function DealsPage() {
-  return <Suspense fallback={<PageContainer className="py-6 sm:py-8"><PageHeader title="Current offers" description="Reduced prices from Mwezora shops." /></PageContainer>}><DealsRuntime /></Suspense>;
+  return <Suspense fallback={<PageContainer className="py-6 sm:py-8"><PageHeader title="Current offers" description="Reduced prices from Mezora shops." /></PageContainer>}><DealsRuntime /></Suspense>;
 }
 
 async function DealsRuntime() {
@@ -20,7 +20,7 @@ async function DealsRuntime() {
       <div className="space-y-7">
         <PageHeader
           title="Current offers"
-          description="Reduced prices from Mwezora shops."
+          description="Reduced prices from Mezora shops."
         />
         {!result.success ? (
           <ErrorState
@@ -40,7 +40,7 @@ async function DealsRuntime() {
           <IllustratedEmptyState
             illustration="/illustrations/empty-deals.svg"
             title="No deals right now"
-            description="Check back later for current offers from Mwezora shops."
+            description="Check back later for current offers from Mezora shops."
             action={{ label: "Browse products", href: "/products" }}
             size="standard"
           />

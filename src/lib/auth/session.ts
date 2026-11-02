@@ -38,7 +38,7 @@ export async function resolveAuthenticatedUser(request?: Request): Promise<Authe
   }
 
   // Native clients authenticate with the same Firebase identity token used by
-  // the web sign-in flow. Resolve its current SmartDuka account here rather
+  // the web sign-in flow. Resolve its current Mezora account here rather
   // than trusting UID, vendor, or role claims supplied by a client.
   const bearer = authHeader?.match(/^Bearer\s+(.+)$/i)?.[1];
   if (bearer) {

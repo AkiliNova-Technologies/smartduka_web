@@ -14,7 +14,7 @@ export type PaymentEligibility = {
 };
 export type PaymentEligibilityOptions = { sandboxQualification?: boolean };
 
-/** Central checkout gate: payment destinations belong to an active vendor, never SmartDuka. */
+/** Central checkout gate: payment destinations belong to an active vendor, never Mezora. */
 export class PaymentEligibilityService {
   static async canAcceptPayments(
     vendorId: string,

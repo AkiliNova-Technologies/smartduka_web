@@ -1,6 +1,6 @@
 # Database recovery release gate
 
-Mwezora's schema can be rebuilt from an empty PostgreSQL database by applying all Prisma migrations in order. The release-hardening run applied all 48 migrations successfully to a disposable PostgreSQL 17 cluster before running the advertising concurrency suite.
+Mezora's schema can be rebuilt from an empty PostgreSQL database by applying all Prisma migrations in order. The release-hardening run applied all 48 migrations successfully to a disposable PostgreSQL 17 cluster before running the advertising concurrency suite.
 
 That migration result is not evidence that production data can be recovered. Before a production launch, the database owner must record and verify:
 

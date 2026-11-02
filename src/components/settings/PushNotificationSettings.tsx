@@ -10,14 +10,14 @@ export function PushNotificationSettings() {
   const { subscribed, working, enable, disable, sendTest, unavailable, installationRequired, denied, permission } = usePushNotificationSettings();
   const status = denied ? "Blocked" : installationRequired ? "Installation required" : unavailable ? "Unavailable" : subscribed ? "Enabled" : "Disabled";
   const description = installationRequired
-    ? "On iPhone and iPad, install Mwezora from Safari’s Share menu before enabling notifications."
+    ? "On iPhone and iPad, install Mezora from Safari’s Share menu before enabling notifications."
     : denied
-      ? "Notifications are blocked in this browser. Open your browser or site settings, allow notifications for Mwezora, then return here."
+      ? "Notifications are blocked in this browser. Open your browser or site settings, allow notifications for Mezora, then return here."
       : unavailable
         ? "This browser or deployment cannot use secure web push notifications."
         : subscribed
-          ? "This browser can receive account updates when Mwezora is closed."
-          : "Enable supported browser notifications for important account updates when Mwezora is closed.";
+          ? "This browser can receive account updates when Mezora is closed."
+          : "Enable supported browser notifications for important account updates when Mezora is closed.";
 
   return (
     <Card className="mt-4">
@@ -49,7 +49,7 @@ export function PushNotificationSettings() {
         {denied && (
           <div className="mt-4 flex gap-2 rounded-lg bg-muted p-3 text-xs text-muted-foreground">
             <ShieldAlert className="size-4 shrink-0" />
-            Mwezora cannot reopen the browser permission prompt after it is denied.
+            Mezora cannot reopen the browser permission prompt after it is denied.
           </div>
         )}
       </CardContent>

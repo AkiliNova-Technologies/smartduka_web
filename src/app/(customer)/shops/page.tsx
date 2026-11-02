@@ -31,7 +31,7 @@ async function ShopsGrid({ stores, searchParams }: ShopsPageProps & { stores: Pu
 }
 
 export default function ShopsPage({ searchParams }: ShopsPageProps) {
-  return <Suspense fallback={<PageContainer className="py-6 sm:py-8"><PageHeader title="Browse shops" description="Discover products from local businesses on Mwezora." /></PageContainer>}><ShopsRuntime searchParams={searchParams} /></Suspense>;
+  return <Suspense fallback={<PageContainer className="py-6 sm:py-8"><PageHeader title="Browse shops" description="Discover products from local businesses on Mezora." /></PageContainer>}><ShopsRuntime searchParams={searchParams} /></Suspense>;
 }
 
 async function ShopsRuntime({ searchParams }: ShopsPageProps) {
@@ -40,9 +40,9 @@ async function ShopsRuntime({ searchParams }: ShopsPageProps) {
   return (
     <PageContainer className="py-6 sm:py-8">
       <div className="space-y-7">
-        <PageHeader title="Browse shops" description="Discover products from local businesses on Mwezora." />
+        <PageHeader title="Browse shops" description="Discover products from local businesses on Mezora." />
         <PromotionSection placement="SHOPS" compact />
-        {stores.length ? <Suspense fallback={<ShopsGridFallback stores={stores} />}><ShopsGrid stores={stores} searchParams={searchParams} /></Suspense> : <IllustratedEmptyState illustration="/illustrations/empty-shops.svg" title="No shops available yet" description="Mwezora shops will appear here as they become available." action={{ label: "Browse products", href: "/products" }} />}
+        {stores.length ? <Suspense fallback={<ShopsGridFallback stores={stores} />}><ShopsGrid stores={stores} searchParams={searchParams} /></Suspense> : <IllustratedEmptyState illustration="/illustrations/empty-shops.svg" title="No shops available yet" description="Mezora shops will appear here as they become available." action={{ label: "Browse products", href: "/products" }} />}
       </div>
     </PageContainer>
   );

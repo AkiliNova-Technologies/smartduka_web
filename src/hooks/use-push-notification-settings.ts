@@ -41,7 +41,7 @@ export function usePushNotificationSettings() {
   React.useEffect(() => { const timer = window.setTimeout(() => void refresh(), 0); return () => window.clearTimeout(timer); }, [refresh]);
   const enable = async () => {
     const current = browserState(); if (!current.supported) return false;
-    if (current.ios && !current.standalone) { toast.error("On iPhone and iPad, add Mwezora to your Home Screen before enabling notifications."); return false; }
+    if (current.ios && !current.standalone) { toast.error("On iPhone and iPad, add Mezora to your Home Screen before enabling notifications."); return false; }
     setWorking(true);
     try {
       const config = await pushClient.configuration();

@@ -9,7 +9,7 @@ import { Suspense } from "react";
 import { connection } from "next/server";
 
 export default function NewArrivalsPage() {
-  return <Suspense fallback={<PageContainer className="py-6 sm:py-8"><PageHeader title="New arrivals" description="The latest products added by Mwezora shops." /></PageContainer>}><NewArrivalsRuntime /></Suspense>;
+  return <Suspense fallback={<PageContainer className="py-6 sm:py-8"><PageHeader title="New arrivals" description="The latest products added by Mezora shops." /></PageContainer>}><NewArrivalsRuntime /></Suspense>;
 }
 
 async function NewArrivalsRuntime() {
@@ -20,7 +20,7 @@ async function NewArrivalsRuntime() {
       <div className="space-y-7">
         <PageHeader
           title="New arrivals"
-          description="The latest products added by Mwezora shops."
+          description="The latest products added by Mezora shops."
         />
         {!result.success ? (
           <ErrorState

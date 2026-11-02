@@ -45,7 +45,7 @@ describe("marketplace personalization contracts", () => {
     const home = source("src/app/(customer)/page.tsx");
     const grid = source("src/components/home/ProductGrid.tsx");
     expect(grid).toContain("Picked from what you’ve been exploring.");
-    expect(grid).toContain("Popular picks from across Mwezora.");
+    expect(grid).toContain("Popular picks from across Mezora.");
     expect(grid).toContain("Continue where you left off.");
     expect(grid).toContain("slice(0, 4)");
     expect(grid).toContain("if (!recentlyViewed.length) return null");

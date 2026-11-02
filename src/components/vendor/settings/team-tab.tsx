@@ -65,7 +65,7 @@ export function TeamTab() {
       <div>
         <h2 className="text-lg font-semibold">Shop team</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Owners can delegate day-to-day operations to existing Mwezora users.
+          Owners can delegate day-to-day operations to existing Mezora users.
           Ownership and payouts remain protected.
         </p>
       </div>

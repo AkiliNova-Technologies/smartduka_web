@@ -5,6 +5,7 @@ import { Check, CircleDollarSign, ShieldCheck, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Sheet,
   SheetContent,
@@ -22,7 +23,8 @@ type Plan = {
   code: string;
   name: string;
   description: string | null;
-  price: string;
+  monthlyPrice: number;
+  yearlyPrice: number;
   currency: string;
   staffSeats: number;
   features: unknown;
@@ -33,6 +35,7 @@ type Item = {
   status: string;
   currentPeriodStart: string | null;
   currentPeriodEnd: string | null;
+  billingInterval: "MONTHLY" | "YEARLY";
   amount: string;
   payment: { status: string; reference: string | null } | null;
 };
@@ -92,7 +95,8 @@ export default function SubscriptionPage() {
     [selected, setSelected] = React.useState<Plan | null>(null),
     [phone, setPhone] = React.useState(""),
     [notice, setNotice] = React.useState(""),
-    [busy, setBusy] = React.useState(false);
+    [busy, setBusy] = React.useState(false),
+    [billingInterval, setBillingInterval] = React.useState<"MONTHLY" | "YEARLY">("MONTHLY");
   const load = React.useCallback(async () => {
     setFailure("");
     try {
@@ -122,12 +126,25 @@ export default function SubscriptionPage() {
       return setNotice("Enter the MTN mobile-money number to continue.");
     setBusy(true);
     try {
+      let lifecycleIntentId: string | undefined;
+      if (data?.entitlement.activeSubscription) {
+        const change = await fetch("/api/v1/vendor/subscription/plan-change", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ planCode: selected.code, billingInterval, idempotencyKey: crypto.randomUUID() }),
+          }),
+          changeBody = await change.json();
+        if (!change.ok) throw new Error(error(changeBody, "Unable to schedule the subscription change."));
+        lifecycleIntentId = changeBody.data.id;
+      }
       const order = await fetch("/api/v1/vendor/subscription", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             planCode: selected.code,
+            billingInterval,
             idempotencyKey: crypto.randomUUID(),
+            lifecycleIntentId,
           }),
         }),
         ob = await order.json();
@@ -193,14 +210,14 @@ export default function SubscriptionPage() {
   const comparisonRows = React.useMemo<PlanComparison[]>(
     () => {
       const plans = data?.plans ?? [];
-      const values = (starter: string, growth: string, premium: string) => Object.fromEntries(plans.map(plan => [plan.code, plan.code === "STARTER" ? starter : plan.code === "GROWTH" ? growth : premium]));
+      const values = (starter: string, growth: string, premium: string, enterprise: string) => Object.fromEntries(plans.map(plan => [plan.code, plan.code === "STARTER" ? starter : plan.code === "GROWTH" ? growth : plan.code === "PREMIUM" ? premium : enterprise]));
       return [
-        { id: "products", feature: "Active products", values: values("100", "1,000", "Fair-use unlimited") },
-        { id: "branches", feature: "Branches", values: values("1", "5", "20") },
-        { id: "team-members", feature: "Non-owner staff", values: values("2", "10", "30") },
-        { id: "analytics", feature: "Analytics entitlement", values: values("Basic", "Advanced", "Advanced + Premium insights") },
-        { id: "inventory", feature: "Inventory entitlement", values: values("Standard", "Standard", "Advanced") },
-        { id: "exports", feature: "CSV exports", values: values("—", "Included", "Included") },
+        { id: "products", feature: "Active products", values: values("100", "1,000", "Fair-use unlimited", "Fair-use unlimited") },
+        { id: "branches", feature: "Branches", values: values("1", "5", "20", "20") },
+        { id: "team-members", feature: "Team members including owner", values: values("2", "5", "10", "25") },
+        { id: "analytics", feature: "Analytics entitlement", values: values("Basic", "Advanced", "Advanced + Premium insights", "Advanced + Premium insights") },
+        { id: "inventory", feature: "Inventory entitlement", values: values("Standard", "Standard", "Advanced", "Advanced") },
+        { id: "exports", feature: "CSV exports", values: values("—", "Included", "Included", "Included") },
       ];
     },
     [data?.plans],
@@ -218,6 +235,7 @@ export default function SubscriptionPage() {
     [data?.plans],
   );
   const active = data?.entitlement.activeSubscription;
+  const activeInterval = data?.history.find((item) => item.status === "ACTIVE" || item.status === "CANCELLED")?.billingInterval ?? "MONTHLY";
   const snapshot = authoritative.entitlement;
   const stateLabel = snapshot ? ({ TRIAL_ACTIVE: "Trial active", TRIAL_EXPIRED: "Trial expired", SUBSCRIPTION_ACTIVE: "Active", SUBSCRIPTION_GRACE: "Grace period", SUBSCRIPTION_EXPIRED: "Expired", CANCELLED_BUT_ACTIVE: "Cancelled · active until period end", LEGACY_TRANSITION: "Legacy transition", NO_ENTITLEMENT: "Subscription required" } as const)[snapshot.state] : "Loading access";
   const currentPlan = snapshot?.plan?.code ? data?.plans.find(plan => plan.code === snapshot.plan?.code) : null;
@@ -260,9 +278,9 @@ export default function SubscriptionPage() {
                     Your shop access
                   </p>
                   <h2 className="text-lg font-semibold">
-                    {currentPlan?.name ?? snapshot?.plan?.code ?? (snapshot?.state === "TRIAL_ACTIVE" ? "Free trial · 14-day introductory trial" : "Subscription required")}
+                    {currentPlan?.name ?? snapshot?.plan?.code ?? (snapshot?.state === "TRIAL_ACTIVE" ? "Free trial · 30-day introductory trial" : "Subscription required")}
                   </h2>
-                  {currentPlan && <p className="text-sm text-muted-foreground">{money(currentPlan.price)} / month</p>}
+                  {currentPlan && <p className="text-sm text-muted-foreground">{money(String(activeInterval === "YEARLY" ? currentPlan.yearlyPrice : currentPlan.monthlyPrice))} / {activeInterval === "YEARLY" ? "year" : "month"}</p>}
                 </div>
               </div>
               <Badge variant={snapshot?.state === "SUBSCRIPTION_ACTIVE" || snapshot?.state === "TRIAL_ACTIVE" ? "default" : "secondary"}>{stateLabel}</Badge>
@@ -276,10 +294,17 @@ export default function SubscriptionPage() {
           {snapshot && <section className="space-y-3"><div><h2 className="text-xl font-semibold">Resource usage</h2><p className="mt-1 text-sm text-muted-foreground">Authoritative usage for this shop.</p></div><ResourceUsageGrid entitlement={snapshot} /></section>}
           {snapshot && <section className="rounded-2xl border bg-card p-5"><h2 className="text-lg font-semibold">Available capabilities</h2><div className="mt-3 flex flex-wrap gap-2">{Object.entries(snapshot.capabilityModes).filter(([, mode]) => Boolean(mode)).map(([capability, mode]) => <Badge key={capability} variant="secondary">{label(capability)} · {mode === "PREVIEW" ? "Preview" : "Available"}</Badge>)}</div><p className="mt-3 text-xs text-muted-foreground">Capabilities describe plan access. Features still under development are not presented as working tools.</p></section>}
           <section>
-            <h2 className="text-xl font-semibold">Available plans</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Choose the tools that fit how you run your shop.
-            </p>
+            <div className="rounded-2xl border bg-card p-5 shadow-sm">
+              <Badge variant="secondary">Introductory offer</Badge>
+              <h2 className="mt-3 text-xl font-semibold">30-day free trial</h2>
+              <p className="mt-1 text-sm text-muted-foreground">Explore vendor tools with one account. This is not a recurring free plan.</p>
+            </div>
+            <div className="mt-8 flex flex-wrap items-end justify-between gap-4">
+              <div><h2 className="text-xl font-semibold">Available plans</h2><p className="mt-1 text-sm text-muted-foreground">Choose the tools that fit how you run your shop.</p></div>
+              <Tabs value={billingInterval} onValueChange={(value) => setBillingInterval(value as "MONTHLY" | "YEARLY")}>
+                <TabsList aria-label="Subscription billing interval"><TabsTrigger value="MONTHLY">Monthly</TabsTrigger><TabsTrigger value="YEARLY">Yearly</TabsTrigger></TabsList>
+              </Tabs>
+            </div>
             {!ready && (
               <p className="mt-4 rounded-xl border bg-muted/60 p-3 text-sm text-muted-foreground">
                 Subscription payments are temporarily unavailable. You can still
@@ -292,9 +317,9 @@ export default function SubscriptionPage() {
                 <code>npm run seed:subscription-plans</code>.
               </p>
             ) : (
-              <div className="mt-4 grid gap-4 lg:grid-cols-3">
+              <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 {data.plans.map((plan) => {
-                  const current = active?.plan.code === plan.code;
+                  const current = active?.plan.code === plan.code && activeInterval === billingInterval;
                   return (
                     <article
                       key={plan.code}
@@ -314,14 +339,15 @@ export default function SubscriptionPage() {
                         {plan.description}
                       </p>
                       <p className="mt-5 text-3xl font-semibold">
-                        {money(plan.price)}{" "}
+                        {money(String(billingInterval === "YEARLY" ? plan.yearlyPrice : plan.monthlyPrice))}{" "}
                         <span className="text-sm font-normal text-muted-foreground">
-                          / month
+                          / {billingInterval === "YEARLY" ? "year" : "month"}
                         </span>
                       </p>
+                      {billingInterval === "YEARLY" && <p className="mt-1 text-sm font-medium text-primary">Save {money(String(plan.monthlyPrice * 12 - plan.yearlyPrice))} annually</p>}
                       <p className="mt-5 flex items-center gap-2 rounded-xl bg-muted/70 p-3 text-sm">
                         <Users className="size-4 text-primary" />
-                        Up to {plan.staffSeats} team members
+                        Up to {plan.staffSeats} team members including owner
                       </p>
                       <ul className="mt-5 space-y-2 text-sm">
                         {list(plan)
@@ -338,7 +364,7 @@ export default function SubscriptionPage() {
                         disabled={current || !ready}
                         onClick={() => setSelected(plan)}>
                         {current
-                          ? "Current plan"
+                          ? `Current ${billingInterval === "YEARLY" ? "yearly" : "monthly"} plan`
                           : ready
                             ? `Choose ${plan.name}`
                             : "Payments unavailable"}
@@ -412,7 +438,7 @@ export default function SubscriptionPage() {
               <div className="rounded-xl bg-muted p-4">
                 <strong>{selected.name}</strong>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  {money(selected.price)} · Monthly billing
+                  {money(String(billingInterval === "YEARLY" ? selected.yearlyPrice : selected.monthlyPrice))} · {billingInterval === "YEARLY" ? "Yearly" : "Monthly"} billing
                 </p>
               </div>
               <label
@@ -441,7 +467,7 @@ export default function SubscriptionPage() {
               onClick={() => void pay()}>
               {busy
                 ? "Sending payment request…"
-                : `Request payment for ${selected ? money(selected.price) : ""}`}
+                : `Request payment for ${selected ? money(String(billingInterval === "YEARLY" ? selected.yearlyPrice : selected.monthlyPrice)) : ""}`}
             </Button>
           </SheetFooter>
         </SheetContent>

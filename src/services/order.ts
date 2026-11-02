@@ -44,7 +44,7 @@ function serializeCustomerOrder(order: CustomerOrderRecord) {
     discountAmount: Math.max(0, Number(order.subTotal) + Number(order.totalShipping) + Number(order.taxAmount) - Number(order.totalAmount)),
     createdAt: order.createdAt.toISOString(), notes: order.notes,
     items: order.orderItems.map((item) => ({
-      id: item.id, productId: item.productId, subOrderId: item.subOrderId, variantName: item.variantNameSnapshot,
+      id: item.id, productId: item.productId, subOrderId: item.subOrderId, variantId: item.variantId, variantName: item.variantNameSnapshot,
       variantOptions: item.variantOptionsSnapshot && typeof item.variantOptionsSnapshot === "object" && !Array.isArray(item.variantOptionsSnapshot) ? item.variantOptionsSnapshot as Record<string, string> : null,
       name: item.productNameSnapshot ?? item.product.name, quantity: item.quantity, price: Number(item.priceAtPurchase),
       lineTotal: Number(item.totalPrice), image: item.product.images[0]?.url || null, vendorName: item.product.vendor.storeName,
@@ -81,6 +81,7 @@ export interface CheckoutIntent {
     quantity: number;
   }>;
   shippingAddress?: string;
+  addressId?: string;
   shippingPhone: string;
   shippingEmail?: string;
   deliveryDistrict?: string;
@@ -328,6 +329,11 @@ function createOrderNumber() {
 
 export class OrderService {
   static async createOrder(input: CreateOrderInput) {
+    if (input.addressId) {
+      const address = await prisma.customerAddress.findFirst({ where: { id: input.addressId, customerId: input.userId } });
+      if (!address) throw new CheckoutError("The selected delivery address is unavailable.", "INVALID_CHECKOUT");
+      input = { ...input, shippingAddress: [address.area, address.street, address.building, address.landmark, address.city, address.district, address.country].filter(Boolean).join(", "), shippingPhone: address.recipientPhone, deliveryDistrict: address.district };
+    }
     validateCheckoutIntent(input);
     const requestHash = checkoutRequestHash(input);
     const existing = await prisma.order.findFirst({
@@ -558,7 +564,7 @@ export class OrderService {
               vendorSubTotal: group.subtotal,
               vendorShipping: group.shipping,
               vendorTotal: group.total,
-              // Direct-to-vendor payments never produce a SmartDuka commission
+              // Direct-to-vendor payments never produce a Mezora commission
               // or a payout entitlement. Legacy fields remain as zero snapshots.
               platformCommission: ZERO,
               commissionRate: ZERO,

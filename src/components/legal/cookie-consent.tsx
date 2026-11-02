@@ -136,7 +136,7 @@ export function CookieConsentProvider({
             <div className="min-w-0">
               <h2 className="text-sm font-semibold">Your privacy choices</h2>
               <p className="mt-1 text-sm leading-5 text-muted-foreground">
-                Mwezora uses essential cookies to keep the marketplace secure and working. We do not currently use optional analytics or marketing cookies.
+                Mezora uses essential cookies to keep the marketplace secure and working. We do not currently use optional analytics or marketing cookies.
               </p>
               <Link href="/cookie-policy" className="mt-2 inline-flex text-xs font-medium text-primary underline-offset-4 hover:underline">Cookie Policy</Link>
             </div>
@@ -154,7 +154,7 @@ export function CookieConsentProvider({
         <SheetContent side="bottom" className="mx-auto max-h-[85dvh] w-full overflow-y-auto rounded-t-2xl sm:max-w-xl">
           <SheetHeader>
             <SheetTitle>Cookie preferences</SheetTitle>
-            <SheetDescription>Manage the cookies Mwezora uses on this device.</SheetDescription>
+            <SheetDescription>Manage the cookies Mezora uses on this device.</SheetDescription>
           </SheetHeader>
           <div className="space-y-4 px-4 pb-2 text-sm">
             <section className="rounded-xl border border-border bg-muted/30 p-4" aria-labelledby="essential-cookies">
@@ -166,8 +166,8 @@ export function CookieConsentProvider({
                 <span className="shrink-0 rounded-full border bg-background px-2.5 py-1 text-xs font-medium">Always on</span>
               </div>
             </section>
-            {([["analytics", "Analytics cookies", "Help us understand marketplace usage."], ["marketing", "Marketing cookies", "Support relevant Mwezora promotions."], ["preferences", "Preference cookies", "Remember non-essential display choices."]] as const).map(([key, title, description]) => <label key={key} className="flex cursor-pointer items-start justify-between gap-4 rounded-xl border p-4"><span><span className="block font-semibold">{title}</span><span className="mt-1 block text-xs leading-5 text-muted-foreground">{description}</span></span><input type="checkbox" checked={preferences[key]} onChange={(event) => setPreferences(current => ({ ...current, [key]: event.target.checked }))} className="mt-1 size-4 accent-primary" /></label>)}
-            <p className="text-xs leading-5 text-muted-foreground">Mwezora has no optional analytics or marketing tracking enabled today. Your choices are saved before any future optional category is used.</p>
+            {([["analytics", "Analytics cookies", "Help us understand marketplace usage."], ["marketing", "Marketing cookies", "Support relevant Mezora promotions."], ["preferences", "Preference cookies", "Remember non-essential display choices."]] as const).map(([key, title, description]) => <label key={key} className="flex cursor-pointer items-start justify-between gap-4 rounded-xl border p-4"><span><span className="block font-semibold">{title}</span><span className="mt-1 block text-xs leading-5 text-muted-foreground">{description}</span></span><input type="checkbox" checked={preferences[key]} onChange={(event) => setPreferences(current => ({ ...current, [key]: event.target.checked }))} className="mt-1 size-4 accent-primary" /></label>)}
+            <p className="text-xs leading-5 text-muted-foreground">Mezora has no optional analytics or marketing tracking enabled today. Your choices are saved before any future optional category is used.</p>
             <Link href="/cookie-policy" className="inline-flex text-xs font-medium text-primary underline-offset-4 hover:underline">Read our Cookie Policy</Link>
           </div>
           <SheetFooter className="border-t sm:flex-row sm:justify-end">

@@ -211,7 +211,7 @@ export default function VendorProductsPage() {
         <IllustratedEmptyState
           illustration="/illustrations/vendor-empty-products.svg"
           title="No products yet"
-          description="Add your first product to start selling on SmartDuka."
+          description="Add your first product to start selling on Mezora."
           action={{ label: "Add product", href: "/vendor/products/new" }}
           size="standard"
         />

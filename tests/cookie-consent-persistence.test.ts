@@ -14,7 +14,7 @@ describe("cookie consent persistence", () => {
     expect(parseCookieConsent(JSON.stringify({ ...saved, version: COOKIE_CONSENT_VERSION + 1 }))).toBeNull();
   });
 
-  it("restores the retained SmartDuka cookie key during the Mwezora transition", () => {
+  it("restores the retained Mezora cookie key during the Mezora transition", () => {
     expect(readCookieConsent(`session=abc; smartduka_cookie_consent=${encodeURIComponent(JSON.stringify(saved))}; sidebar_state=true`)).toEqual(saved);
   });
 

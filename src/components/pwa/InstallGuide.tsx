@@ -58,7 +58,7 @@ export function InstallGuide() {
   if (!visible) return null;
 
   return (
-    <aside className="fixed inset-x-3 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-40 mx-auto max-w-md rounded-2xl border border-border/70 bg-card p-4 text-card-foreground shadow-sm md:inset-x-auto md:right-5 md:bottom-5" aria-label="Install Mwezora">
+    <aside className="fixed inset-x-3 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-40 mx-auto max-w-md rounded-2xl border border-border/70 bg-card p-4 text-card-foreground shadow-sm md:inset-x-auto md:right-5 md:bottom-5" aria-label="Install Mezora">
       <button type="button" onClick={dismiss} className="absolute right-2 top-2 rounded-full p-2 text-muted-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring" aria-label="Dismiss install guidance">
         <X className="size-4" />
       </button>
@@ -67,9 +67,9 @@ export function InstallGuide() {
           {ios ? <Share className="size-4" aria-hidden="true" /> : <Download className="size-4" aria-hidden="true" />}
         </span>
         <div>
-          <p className="text-sm font-semibold">Add Mwezora to your Home Screen</p>
+          <p className="text-sm font-semibold">Add Mezora to your Home Screen</p>
           <p className="mt-1 text-xs leading-5 text-muted-foreground">
-            {ios ? "Open the Share menu, then choose Add to Home Screen." : "Install Mwezora for quick access from your device."}
+            {ios ? "Open the Share menu, then choose Add to Home Screen." : "Install Mezora for quick access from your device."}
           </p>
           {!ios && installPrompt ? (
             <button type="button" onClick={() => void install()} className="mt-3 rounded-full bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Install</button>

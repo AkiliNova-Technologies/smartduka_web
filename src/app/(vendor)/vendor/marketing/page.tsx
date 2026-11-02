@@ -504,7 +504,7 @@ function Details({
   const notice = !campaign
     ? null
     : campaign.payment?.status === "PENDING"
-      ? "Payment confirmation is pending. Do not pay again while SmartDuka verifies the transaction."
+      ? "Payment confirmation is pending. Do not pay again while Mezora verifies the transaction."
       : campaign.payment?.status === "CONFIRMATION_DELAYED"
         ? "Payment confirmation is taking longer than expected."
         : ["FAILED", "EXPIRED", "CANCELLED"].includes(
@@ -514,7 +514,7 @@ function Details({
           : campaign.payment?.status === "REVERSED"
             ? "Payment reversed — review required."
             : campaign.status === "REVIEW_REQUIRED"
-              ? "This paid promotion is not being delivered. SmartDuka support must review recovery or refund options."
+              ? "This paid promotion is not being delivered. Mezora support must review recovery or refund options."
             : campaign.status === "SCHEDULED"
               ? "This campaign is scheduled and will activate automatically."
               : null;

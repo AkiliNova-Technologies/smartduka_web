@@ -1,4 +1,4 @@
-# Mwezora release-hardening audit — 2026-10-10
+# Mezora release-hardening audit — 2026-10-10
 
 ## Completed engineering gates
 

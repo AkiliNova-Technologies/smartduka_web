@@ -1,4 +1,4 @@
-# Mwezora responsive-brand logo assets — V2
+# Mezora responsive-brand logo assets — V2
 
 ## Contents
 - `mwezora-bag-adaptive.svg`: vector bag/sweep symbol; color uses `--mwezora-accent` with `currentColor` fallback.
@@ -6,7 +6,7 @@
 - `mwezora-horizontal-adaptive.svg`: bag plus vector wordmark.
 - `*-classic.svg`: self-contained static classic-color exports, suitable for `<img>` and offline assets.
 - `mwezora-app-{classic,dark,light}.svg` and matching 1024px PNG files: fixed-color OS/app-store icons.
-- `MwezoraLogo.tsx`: drop-in inline React component for *live theme reactivity*.
+- `MezoraLogo.tsx`: drop-in inline React component for *live theme reactivity*.
 
 ## Theme integration
 The component uses `--mwezora-logo-accent` falling back to `--primary` and `--mwezora-logo-foreground` falling back to `currentColor`.

@@ -42,8 +42,8 @@ export class PushTestDeliveryError extends Error {
   }
 }
 
-const testTitle = "Mwezora notifications are working";
-const testMessage = "Your device is ready to receive important updates from Mwezora.";
+const testTitle = "Mezora notifications are working";
+const testMessage = "Your device is ready to receive important updates from Mezora.";
 const testPath = "/notifications";
 
 function testDeliveryStatus(status: PushDeliveryStatus) {
@@ -83,7 +83,7 @@ export class PushDeliveryOutboxService {
         throw new PushTestDeliveryError("This device does not have active notifications. Enable notifications and try again.", "NO_ACTIVE_SUBSCRIPTION");
       }
       if (subscription.userId !== input.userId) {
-        throw new PushTestDeliveryError("This browser is enabled for another Mwezora account.", "OWNERSHIP_CONFLICT");
+        throw new PushTestDeliveryError("This browser is enabled for another Mezora account.", "OWNERSHIP_CONFLICT");
       }
 
       const existing = await database.pushDeliveryOutbox.findUnique({

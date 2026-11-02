@@ -23,7 +23,7 @@ import { useUserData } from "@/providers/UserDataProvider";
 import { NotificationsSheet } from "@/components/notifications/NotificationsSheet";
 import { MarketplaceSearch } from "@/components/marketplace/marketplace-search";
 import { CustomerNavigationSheet } from "@/components/layout/CustomerNavigationSheet";
-import { MwezoraLogoLink } from "@/components/brand/MwezoraLogo";
+import { MezoraLogoLink } from "@/components/brand/MezoraLogo";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -220,8 +220,8 @@ export function Header() {
           <Menu className="size-5" />
         </button>
         <div className="flex min-w-0 flex-1 items-center md:flex-none">
-          <MwezoraLogoLink variant="horizontal" size="sm" className="md:hidden" />
-          <MwezoraLogoLink
+          <MezoraLogoLink variant="horizontal" size="sm" className="md:hidden" />
+          <MezoraLogoLink
             variant="horizontal"
             size="sm"
             className="hidden md:inline-flex"

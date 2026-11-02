@@ -27,8 +27,8 @@ describe("P3A test notification boundaries", () => {
     expect(service).toContain("static async enqueueTest");
     expect(service).toContain("kind: PushDeliveryKind.TEST");
     expect(service).toContain("targetSubscriptionId: subscription.id");
-    expect(service).toContain("Mwezora notifications are working");
-    expect(service).toContain("Your device is ready to receive important updates from Mwezora.");
+    expect(service).toContain("Mezora notifications are working");
+    expect(service).toContain("Your device is ready to receive important updates from Mezora.");
   });
 
   it("only sends a targeted job to the verified active subscription", () => {

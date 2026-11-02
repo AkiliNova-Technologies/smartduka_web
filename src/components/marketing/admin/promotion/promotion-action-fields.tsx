@@ -15,7 +15,7 @@ const labels: Record<PromotionCtaType, string> = {
   PRODUCT: "Product",
   SHOP: "Shop",
   CATEGORY: "Category",
-  INTERNAL_PATH: "SmartDuka page",
+  INTERNAL_PATH: "Mezora page",
   EXTERNAL_URL: "External website",
 };
 const entityCopy = {
@@ -125,7 +125,7 @@ export function PromotionActionFields({
           ) : (
           <div className="space-y-2">
             <Label>
-              {type === "EXTERNAL_URL" ? "Website URL" : "SmartDuka path"}
+              {type === "EXTERNAL_URL" ? "Website URL" : "Mezora path"}
             </Label>
             <Input
               type={type === "EXTERNAL_URL" ? "url" : "text"}

@@ -31,7 +31,7 @@ export class VendorTeamService {
     const normalizedEmail = email.trim().toLowerCase();
     if (!normalizedEmail || !delegableRoles.has(role)) throw new VendorTeamError("Choose an existing user and a delegable role.");
     const member = await prisma.user.findUnique({ where: { email: normalizedEmail }, select: { id: true, vendorId: true, vendorRole: true, status: true } });
-    if (!member || member.status !== "ACTIVE") throw new VendorTeamError("Choose an active Mwezora user.");
+    if (!member || member.status !== "ACTIVE") throw new VendorTeamError("Choose an active Mezora user.");
     if (member.id === context.user.id) throw new VendorTeamError("The owner already has full shop access.");
     if (member.vendorId && member.vendorId !== context.vendorId) throw new VendorTeamError("This user already belongs to another shop.");
     return prisma.$transaction(async tx => {
@@ -43,7 +43,7 @@ export class VendorTeamService {
     }, { isolationLevel: "Serializable" });
   }
 
-  static async seatUsage() { const context = await requireVendorContext("vendor:manage_team"); const entitlement = await VendorEntitlementService.summary(context.vendorId); const used = await prisma.user.count({ where: { vendorId: context.vendorId, id: { not: context.vendor.ownerId }, vendorRole: { in: [...delegableRoles] } } }); const limit = VendorEntitlementService.staffSeatLimit(entitlement); return { used, limit, canAdd: used < limit, state: entitlement.status }; }
+  static async seatUsage() { const context = await requireVendorContext("vendor:manage_team"); const entitlement = await VendorEntitlementService.summary(context.vendorId); const used = await prisma.user.count({ where: { OR: [{ id: context.vendor.ownerId, status: "ACTIVE" }, { vendorId: context.vendorId, id: { not: context.vendor.ownerId }, status: "ACTIVE", vendorRole: { in: [...delegableRoles] } }] } }); const limit = VendorEntitlementService.staffSeatLimit(entitlement); return { used, limit, canAdd: used < limit, state: entitlement.status }; }
 
   static async changeRole(memberId: string, role: VendorUserRole) {
     const context = await requireOwner();

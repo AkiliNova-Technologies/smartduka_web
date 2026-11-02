@@ -100,7 +100,7 @@ export default function VendorVerificationPage() {
     <main className="w-full max-w-7xl space-y-6">
       <DashboardPageHeader
         title="Shop Verification"
-        description="Build customer confidence by having SmartDuka review your shop information."
+        description="Build customer confidence by having Mezora review your shop information."
         backHref="/vendor/settings"
         trailing={<ShopVerificationStatusBadge status={currentStatus} />}
       />

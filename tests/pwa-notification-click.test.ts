@@ -32,7 +32,7 @@ function notificationWorker(windows: WindowClient[], openWindow = vi.fn()) {
 }
 
 describe("PWA notification click navigation", () => {
-  it.each(["/", "/products"]) ("navigates and focuses an existing Mwezora tab from %s", async (pathname) => {
+  it.each(["/", "/products"]) ("navigates and focuses an existing Mezora tab from %s", async (pathname) => {
     const navigated = { url: "https://mwezora.test/notifications", focus: vi.fn(async () => undefined) };
     const client = { url: `https://mwezora.test${pathname}`, navigate: vi.fn(async () => navigated), focus: vi.fn() };
     const harness = notificationWorker([client]);
@@ -50,7 +50,7 @@ describe("PWA notification click navigation", () => {
     expect(other.navigate).not.toHaveBeenCalled();
   });
 
-  it("opens a window only when no reusable Mwezora client exists", async () => {
+  it("opens a window only when no reusable Mezora client exists", async () => {
     const opened = { url: "https://mwezora.test/notifications", focus: vi.fn(async () => undefined) };
     const openWindow = vi.fn(async () => opened);
     const harness = notificationWorker([], openWindow);
@@ -59,7 +59,7 @@ describe("PWA notification click navigation", () => {
     expect(opened.focus).toHaveBeenCalledOnce();
   });
 
-  it("does not reuse a window outside Mwezora's origin", async () => {
+  it("does not reuse a window outside Mezora's origin", async () => {
     const unrelated = { url: "https://unrelated.example/products", navigate: vi.fn(), focus: vi.fn() };
     const openWindow = vi.fn(async () => null);
     const harness = notificationWorker([unrelated], openWindow);

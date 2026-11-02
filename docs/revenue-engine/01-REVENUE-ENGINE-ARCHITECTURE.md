@@ -9,7 +9,7 @@ The revenue engine has four distinct concerns:
 3. **Platform billing:** existing platform revenue order/intent and authoritative reconciliation.
 4. **Feature enforcement:** domain services ask the entitlement service before committing quota-consuming or gated operations.
 
-Marketplace order payments must never enter this boundary. `PlatformRevenueOrder`/`PlatformPaymentIntent` are the reusable vendor-to-Mwezora ledger; marketplace `PaymentIntent` remains customer-to-vendor (`prisma/schema.prisma:1428-1477,1819-1905`). Commission stays zero; existing checkout already forces zero (`src/services/order.ts:170-174,301-303`).
+Marketplace order payments must never enter this boundary. `PlatformRevenueOrder`/`PlatformPaymentIntent` are the reusable vendor-to-Mezora ledger; marketplace `PaymentIntent` remains customer-to-vendor (`prisma/schema.prisma:1428-1477,1819-1905`). Commission stays zero; existing checkout already forces zero (`src/services/order.ts:170-174,301-303`).
 
 ## Proposed component flow
 

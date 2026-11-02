@@ -2310,6 +2310,7 @@ model SubscriptionPlanVersion {
   version           Int
   policyVersion     String
   monthlyPriceUgx   Decimal                           @db.Decimal(18, 2)
+  yearlyPriceUgx    Decimal?                          @db.Decimal(18, 2)
   billingCycle      BillingCycle                      @default(MONTHLY)
   activeProductLimit Int?
   productSafetyCeiling Int?
@@ -2340,6 +2341,7 @@ model VendorSubscription {
   planVersion   SubscriptionPlanVersion? @relation(fields: [planVersionId], references: [id], onDelete: Restrict)
 
   status             SubscriptionStatus    @default(TRIAL)
+  billingCycle       BillingCycle           @default(MONTHLY)
   startedAt          DateTime              @default(now())
   currentPeriodStart DateTime?
   currentPeriodEnd   DateTime?
@@ -2369,6 +2371,7 @@ model SubscriptionLifecycleIntent {
   status                  SubscriptionLifecycleIntentStatus @default(PENDING)
   requestedPlanId         String?
   requestedPlanVersionId  String?
+  requestedBillingCycle   BillingCycle?
   effectiveAt             DateTime
   idempotencyKey          String                            @db.VarChar(191)
   requestedById           String
@@ -2401,6 +2404,7 @@ model SubscriptionBillingIntent {
   revenueOrderId           String                     @unique
   revenueOrder             PlatformRevenueOrder       @relation(fields: [revenueOrderId], references: [id], onDelete: Restrict)
   purpose                  SubscriptionBillingPurpose
+  billingCycle             BillingCycle                @default(MONTHLY)
   amount                   Decimal                    @db.Decimal(18, 2)
   currency                 String                     @default("UGX") @db.VarChar(3)
   idempotencyKey           String                     @db.VarChar(191)
@@ -2432,6 +2436,7 @@ model SubscriptionPaidPeriod {
   planVersionId     String
   planVersion       SubscriptionPlanVersion         @relation(fields: [planVersionId], references: [id], onDelete: Restrict)
   status            SubscriptionPaidPeriodStatus
+  billingCycle      BillingCycle                    @default(MONTHLY)
   periodStart       DateTime
   periodEnd         DateTime
   amount            Decimal                        @db.Decimal(18, 2)

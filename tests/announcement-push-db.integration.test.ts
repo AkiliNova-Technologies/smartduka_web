@@ -31,7 +31,7 @@ describe.skipIf(!enabled)("P3C announcement push database integration", () => {
   });
 
   it("publishes scheduled push intent and fans out only to authoritative eligible accounts", async () => {
-    const announcement = await prisma.announcement.create({ data: { title: "Scheduled maintenance", message: "Mwezora will undergo scheduled maintenance tonight.", category: AnnouncementCategory.OPERATIONS, priority: AnnouncementPriority.IMPORTANT, audience: AnnouncementAudience.CUSTOMERS, contentClass: AnnouncementContentClass.ESSENTIAL, pushEnabled: true, status: AnnouncementStatus.SCHEDULED, scheduledAt: new Date(Date.now() - 1000), createdById: ids.admin, publishedById: ids.admin } });
+    const announcement = await prisma.announcement.create({ data: { title: "Scheduled maintenance", message: "Mezora will undergo scheduled maintenance tonight.", category: AnnouncementCategory.OPERATIONS, priority: AnnouncementPriority.IMPORTANT, audience: AnnouncementAudience.CUSTOMERS, contentClass: AnnouncementContentClass.ESSENTIAL, pushEnabled: true, status: AnnouncementStatus.SCHEDULED, scheduledAt: new Date(Date.now() - 1000), createdById: ids.admin, publishedById: ids.admin } });
     expect(await AnnouncementService.advanceLifecycle()).toMatchObject({ published: 1 });
     expect(await prisma.announcementPushDispatch.findUnique({ where: { announcementId: announcement.id } })).toMatchObject({ status: AnnouncementPushDispatchStatus.PENDING, cursorUserId: null });
     expect(await AnnouncementPushService.runFanout()).toMatchObject({ processed: 2, queued: 2 });
@@ -50,7 +50,7 @@ describe.skipIf(!enabled)("P3C announcement push database integration", () => {
   });
 
   it("restricts the acceptance announcement to isolated test administrators and is concurrency-safe", async () => {
-    const announcement = await prisma.announcement.create({ data: { title: "Mwezora notification test", message: "This is a test of Mwezora's platform announcement notifications.", category: AnnouncementCategory.OPERATIONS, priority: AnnouncementPriority.IMPORTANT, audience: AnnouncementAudience.ADMINISTRATORS, contentClass: AnnouncementContentClass.ESSENTIAL, pushEnabled: true, status: AnnouncementStatus.PUBLISHED, publishedAt: new Date(), createdById: ids.admin, publishedById: ids.admin, pushDispatch: { create: {} } } });
+    const announcement = await prisma.announcement.create({ data: { title: "Mezora notification test", message: "This is a test of Mezora's platform announcement notifications.", category: AnnouncementCategory.OPERATIONS, priority: AnnouncementPriority.IMPORTANT, audience: AnnouncementAudience.ADMINISTRATORS, contentClass: AnnouncementContentClass.ESSENTIAL, pushEnabled: true, status: AnnouncementStatus.PUBLISHED, publishedAt: new Date(), createdById: ids.admin, publishedById: ids.admin, pushDispatch: { create: {} } } });
     await Promise.all([AnnouncementPushService.runFanout(), AnnouncementPushService.runFanout()]);
     expect(await prisma.pushDeliveryOutbox.findMany({ where: { announcementId: announcement.id }, select: { userId: true } })).toEqual([{ userId: ids.admin }]);
   });

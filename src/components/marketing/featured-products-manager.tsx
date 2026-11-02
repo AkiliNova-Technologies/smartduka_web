@@ -27,7 +27,7 @@ function previewProduct(row: FeaturedRow): MarketplaceProduct | null {
     inventoryCount: Number(product.inventoryCount ?? 0),
     image: images?.[0]?.url ?? "",
     vendorId: String(product.vendorId ?? vendor?.id ?? ""),
-    vendorName: String(vendor?.storeName ?? "Mwezora shop"),
+    vendorName: String(vendor?.storeName ?? "Mezora shop"),
     isPurchasable: Number(product.inventoryCount ?? 0) > 0,
   };
 }

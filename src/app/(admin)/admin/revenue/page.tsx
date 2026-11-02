@@ -238,7 +238,7 @@ export default function RevenuePage() {
           Platform Revenue
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Track SmartDuka subscription and promotion revenue, platform payments,
+          Track Mezora subscription and promotion revenue, platform payments,
           and items requiring review.
         </p>
       </header>

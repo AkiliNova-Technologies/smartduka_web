@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { LoginForm } from "@/components/login-form";
 import Image from "next/image";
-import { MwezoraLogoLink } from "@/components/brand/MwezoraLogo";
+import { MezoraLogoLink } from "@/components/brand/MezoraLogo";
 
 export default function LoginPage() {
   return (
@@ -12,7 +12,7 @@ export default function LoginPage() {
       {/* AUTH INTERFACE ENTRY CONTAINER */}
       <div className="flex flex-col gap-4 p-6 md:p-10 justify-between">
         <div className="flex justify-center gap-2 md:justify-start">
-          <MwezoraLogoLink variant="horizontal" size="md" label="Mwezora marketplace home" />
+          <MezoraLogoLink variant="horizontal" size="md" label="Mezora marketplace home" />
         </div>
         
         <div className="flex flex-1 items-center justify-center py-8">

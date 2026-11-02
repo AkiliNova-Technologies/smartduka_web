@@ -6,7 +6,7 @@ Overall status: **RECOVERED AND VERIFIED**
 
 ## Root cause
 
-The original R3B migration declared 13 identifier and foreign-key columns as PostgreSQL `UUID`, while Mwezora's referenced identifiers use `TEXT`. PostgreSQL rejected foreign-key creation with error `42804`, leaving a non-transactional partial schema and Prisma `P3018`. The corrected migration uses `TEXT`.
+The original R3B migration declared 13 identifier and foreign-key columns as PostgreSQL `UUID`, while Mezora's referenced identifiers use `TEXT`. PostgreSQL rejected foreign-key creation with error `42804`, leaving a non-transactional partial schema and Prisma `P3018`. The corrected migration uses `TEXT`.
 
 ## Confirmed target
 

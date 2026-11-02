@@ -1,4 +1,4 @@
-# Mwezora remaining work backlog
+# Mezora remaining work backlog
 
 Effort is relative engineering effort (S/M/L/XL), not a deadline. All payment acceptance must use controlled isolated/provider-approved environments and must not enable production charging prematurely.
 
@@ -24,7 +24,7 @@ Effort is relative engineering effort (S/M/L/XL), not a deadline. All payment ac
 | MZ-P1-008 | Audit and enforce privileged action logging | scattered audit writes | P1 | Forensics/compliance gaps | Admin action taxonomy | M | 4C-Admin | Every vendor moderation, billing, campaign, notification, cleanup and role mutation emits immutable actor/IP/result audit event |
 | MZ-P1-009 | Verify subscription uniqueness/overlap invariant | `VendorSubscription` lacks active uniqueness (`prisma/schema.prisma:2224-2249`) | P1 | Duplicate entitlements/charges | Subscription lifecycle design | M | 4C-Revenue | Concurrent checkout cannot create overlapping payable/active periods; replay activates once; DB/service tests |
 | MZ-P1-010 | Verify guest/account cache isolation | local `smartduka-*` keys and client providers | P1 | Cross-account leakage/stale totals | Auth lifecycle | M | 4B-Acceptance | Two-account browser test proves wishlist/orders/notifications/recent/cart policy and cache invalidation; logout clears scoped state |
-| MZ-P2-001 | Replace remaining user-facing SmartDuka naming | user-visible vendor/admin copy and API README | P2 | Brand inconsistency/confusion | Brand decision on technical names | S | 4C-UX | Mwezora visible copy everywhere; legacy storage/API identifiers documented or migrated safely |
+| MZ-P2-001 | Replace remaining user-facing Mezora naming | user-visible vendor/admin copy and API README | P2 | Brand inconsistency/confusion | Brand decision on technical names | S | 4C-UX | Mezora visible copy everywhere; legacy storage/API identifiers documented or migrated safely |
 | MZ-P2-002 | Reconcile page-level fetching with architecture rule | direct fetch in admin finance pages | P2 | Duplicate error/cache/cancellation behavior | Existing clients/hooks patterns | M | 4C-Tech debt | UI consumes hooks; typed clients own endpoints/parsing; cancellation/invalidation tests |
 | MZ-P2-003 | Add server cart/address book if required | no Cart model; checkout address per order | P2 | Weak cross-device experience | Product decision | L | 4D-Experience | Auth cart/address CRUD, guest merge/conflict rules, account isolation and E2E |
 | MZ-P2-004 | Add mobile vendor-team mutations | V1 team is read-only | P2 | Mobile vendor admin incomplete | RBAC/seat entitlements | M | 4D-Mobile | Owner-only invite/change/remove with audit, idempotency and authorization tests |

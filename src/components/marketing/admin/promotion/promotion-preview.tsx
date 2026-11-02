@@ -9,7 +9,7 @@ export function PromotionPreview({ form }: { form: PromotionFormValue }) {
     <MarketingPreviewShell
       title="Homepage hero preview"
       description="Desktop and mobile use the same presentation customers see."
-      empty={!hasContent ? <MarketingPreviewEmpty illustration={<ImageIcon aria-hidden="true" className="size-8 text-muted-foreground" />} title="Your next featured story starts here" description="Add your banner image and content to see how it will appear on the Mwezora homepage." /> : undefined}
+      empty={!hasContent ? <MarketingPreviewEmpty illustration={<ImageIcon aria-hidden="true" className="size-8 text-muted-foreground" />} title="Your next featured story starts here" description="Add your banner image and content to see how it will appear on the Mezora homepage." /> : undefined}
     >
       {hasContent ? <HeroCarousel size="compact" slides={[{
         id: "admin-preview",

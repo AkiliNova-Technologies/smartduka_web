@@ -80,7 +80,7 @@ export function ProductGrid({
     <div className="w-full space-y-10">
       {section(
         "Current offers",
-        "Savings from Mwezora shops.",
+        "Savings from Mezora shops.",
         deals,
         "/deals",
       )}
@@ -94,7 +94,7 @@ export function ProductGrid({
         recommendationsPersonalized ? "Recommended for you" : "Discover products",
         recommendationsPersonalized
           ? "Picked from what you’ve been exploring."
-          : "Popular picks from across Mwezora.",
+          : "Popular picks from across Mezora.",
         recommendations,
         "/products",
       )}

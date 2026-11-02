@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { VendorKycForm } from "@/components/vendor/kyc-form";
 import { useAuth } from "@/hooks/use-auth";
-import { MwezoraLogoLink } from "@/components/brand/MwezoraLogo";
+import { MezoraLogoLink } from "@/components/brand/MezoraLogo";
 
 export default function BecomeSellerPage() {
   const { loading } = useAuth();
@@ -37,18 +37,18 @@ export default function BecomeSellerPage() {
         <div className="absolute inset-0 bg-gradient-to-r from-zinc-950/75 via-zinc-950/10 to-transparent" />
 
         <div className="absolute top-10 left-12 z-10">
-          <MwezoraLogoLink variant="monochrome" size="md" label="Mwezora marketplace home" linkClassName="text-white" />
+          <MezoraLogoLink variant="monochrome" size="md" label="Mezora marketplace home" linkClassName="text-white" />
         </div>
 
         <div className="absolute bottom-12 left-12 right-12 z-10 text-white max-w-sm space-y-2 select-none">
           <span className="text-[10px] uppercase font-bold tracking-widest bg-white/10 backdrop-blur-md border border-white/10 px-2.5 py-1 rounded-full inline-block">
-            Sell on Mwezora
+            Sell on Mezora
           </span>
           <h2 className="text-2xl font-bold tracking-tight text-zinc-100 leading-tight">
             Your Store. Your Story. Your Next Chapter.
           </h2>
           <p className="text-xs text-zinc-400 font-medium leading-relaxed">
-            Bring your beautiful products to more customers and grow your business with Mwezora.
+            Bring your beautiful products to more customers and grow your business with Mezora.
           </p>
         </div>
       </div>
@@ -56,7 +56,7 @@ export default function BecomeSellerPage() {
       {/* RIGHT PANEL: KYC ONBOARDING FORM */}
       <div className="flex flex-col gap-4 p-6 md:p-10 justify-between">
         <div className="flex items-center justify-between">
-          <MwezoraLogoLink variant="horizontal" size="sm" label="Mwezora marketplace home" linkClassName="lg:hidden" />
+          <MezoraLogoLink variant="horizontal" size="sm" label="Mezora marketplace home" linkClassName="lg:hidden" />
           <div className="hidden lg:block" />
           <Link
             href="/help"

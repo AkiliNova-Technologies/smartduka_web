@@ -1,10 +1,10 @@
-# SmartDuka mobile V1 API readiness audit
+# Mezora mobile V1 API readiness audit
 
 Audited 2026-10-05. The web application is the source of truth: route handlers and server actions delegate to `ProductService`, `OrderService`, `VendorService`, `VendorTeamService`, `MarketplaceReportService`, `ShopVerificationService`, and payment/fulfilment services backed by Prisma.
 
 ## Authentication and authority
 
-Web uses a signed httpOnly SmartDuka session cookie created after Firebase ID-token verification. V1 adds `resolveAuthenticatedUser()` in `src/lib/auth/session.ts`: it accepts the existing cookie/session path, an existing signed SmartDuka bearer token, or a Firebase ID token in `Authorization: Bearer`. Firebase identity is synchronized to the existing `User`/`Account` model; user active state and all vendor membership/permissions are read from the database. Client IDs, vendor IDs, role claims, pricing, stock, and totals are never authoritative.
+Web uses a signed httpOnly Mezora session cookie created after Firebase ID-token verification. V1 adds `resolveAuthenticatedUser()` in `src/lib/auth/session.ts`: it accepts the existing cookie/session path, an existing signed Mezora bearer token, or a Firebase ID token in `Authorization: Bearer`. Firebase identity is synchronized to the existing `User`/`Account` model; user active state and all vendor membership/permissions are read from the database. Client IDs, vendor IDs, role claims, pricing, stock, and totals are never authoritative.
 
 ## Capability matrix
 

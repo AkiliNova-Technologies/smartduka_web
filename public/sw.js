@@ -2,9 +2,9 @@ const CACHE_NAME = "mwezora-public-v1";
 const OFFLINE_URL = "/offline.html";
 const PRECACHE_URLS = [
   OFFLINE_URL,
-  "/mwezora-app-192.png",
-  "/mwezora-app-512.png",
-  "/mwezora-horizontal-classic.svg",
+  "/mezora-app-192.png",
+  "/mezora-app-512.png",
+  "/mezora-horizontal-light.svg",
 ];
 
 self.addEventListener("install", (event) => {
@@ -34,7 +34,7 @@ function safeInternalPath(value) {
 self.addEventListener("push", (event) => {
   let payload = {};
   try { payload = event.data?.json() ?? {}; } catch { payload = {}; }
-  const title = typeof payload.title === "string" && payload.title.trim() ? payload.title.slice(0, 160) : "Mwezora";
+  const title = typeof payload.title === "string" && payload.title.trim() ? payload.title.slice(0, 160) : "Mezora";
   const body = typeof payload.body === "string" ? payload.body.slice(0, 1000) : "You have a new update.";
   const path = safeInternalPath(payload.path);
   // Only bounded server-generated tags are honored. Transactional tags are
@@ -44,8 +44,8 @@ self.addEventListener("push", (event) => {
     : `mwezora:${path}:${title}`;
   event.waitUntil(self.registration.showNotification(title, {
     body,
-    icon: "/mwezora-app-192.png",
-    badge: "/mwezora-app-192.png",
+    icon: "/mezora-app-192.png",
+    badge: "/mezora-app-192.png",
     tag,
     renotify: false,
     data: { path },
@@ -65,7 +65,7 @@ self.addEventListener("notificationclick", (event) => {
     }
 
     const scope = new URL(self.registration.scope);
-    const isMwezoraWindow = (client) => {
+    const isMezoraWindow = (client) => {
       try {
         const url = new URL(client.url);
         return url.origin === self.location.origin && url.pathname.startsWith(scope.pathname);
@@ -78,7 +78,7 @@ self.addEventListener("notificationclick", (event) => {
       if (!client || typeof client.focus !== "function") return false;
       try { await client.focus(); return true; } catch { return false; }
     };
-    const candidates = windows.filter(isMwezoraWindow);
+    const candidates = windows.filter(isMezoraWindow);
 
     // Prefer a tab already at the exact internal destination. It avoids a
     // needless navigation and avoids opening a duplicate browser tab.
@@ -98,7 +98,7 @@ self.addEventListener("notificationclick", (event) => {
         await focusSafely(navigated);
         return;
       } catch {
-        // Try another existing Mwezora window before opening a new one.
+        // Try another existing Mezora window before opening a new one.
       }
     }
 
