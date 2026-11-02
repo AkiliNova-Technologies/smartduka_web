@@ -1,13 +1,14 @@
 "use client";
 
 import { Loader2 } from "lucide-react";
+import { Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { VendorKycForm } from "@/components/vendor/kyc-form";
 import { useAuth } from "@/hooks/use-auth";
 import { MezoraLogoLink } from "@/components/brand/MezoraLogo";
 
-export default function BecomeSellerPage() {
+function SellerOnboardingContent() {
   const { loading } = useAuth();
 
   if (loading) {
@@ -92,4 +93,8 @@ export default function BecomeSellerPage() {
       </div>
     </div>
   );
+}
+
+export default function BecomeSellerPage() {
+  return <Suspense fallback={<div className="min-h-svh flex items-center justify-center bg-background"><Loader2 className="size-6 animate-spin text-primary" aria-label="Loading seller application" /></div>}><SellerOnboardingContent /></Suspense>;
 }
