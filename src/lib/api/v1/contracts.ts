@@ -69,4 +69,4 @@ export const inventoryQuerySchema = z.object({ q: z.string().trim().max(120).opt
 export const inventoryAdjustmentSchema = z.object({ productId: z.string().uuid(), variantId: z.string().uuid().optional(), operation: z.enum(["INCREMENT", "DECREMENT", "SET"]), quantity: z.number().int().min(0).max(1_000_000), reason: z.enum(["RESTOCK", "CORRECTION", "DAMAGE", "RETURN", "OTHER"]) }).strict().superRefine((value, context) => {
   if (value.operation !== "SET" && value.quantity < 1) context.addIssue({ code: z.ZodIssueCode.custom, path: ["quantity"], message: "Quantity must be greater than zero." });
 });
-export const analyticsPeriodSchema = z.enum(["TODAY", "7D", "30D"]);
+export const analyticsPeriodSchema = z.enum(["TODAY", "7D", "30D", "90D"]);
