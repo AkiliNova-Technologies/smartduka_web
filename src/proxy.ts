@@ -24,6 +24,8 @@ const SECRET_AUTHENTICATED_CRON_ROUTES = new Set([
 ]);
 const NATIVE_BEARER_ROUTES = new Set([
   "GET /api/v1/me",
+  "GET /api/v1/preferences/appearance",
+  "PATCH /api/v1/preferences/appearance",
   "GET /api/v1/vendor/context",
   "GET /api/v1/vendor/analytics",
   "GET /api/v1/vendor/dashboard",
