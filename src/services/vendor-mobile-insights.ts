@@ -5,7 +5,7 @@ const actionable = ["PENDING", "PROCESSING", "READY_FOR_PICKUP"] as const;
 const lowStockThreshold = 5;
 type LowStockItem = { productId: string; variantId: string | null; productName: string; variantName: string | null; sku: string | null; stock: number; available: boolean };
 const startOfToday = () => { const date = new Date(); date.setHours(0, 0, 0, 0); return date; };
-const rangeStart = (period: "TODAY" | "7D" | "30D") => { const date = startOfToday(); if (period !== "TODAY") date.setDate(date.getDate() - (period === "7D" ? 6 : 29)); return date; };
+const rangeStart = (period: "TODAY" | "7D" | "30D" | "90D") => { const date = startOfToday(); if (period !== "TODAY") date.setDate(date.getDate() - (period === "7D" ? 6 : 29)); return date; };
 
 export class VendorMobileInsightsService {
   static async dashboard() {
@@ -26,7 +26,7 @@ export class VendorMobileInsightsService {
     const now = new Date();
     const kampala = new Date(now.getTime() + 3 * 3600000);
     const midnight = Date.UTC(kampala.getUTCFullYear(), kampala.getUTCMonth(), kampala.getUTCDate()) - 3 * 3600000;
-    const days = period === "TODAY" ? 1 : period === "7D" ? 7 : 30;
+    const days = period === "TODAY" ? 1 : period === "7D" ? 7 : period === "90D" ? 90 : 30;
     const currentStart = new Date(midnight - (days - 1) * 86400000);
     const previousStart = new Date(currentStart.getTime() - days * 86400000);
     const intents = await prisma.paymentIntent.findMany({
@@ -43,7 +43,7 @@ export class VendorMobileInsightsService {
     const summarize = (from: Date, to: Date) => {
       const matches = intents.filter((i) => i.confirmedAt && i.confirmedAt >= from && i.confirmedAt < to);
       const orders = new Map(matches.map((i) => [i.subOrderId, i]));
-      const gross = matches.reduce((sum, i) => sum + Number(i.amount), 0);
+      const gross = [...orders.values()].reduce((sum, i) => sum + Number(i.amount), 0);
       const refunds = [...orders.values()].reduce((sum, i) => sum +
         i.subOrder.refunds.reduce((value, refund) => value + Number(refund.amount), 0), 0);
       const revenue = Math.max(0, gross - refunds);
