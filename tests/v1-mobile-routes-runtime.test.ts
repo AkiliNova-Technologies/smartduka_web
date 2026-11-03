@@ -65,8 +65,8 @@ describe("V1 mobile route adapters", () => {
     mocks.dashboard.mockResolvedValue({ summary: { todayRevenue: 2 }, recentOrders: [], lowStockItems: [] }); mocks.analytics.mockResolvedValue({ period: "7D", revenue: 2, topProducts: [] });
     expect(await (await dashboard.GET()).json()).toEqual({ data: expect.objectContaining({ summary: expect.any(Object) }) });
     const analytic = await analytics.GET(request("http://localhost/api/v1/vendor/analytics?period=TODAY") as never); expect(analytic.status).toBe(200); expect(mocks.analytics).toHaveBeenCalledWith("TODAY");
-    await analytics.GET(request("http://localhost/api/v1/vendor/analytics") as never); expect(mocks.analytics).toHaveBeenLastCalledWith("7D");
-    const invalid = await analytics.GET(request("http://localhost/api/v1/vendor/analytics?period=90D") as never); expect(invalid.status).toBe(400); expect(await invalid.json()).toHaveProperty("error.code", "VALIDATION_ERROR");
+    await analytics.GET(request("http://localhost/api/v1/vendor/analytics") as never); expect(mocks.analytics).toHaveBeenLastCalledWith("30D");
+    const ninetyDays = await analytics.GET(request("http://localhost/api/v1/vendor/analytics?period=90D") as never); expect(ninetyDays.status).toBe(200); expect(mocks.analytics).toHaveBeenLastCalledWith("90D");
     mocks.dashboard.mockRejectedValueOnce(new mocks.VendorAuthorizationError()); const denied = await dashboard.GET(); expect(denied.status).toBe(403); expect(await denied.json()).toHaveProperty("error.code", "VENDOR_ACCESS_DENIED");
   });
 

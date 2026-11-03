@@ -7,7 +7,7 @@ const source = (path: string) => readFileSync(resolve(process.cwd(), path), "utf
 
 describe("V1 vendor mobile contracts", () => {
   it("bounds analytics and inventory mutation inputs", () => {
-    expect(analyticsPeriodSchema.safeParse("90D").success).toBe(false);
+    expect(analyticsPeriodSchema.safeParse("90D").success).toBe(true);
     expect(inventoryAdjustmentSchema.safeParse({ productId: "00000000-0000-4000-8000-000000000000", operation: "DECREMENT", quantity: 0, reason: "DAMAGE" }).success).toBe(false);
     expect(vendorProductCreateSchema.safeParse({ name: "Tea", slug: "tea", basePrice: 10, vendorId: "injected" }).success).toBe(false);
   });

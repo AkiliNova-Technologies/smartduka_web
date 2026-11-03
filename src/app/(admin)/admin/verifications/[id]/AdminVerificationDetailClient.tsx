@@ -294,10 +294,10 @@ export function AdminVerificationDetailClient({
         trailing={
           <>
             {app.vendorApplicationId && (
-              <Button asChild variant="default" size="lg" className="rounded-full px-4">
+              <Button asChild variant="outline" size="lg" className="rounded-full px-4">
                 <Link
                   href={`/admin/vendors?applicationId=${app.vendorApplicationId}`}>
-                  Open Vendor details
+                  Open vendor details
                 </Link>
               </Button>
             )}
