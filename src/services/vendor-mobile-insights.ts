@@ -21,7 +21,7 @@ export class VendorMobileInsightsService {
     return { summary: { todayRevenue: todayCompleted.reduce((sum, order) => sum + Number(order.vendorTotal), 0), todayOrders: todayCompleted.length, openOrders, lowStockCount: lowStockItems.length }, recentOrders: recentOrders.map((order) => ({ id: order.id, orderNumber: order.subOrderNumber, status: order.status, total: Number(order.vendorTotal), paymentStatus: order.order.paymentStatus, customerName: order.order.customer.name, itemCount: order.items.length, createdAt: order.createdAt })), lowStockItems: lowStockItems.slice(0, 10) };
   }
 
-  static async analytics(period: "TODAY" | "7D" | "30D") {
+  static async analytics(period: "TODAY" | "7D" | "30D" | "90D") {
     const context = await requireVendorContext("vendor:view_ledger");
     const now = new Date();
     const kampala = new Date(now.getTime() + 3 * 3600000);
