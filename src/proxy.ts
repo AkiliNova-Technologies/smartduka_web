@@ -110,7 +110,8 @@ export function isNativeBearerPassThrough(
     normalizedMethod === "GET" &&
     /^\/api\/v1\/orders\/[^/]+\/payment-status$/.test(normalizedPathname);
   const notificationItem =
-    ["GET", "DELETE"].includes(normalizedMethod) &&
+    normalizedMethod === "DELETE" &&
+    normalizedPathname !== "/api/v1/notifications/read-all" &&
     /^\/api\/v1\/notifications\/[^/]+$/.test(normalizedPathname);
   const notificationReadState =
     normalizedMethod === "PATCH" &&
