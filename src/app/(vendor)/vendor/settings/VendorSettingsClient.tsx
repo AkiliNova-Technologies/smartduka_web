@@ -62,7 +62,12 @@ export default function VendorSettingsPage() {
   });
   const selectTab = (tab: TabID) => {
     setActiveTab(tab);
-    router.replace(tab === "branding" ? "/vendor/settings" : `/vendor/settings?tab=${tab}`, { scroll: false });
+    const path = tab === "branding"
+      ? "/vendor/settings"
+      : tab === "payments"
+        ? "/vendor/settings?tab=payments"
+        : `/vendor/settings?tab=${tab}`;
+    router.replace(path, { scroll: false });
   };
 
   // Loading skeleton — only shows on first load, not on subsequent navigations

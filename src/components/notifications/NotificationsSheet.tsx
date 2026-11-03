@@ -298,7 +298,7 @@ export function NotificationsSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
-        className="flex min-w-[360px] w-full flex-col overflow-hidden border-l border-border/60 bg-background p-0 sm:max-w-lg">
+        className="flex min-w-[360px] w-full flex-col overflow-hidden border-l border-border/60 bg-background p-0 sm:max-w-md">
         <SheetHeader className="sticky top-0 z-10 shrink-0 border-b border-border/60 bg-background/95 px-4 pb-4 pr-12 pt-[max(1.25rem,env(safe-area-inset-top))] backdrop-blur">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">

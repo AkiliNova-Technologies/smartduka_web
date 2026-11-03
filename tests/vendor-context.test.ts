@@ -116,4 +116,15 @@ describe("authoritative vendor context", () => {
     mocks.findUnique.mockResolvedValue({ id: "other", status: "ACTIVE", vendorId: "vendor-b", vendorRole: "OWNER", vendorProfile: vendorA, ownedVendor: null });
     await expect(requireVendorContext("vendor:request_payout")).rejects.toBeInstanceOf(VendorAuthorizationError);
   });
+
+  it("limits financial insights to ledger-authorized roles", async () => {
+    for (const role of ["OWNER", "ADMIN", "ACCOUNTANT"] as const) {
+      mocks.findUnique.mockResolvedValue({ id: `${role}-a`, status: "ACTIVE", vendorId: "vendor-a", vendorRole: role, vendorProfile: vendorA, ownedVendor: null });
+      await expect(requireVendorContext("vendor:view_ledger")).resolves.toMatchObject({ vendorId: "vendor-a", vendorRole: role });
+    }
+    for (const role of ["MANAGER", "STAFF"] as const) {
+      mocks.findUnique.mockResolvedValue({ id: `${role}-a`, status: "ACTIVE", vendorId: "vendor-a", vendorRole: role, vendorProfile: vendorA, ownedVendor: null });
+      await expect(requireVendorContext("vendor:view_ledger")).rejects.toBeInstanceOf(VendorAuthorizationError);
+    }
+  });
 });

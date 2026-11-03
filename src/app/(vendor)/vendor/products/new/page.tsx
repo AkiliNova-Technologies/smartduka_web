@@ -628,9 +628,8 @@ export default function VendorProductFormPage() {
               </div>
               {productType === "variants" && (
                 <p className="text-xs text-muted-foreground">
-                  Prices and inventory are configured for each variant
-                  combination in the next step. Stock is managed by your product
-                  variants.
+                  Prices and inventory are configured for each variant combination
+                  in the next step. Stock is managed by your product variants.
                 </p>
               )}
               <div className="space-y-2">
