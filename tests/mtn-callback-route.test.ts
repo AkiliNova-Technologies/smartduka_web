@@ -41,4 +41,15 @@ describe("MTN sandbox callback", () => {
     expect((await POST(new Request("http://localhost", { method: "POST", body: JSON.stringify({ referenceId: "ref-a", status: "SUCCESSFUL" }) }))).status).toBe(503);
     expect(mocks.reconcile).not.toHaveBeenCalled();
   });
+  it("safely re-queries delayed callbacks and treats callback replay as idempotent", async () => {
+    mocks.intentFind.mockResolvedValue({ id: "intent-a", vendorId: "vendor-a" });
+    mocks.status.mockResolvedValue({ providerReference: "ref-a", status: "SUCCESSFUL", amount: "100", currency: "EUR", providerTransactionId: "txn-a" });
+    mocks.reconcile.mockResolvedValueOnce({ outcome: "TRANSITION_APPLIED" }).mockResolvedValueOnce({ outcome: "DUPLICATE" });
+    const request = () => new Request("http://localhost", { method: "POST", body: JSON.stringify({ referenceId: "ref-a", status: "FAILED" }) });
+    expect((await POST(request())).status).toBe(200);
+    expect((await POST(request())).status).toBe(200);
+    expect(mocks.status).toHaveBeenCalledTimes(2);
+    expect(mocks.reconcile).toHaveBeenCalledTimes(2);
+    expect(mocks.auditCreate).toHaveBeenCalledTimes(2);
+  });
 });

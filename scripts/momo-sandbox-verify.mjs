@@ -27,11 +27,7 @@ const response = await fetch(`${base}/collection/token/`, {
 });
 
 if (!response.ok) {
-  const errorBody = await response.text();
-
-  throw new Error(
-    `MTN OAuth failed (${response.status}): ${errorBody}`,
-  );
+  throw new Error(`MTN OAuth failed (${response.status}).`);
 }
 
 const body = await response.json();

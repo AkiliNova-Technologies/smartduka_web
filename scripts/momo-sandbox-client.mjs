@@ -18,8 +18,19 @@ export function sandboxConfig(env = process.env) {
       throw new Error(
         "MTN sandbox configuration is incomplete: " + key + " is required.",
       );
+  const base = new URL(env.MTN_MOMO_BASE_URL);
+  if (base.protocol !== "https:")
+    throw new Error("MTN sandbox base URL must use HTTPS.");
+  if (env.MTN_MOMO_TARGET_ENVIRONMENT !== "sandbox")
+    throw new Error("MTN sandbox target environment must be exactly sandbox.");
+  if (env.MTN_MOMO_CALLBACK_URL) {
+    const callback = new URL(env.MTN_MOMO_CALLBACK_URL);
+    if (callback.protocol !== "https:") throw new Error("MTN sandbox callback URL must use HTTPS.");
+    if (!env.MTN_MOMO_CALLBACK_HOST || callback.hostname !== env.MTN_MOMO_CALLBACK_HOST)
+      throw new Error("MTN sandbox callback host is missing or does not match.");
+  }
   return {
-    base: env.MTN_MOMO_BASE_URL.replace(/\/$/, ""),
+    base: base.href.replace(/\/$/, ""),
     subscriptionKey: env.MTN_MOMO_COLLECTION_SUBSCRIPTION_KEY,
     user: env.MTN_MOMO_API_USER,
     apiKey: env.MTN_MOMO_API_KEY,

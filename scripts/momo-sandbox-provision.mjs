@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { writeFileSync } from "node:fs";
 
 const base = process.env.MTN_MOMO_BASE_URL?.replace(/\/$/, "");
 const subscriptionKey =
@@ -9,6 +10,10 @@ if (process.env.MTN_MOMO_ENVIRONMENT !== "sandbox") {
   throw new Error(
     "This command only runs with MTN_MOMO_ENVIRONMENT=sandbox.",
   );
+}
+
+if (process.env.MTN_SANDBOX_PROVISION_CONFIRM !== "true") {
+  throw new Error("Set MTN_SANDBOX_PROVISION_CONFIRM=true to explicitly provision sandbox credentials.");
 }
 
 if (!base || !subscriptionKey || !callbackHost) {
@@ -37,11 +42,7 @@ const createUserResponse = await fetch(
 );
 
 if (createUserResponse.status !== 201) {
-  const errorBody = await createUserResponse.text();
-
-  throw new Error(
-    `MTN API user creation failed (${createUserResponse.status}): ${errorBody}`,
-  );
+  throw new Error(`MTN API user creation failed (${createUserResponse.status}).`);
 }
 
 const createKeyResponse = await fetch(
@@ -55,11 +56,7 @@ const createKeyResponse = await fetch(
 );
 
 if (createKeyResponse.status !== 201) {
-  const errorBody = await createKeyResponse.text();
-
-  throw new Error(
-    `MTN API key creation failed (${createKeyResponse.status}): ${errorBody}`,
-  );
+  throw new Error(`MTN API key creation failed (${createKeyResponse.status}).`);
 }
 
 const payload = await createKeyResponse.json();
@@ -68,11 +65,6 @@ if (typeof payload?.apiKey !== "string") {
   throw new Error("MTN returned no API key.");
 }
 
-console.log(
-  [
-    `MTN_MOMO_API_USER=${apiUser}`,
-    `MTN_MOMO_API_KEY=${payload.apiKey}`,
-    "",
-    "Do not commit these values.",
-  ].join("\n"),
-);
+const credentialFile = process.env.MTN_SANDBOX_CREDENTIAL_FILE || ".env.mtn-sandbox.generated";
+writeFileSync(credentialFile, `MTN_MOMO_API_USER=${apiUser}\nMTN_MOMO_API_KEY=${payload.apiKey}\n`, { flag: "wx", mode: 0o600 });
+console.log(`MTN sandbox credentials were written once to ${credentialFile} with owner-only permissions. Do not commit this file.`);
