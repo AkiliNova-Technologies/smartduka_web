@@ -20,8 +20,9 @@ export class PaymentEligibilityService {
     vendorId: string,
     provider?: PaymentProvider,
     options: PaymentEligibilityOptions = {},
+    database: typeof prisma = prisma,
   ): Promise<PaymentEligibility> {
-    const vendor = await prisma.vendorProfile.findUnique({
+    const vendor = await database.vendorProfile.findUnique({
       where: { id: vendorId },
       select: {
         status: true,

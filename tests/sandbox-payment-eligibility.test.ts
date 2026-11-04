@@ -50,5 +50,16 @@ describe("sandbox reconciliation payment eligibility", () => {
   it("never enables the qualification capability in production", () => {
     process.env.MTN_MOMO_ENVIRONMENT = "production";
     expect(PaymentProviderRegistry.isSandboxQualificationReady(PaymentProvider.MTN_MOMO)).toBe(false);
+    process.env.PAYMENTS_MTN_ENABLED = "true";
+    process.env.MTN_MOMO_DIRECT_VENDOR_ROUTING_VERIFIED = "true";
+    expect(PaymentProviderRegistry.getReadiness(PaymentProvider.MTN_MOMO).customerPaymentsReady).toBe(false);
+  });
+
+  it("keeps the unimplemented Airtel adapter unavailable despite feature flags", () => {
+    process.env.PAYMENTS_AIRTEL_ENABLED = "true";
+    process.env.AIRTEL_MONEY_BASE_URL = "https://airtel.example.test";
+    process.env.AIRTEL_MONEY_DIRECT_VENDOR_ROUTING_VERIFIED = "true";
+    expect(PaymentProviderRegistry.getReadiness(PaymentProvider.AIRTEL_MONEY).customerPaymentsReady).toBe(false);
+    expect(() => PaymentProviderRegistry.assertCustomerPaymentsReady(PaymentProvider.AIRTEL_MONEY)).toThrow(PaymentProviderUnavailableError);
   });
 });

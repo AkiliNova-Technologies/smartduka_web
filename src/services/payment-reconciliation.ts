@@ -375,8 +375,11 @@ export class PaymentReconciliationService {
         const total = await tx.subOrder.count({
           where: { orderId: intent.orderId },
         });
-        const successful = await tx.paymentIntent.count({
-          where: { orderId: intent.orderId, status: "SUCCESSFUL" },
+        const successful = await tx.subOrder.count({
+          where: {
+            orderId: intent.orderId,
+            paymentIntents: { some: { status: "SUCCESSFUL" } },
+          },
         });
         if (total === successful)
           await tx.order.updateMany({

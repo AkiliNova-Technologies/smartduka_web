@@ -19,7 +19,7 @@
     "test:revenue-entitlement-browser": "node scripts/run-customer-orders-db-tests.mjs --browser --vendor-entitlements",
     "test:customer-orders-browser": "playwright test tests/browser/customer-orders.acceptance.spec.ts",
     "build:isolated": "node scripts/run-fulfillment-db-tests.mjs --build",
-    "test:payments": "vitest run tests/mtn-momo-provider.test.ts tests/mtn-callback-route.test.ts tests/sandbox-payment-eligibility.test.ts tests/payment-health.test.ts tests/fake-mtn-provider.test.ts tests/payment-progress.test.ts tests/payment-fulfillment.test.ts tests/payment-reconciliation-concurrency.test.ts tests/admin-payments-contract.test.ts",
+    "test:payments": "vitest run tests/mtn-momo-provider.test.ts tests/mtn-callback-route.test.ts tests/sandbox-payment-eligibility.test.ts tests/payment-health.test.ts tests/fake-mtn-provider.test.ts tests/payment-progress.test.ts tests/payment-fulfillment.test.ts tests/payment-intent-integrity.test.ts tests/payment-reconciliation-concurrency.test.ts tests/admin-payments-contract.test.ts",
     "test:revenue": "vitest run tests/platform-revenue-engine-contract.test.ts tests/platform-payment-contract.test.ts tests/platform-revenue-expiry-runtime.test.ts tests/vendor-marketing-ui-contract.test.ts tests/admin-revenue-ui-contract.test.ts tests/vendor-subscription-phase3-contract.test.ts tests/payment-reconciliation-concurrency.test.ts tests/marketplace-allocation.test.ts tests/sandbox-payment-eligibility.test.ts",
     "seed:test-marketplace": "node scripts/seed-test-marketplace.js",
     "seed:test-marketplace:cleanup": "node scripts/seed-test-marketplace.js --cleanup",
