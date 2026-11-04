@@ -85,7 +85,7 @@ export class PaymentIntentService {
       // Idempotency keys only deduplicate identical requests. The advisory
       // transaction lock serializes all initiation attempts for this seller
       // suborder, including requests carrying different keys.
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`payment-initiation:${input.subOrderId}`}))`;
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`payment-initiation:${input.subOrderId}`}))::text AS lock`;
       const subOrder = await tx.subOrder.findFirst({
         where: {
           id: input.subOrderId,

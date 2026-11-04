@@ -52,6 +52,13 @@ const environment = {
   CUSTOMER_ORDERS_TEST_DATABASE: "isolated-local",
   RUN_CUSTOMER_ORDERS_DB_TESTS: "1",
   PAYMENTS_MTN_ENABLED: "true",
+  MTN_MOMO_BASE_URL: "https://sandbox.example.test",
+  MTN_MOMO_COLLECTION_SUBSCRIPTION_KEY: "isolated-test-key",
+  MTN_MOMO_API_USER: "isolated-test-user",
+  MTN_MOMO_API_KEY: "isolated-test-secret",
+  MTN_MOMO_ENVIRONMENT: "sandbox",
+  MTN_SANDBOX_COLLECTION_TESTING_ENABLED: "true",
+  MTN_MOMO_DIRECT_VENDOR_ROUTING_VERIFIED: "true",
   PAYMENTS_AIRTEL_ENABLED: "false",
   PAYMENTS_PESAPAL_ENABLED: "false",
   WEB_PUSH_ENABLED: "true",
@@ -89,7 +96,7 @@ try {
   run(`${postgresBin}/createdb`, ["-h", "127.0.0.1", "-p", String(port), "-U", "postgres", database]);
   run(`${postgresBin}/psql`, ["-h", "127.0.0.1", "-p", String(port), "-U", "postgres", "-d", database, "-v", "ON_ERROR_STOP=1", "-c", "CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN; CREATE SCHEMA storage; CREATE TABLE storage.buckets (id text PRIMARY KEY, name text NOT NULL, public boolean NOT NULL DEFAULT false, file_size_limit bigint, allowed_mime_types text[]);"]);
   run("npx", ["prisma", "migrate", "deploy"], { env: environment });
-  run("npx", ["vitest", "run", "tests/customer-orders-db.integration.test.ts", "tests/announcement-push-db.integration.test.ts"], { env: environment });
+  run("npx", ["vitest", "run", "tests/customer-orders-db.integration.test.ts", "tests/payment-e2e-db.integration.test.ts", "tests/announcement-push-db.integration.test.ts"], { env: environment });
   if (vendorEntitlementAcceptance) run("npx", ["vitest", "run", "tests/vendor-entitlement-browser-fixture.integration.test.ts"], { env: { ...environment, RUN_VENDOR_ENTITLEMENT_BROWSER_ACCEPTANCE: "1" } });
   run("npx", ["vitest", "run", "tests/marketing-push-db.integration.test.ts"], { env: environment });
   if (browserAcceptance) {
