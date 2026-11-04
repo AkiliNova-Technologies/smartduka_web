@@ -104,6 +104,7 @@ export type PublicShopDetail = {
     totalProducts: number;
     rating: number;
     reviewCount: number;
+    followerCount: number;
     reviews: {
       id: string;
       rating: number;
@@ -370,7 +371,7 @@ export class VendorService {
         fulfillmentMethods: true,
         deliveryFee: true,
         deliveryEstimate: true,
-        _count: { select: { products: true } },
+        _count: { select: { products: true, followers: true } },
       },
       orderBy: { createdAt: "desc" },
     });
@@ -413,7 +414,7 @@ export class VendorService {
           },
           orderBy: { createdAt: "desc" },
         },
-        _count: { select: { products: true } },
+        _count: { select: { products: true, followers: true } },
       },
     });
     if (!vendorProfile) return null;
@@ -423,7 +424,7 @@ export class VendorService {
     const products = vendorProfile.products.map((product) => ({ ...serializeMarketplaceProduct({ ...product, vendor: { storeName: vendorProfile.storeName } }), categoryId: product.categoryId, subCategoryName: product.subCategory?.name ?? null }));
     return {
       store: {
-        id: vendorProfile.id, name: vendorProfile.storeName, slug: vendorProfile.slug, logo: vendorProfile.logoUrl, banner: vendorProfile.bannerUrl || null, verified: vendorProfile.verificationStatus === "VERIFIED",
+        id: vendorProfile.id, name: vendorProfile.storeName, slug: vendorProfile.slug, logo: vendorProfile.logoUrl, banner: vendorProfile.bannerUrl || null, verified: vendorProfile.verificationStatus === "VERIFIED", followerCount: vendorProfile._count.followers,
         description: vendorProfile.description || null,
         city: vendorProfile.city || "Kampala", country: vendorProfile.country || "Uganda", returnWindowDays: vendorProfile.returnWindowDays, returnPolicy: vendorProfile.returnPolicy,
         acceptsExchanges: vendorProfile.acceptsExchanges, exchangePolicy: vendorProfile.exchangePolicy, totalProducts: vendorProfile._count.products, rating: reviewSummary.average, reviewCount: reviewSummary.count,

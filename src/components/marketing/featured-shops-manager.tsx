@@ -37,6 +37,7 @@ function previewShop(row: FeaturedRow): FeaturedShopDto | null {
         ? vendor.deliveryEstimate
         : null,
     productCount: Number(count?.products ?? 0),
+    followerCount: 0,
     sponsored: false,
   };
 }

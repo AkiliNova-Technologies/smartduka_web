@@ -16,6 +16,7 @@ export type PublicShopListing = {
   deliveryFee: number | null;
   deliveryEstimate: string | null;
   productCount: number;
+  followerCount: number;
   sponsored?: boolean;
 };
 
@@ -34,7 +35,7 @@ type PublicShopListingRecord = {
   fulfillmentMethods: readonly unknown[];
   deliveryFee: { toString(): string } | number | null;
   deliveryEstimate: string | null;
-  _count: { products: number };
+  _count: { products: number; followers?: number };
 };
 
 /** Converts the public Prisma projection into the only shop-card DTO. */
@@ -59,5 +60,6 @@ export function serializePublicShopListing(
       vendor.deliveryFee == null ? null : Number(vendor.deliveryFee),
     deliveryEstimate: vendor.deliveryEstimate,
     productCount: vendor._count.products,
+    followerCount: vendor._count.followers ?? 0,
   };
 }

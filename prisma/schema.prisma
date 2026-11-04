@@ -839,6 +839,7 @@ model User {
   verificationActivities             ShopVerificationActivity[]       @relation("ShopVerificationActivityActor")
   verificationNotes                  ShopVerificationNote[]           @relation("ShopVerificationNoteAuthor")
   trialExtensions                    VendorTrialExtension[]            @relation("VendorTrialExtensionActor")
+  storeFollows                       StoreFollow[]
 
   @@index([status])
   @@index([vendorId])
@@ -1163,9 +1164,23 @@ model VendorProfile {
   branches                 ShopBranch[]
   branchInventories        BranchInventory[]
   inventoryMovements       InventoryMovement[]
+  followers                StoreFollow[]
 
   @@index([status])
   @@index([createdAt])
+}
+
+model StoreFollow {
+  id         String        @id @default(uuid())
+  customerId String
+  customer   User          @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  vendorId   String
+  vendor     VendorProfile @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  createdAt  DateTime      @default(now())
+
+  @@unique([customerId, vendorId])
+  @@index([customerId, createdAt, id])
+  @@index([vendorId, createdAt])
 }
 
 model ShopBranch {

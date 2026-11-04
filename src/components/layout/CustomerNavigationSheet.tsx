@@ -47,6 +47,7 @@ const shopItems = [
 const accountItems = [
   { label: "My orders", href: "/orders", icon: Package },
   { label: "Wishlist", href: "/wishlist", icon: Heart },
+  { label: "Following", href: "/following", icon: Store },
   { label: "Settings", href: "/settings", icon: Settings },
 ];
 const helpItems = [{ label: "Help & support", href: "/help", icon: CircleHelp }];
