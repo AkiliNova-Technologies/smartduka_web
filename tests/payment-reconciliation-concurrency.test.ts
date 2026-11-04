@@ -23,7 +23,7 @@ const db = vi.hoisted(() => ({
   paymentIntent: {
     findUnique: vi.fn(async ({ where }: { where: DbWhere }) => where.id && fake.intents.get(where.id) ? { ...fake.intents.get(where.id) } : null),
     findUniqueOrThrow: vi.fn(async ({ where }: { where: DbWhere }) => ({ ...(where.id ? fake.intents.get(where.id) : undefined) })),
-    findMany: vi.fn(async ({ where }: { where: DbWhere }) => [...fake.intents.values()].filter((intent) => dueMatch(intent, where)).map((intent) => ({ id: intent.id }))),
+    findMany: vi.fn(async ({ where }: { where: DbWhere }) => [...fake.intents.values()].filter((intent) => dueMatch(intent, where)).map((intent) => ({ id: intent.id, orderId: intent.orderId, subOrderId: intent.subOrderId, provider: intent.provider, createdAt: intent.createdAt, reconcileAttempts: intent.reconcileAttempts, lastReconcileError: intent.lastReconcileError }))),
     updateMany: vi.fn(async ({ where, data }: DbArgs) => {
       const intent = where.id ? fake.intents.get(where.id) : undefined;
       if (!intent || !dueMatch(intent, where)) return { count: 0 };
@@ -86,7 +86,7 @@ import { PaymentReconciliationService } from "@/services/payment-reconciliation"
 function addIntent(id: string, status: PaymentIntentStatus = PaymentIntentStatus.PENDING, orderId = "order-1") {
   fake.intents.set(id, {
     id, status, orderId, subOrderId: `sub-${id}`, vendorId: `vendor-${id}`, provider: PaymentProvider.MTN_MOMO, providerReference: `ref-${id}`,
-    amount: "100.00", currency: "EUR", confirmedAt: null, failedAt: null, nextReconcileAt: new Date(0), reconcileAttempts: 0,
+    amount: "100.00", currency: "EUR", confirmedAt: null, failedAt: null, createdAt: new Date(), nextReconcileAt: new Date(0), reconcileAttempts: 0,
     vendor: { ownerId: `owner-${id}`, storeName: `Shop ${id}` }, order: { customerId: "customer-1" },
   });
 }

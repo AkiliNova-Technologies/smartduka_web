@@ -29,17 +29,19 @@ describe("notification worker scheduling", () => {
     vi.clearAllMocks();
   });
 
-  it("registers one authenticated production schedule for the combined worker", () => {
+  it("registers the authenticated combined notification worker schedule", () => {
     const config = JSON.parse(read("vercel.json")) as {
       crons: { path: string; schedule: string }[];
     };
 
-    expect(config.crons).toEqual([
-      {
-        path: "/api/cron/push-delivery",
-        schedule: "0 6 * * *",
-      },
-    ]);
+    expect(config.crons).toContainEqual({
+      path: "/api/cron/push-delivery",
+      schedule: "0 6 * * *",
+    });
+    expect(config.crons).toContainEqual({
+      path: "/api/cron/payment-reconciliation",
+      schedule: "*/5 * * * *",
+    });
   });
 
   it("advances publication before fanout and delivery", async () => {

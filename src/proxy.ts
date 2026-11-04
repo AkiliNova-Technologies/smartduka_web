@@ -21,6 +21,7 @@ const LEGACY_PUBLIC_API_PREFIXES = [
 const PUBLIC_WEBHOOK_PATH = "/api/webhooks/pesapal";
 const SECRET_AUTHENTICATED_CRON_ROUTES = new Set([
   "GET /api/cron/push-delivery",
+  "GET /api/cron/payment-reconciliation",
 ]);
 const NATIVE_BEARER_ROUTES = new Set([
   "GET /api/v1/me",
