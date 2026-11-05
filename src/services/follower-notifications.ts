@@ -24,7 +24,7 @@ export class FollowerNotificationService {
 
   static async run(now = new Date()) {
     if (!followerNotificationProcessingEnabled()) return { disabled: true, scheduled: 0, claimed: 0, completed: 0, retried: 0, failed: 0 };
-    const scheduled = await this.schedule();
+    const scheduled = await this.schedule(now);
     await prisma.storePublicationDispatch.updateMany({ where: { status: PushDeliveryStatus.PROCESSING, lockedAt: { lt: new Date(now.getTime() - STALE_LOCK_MS) } }, data: { status: PushDeliveryStatus.RETRYING, lockedAt: null, lockToken: null, nextAttemptAt: now, failureCode: "WORKER_LOCK_EXPIRED", lastFailureAt: now } });
     const candidates = await prisma.storePublicationDispatch.findMany({ where: { status: { in: [PushDeliveryStatus.PENDING, PushDeliveryStatus.RETRYING] }, nextAttemptAt: { lte: now } }, select: { id: true }, orderBy: [{ nextAttemptAt: "asc" }, { id: "asc" }], take: WORKER_CONCURRENCY() });
     const results = { disabled: false, scheduled, claimed: 0, completed: 0, retried: 0, failed: 0 };
@@ -32,10 +32,10 @@ export class FollowerNotificationService {
     return results;
   }
 
-  static async schedule() {
+  static async schedule(now = new Date()) {
     const events = await prisma.storePublicationEvent.findMany({ where: { notificationEligible: true, dispatch: null }, select: { id: true }, take: WORKER_CONCURRENCY() * 5, orderBy: [{ publishedAt: "asc" }, { id: "asc" }] });
     if (!events.length) return 0;
-    const result = await prisma.storePublicationDispatch.createMany({ data: events.map(event => ({ publicationEventId: event.id })), skipDuplicates: true });
+    const result = await prisma.storePublicationDispatch.createMany({ data: events.map(event => ({ publicationEventId: event.id, nextAttemptAt: now })), skipDuplicates: true });
     return result.count;
   }
 

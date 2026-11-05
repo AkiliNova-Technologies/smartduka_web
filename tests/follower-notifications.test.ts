@@ -33,8 +33,12 @@ describe("FollowerNotificationService", () => {
 
   it("schedules publication events idempotently with a database uniqueness boundary", async () => {
     mocks.eventFindMany.mockResolvedValue([{ id: "event-a" }, { id: "event-b" }]); mocks.dispatchCreateMany.mockResolvedValue({ count: 1 });
-    await expect(FollowerNotificationService.schedule()).resolves.toBe(1);
-    expect(mocks.dispatchCreateMany).toHaveBeenCalledWith(expect.objectContaining({ skipDuplicates: true }));
+    const now = new Date("2026-11-05T09:00:00Z");
+    await expect(FollowerNotificationService.schedule(now)).resolves.toBe(1);
+    expect(mocks.dispatchCreateMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: [{ publicationEventId: "event-a", nextAttemptAt: now }, { publicationEventId: "event-b", nextAttemptAt: now }],
+      skipDuplicates: true,
+    }));
   });
 
   it("creates an in-app notification for an eligible current follower", async () => {
