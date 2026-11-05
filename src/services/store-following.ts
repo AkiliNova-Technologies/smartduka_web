@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma/client";
 import { publicShopWhere } from "@/lib/marketplace-eligibility";
+import { StorePublicationKind, StorePublicationStatus } from "@prisma/client";
 
 export class StoreFollowingError extends Error {
   constructor(message: string, readonly code: "NOT_FOUND" | "FORBIDDEN" = "NOT_FOUND") { super(message); }
@@ -48,11 +49,19 @@ export class StoreFollowingService {
   }
 
   static async activity(customerId: string, page: number, pageSize: number) {
-    const where = { vendor: { followers: { some: { customerId } }, ...publicShopWhere }, status: { in: ["ACTIVE", "PUBLISHED"] as ("ACTIVE" | "PUBLISHED")[] }, deletedAt: null };
-    const [rows, total] = await Promise.all([
-      prisma.product.findMany({ where, select: { id: true, name: true, slug: true, createdAt: true, images: { select: { url: true }, orderBy: [{ isFeatured: "desc" }, { sortOrder: "asc" }], take: 1 }, vendor: { select: { id: true, storeName: true, slug: true, logoUrl: true } } }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], skip: (page - 1) * pageSize, take: pageSize }),
-      prisma.product.count({ where }),
+    const now = new Date(), offset = (page - 1) * pageSize, take = offset + pageSize;
+    const vendorFilter = { followers: { some: { customerId } }, ...publicShopWhere };
+    const productWhere = { vendor: vendorFilter, status: { in: ["ACTIVE", "PUBLISHED"] as ("ACTIVE" | "PUBLISHED")[] }, deletedAt: null };
+    const publicationWhere = { vendor: vendorFilter, status: StorePublicationStatus.PUBLISHED, publishedAt: { lte: now }, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] };
+    const [products, publications, productTotal, publicationTotal] = await Promise.all([
+      prisma.product.findMany({ where: productWhere, select: { id: true, name: true, slug: true, createdAt: true, images: { select: { url: true }, orderBy: [{ isFeatured: "desc" }, { sortOrder: "asc" }], take: 1 }, vendor: { select: { id: true, storeName: true, slug: true, logoUrl: true } } }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take }),
+      prisma.storePublication.findMany({ where: publicationWhere, select: { id: true, kind: true, title: true, body: true, imageUrl: true, destination: true, destinationProduct: { select: { slug: true } }, publishedAt: true, vendor: { select: { id: true, storeName: true, slug: true, logoUrl: true } } }, orderBy: [{ publishedAt: "desc" }, { id: "desc" }], take }),
+      prisma.product.count({ where: productWhere }), prisma.storePublication.count({ where: publicationWhere }),
     ]);
-    return { items: rows.map((row) => ({ id: `product:${row.id}`, type: "NEW_PRODUCT" as const, publishedAt: row.createdAt.toISOString(), title: row.name, description: `${row.vendor.storeName} added a new product.`, imageUrl: row.images[0]?.url ?? null, destinationPath: `/products/${row.slug}`, store: row.vendor })), total };
+    const items = [
+      ...products.map(row => ({ id: `product:${row.id}`, type: "NEW_PRODUCT" as const, publishedAt: row.createdAt.toISOString(), title: row.name, description: `${row.vendor.storeName} added a new product.`, imageUrl: row.images[0]?.url ?? null, destinationPath: `/products/${row.slug}`, store: row.vendor })),
+      ...publications.map(row => ({ id: `publication:${row.id}`, type: row.kind === StorePublicationKind.ANNOUNCEMENT ? "ANNOUNCEMENT" as const : "FOLLOWER_CAMPAIGN" as const, publishedAt: row.publishedAt!.toISOString(), title: row.title, description: row.body, imageUrl: row.imageUrl, destinationPath: row.destination === "PRODUCT" && row.destinationProduct ? `/products/${row.destinationProduct.slug}` : `/shops/${row.vendor.slug}`, store: row.vendor })),
+    ].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt) || b.id.localeCompare(a.id)).slice(offset, offset + pageSize);
+    return { items, total: productTotal + publicationTotal };
   }
 }
