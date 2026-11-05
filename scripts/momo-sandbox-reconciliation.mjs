@@ -19,8 +19,15 @@ const fail = (key) => set(key, "FAIL");
 function requireSandbox() {
   if (process.env.MTN_MOMO_ENVIRONMENT !== "sandbox" || process.env.MTN_SANDBOX_COLLECTION_TESTING_ENABLED !== "true")
     throw new Error("REFUSE TO RUN: MTN sandbox collection testing must be enabled.");
-  if (process.env.MTN_SANDBOX_RECONCILIATION_QUALIFICATION_ENABLED === "false")
-    throw new Error("REFUSE TO RUN: reconciliation qualification is explicitly disabled.");
+  if (process.env.MTN_SANDBOX_RECONCILIATION_QUALIFICATION_ENABLED !== "true")
+    throw new Error("REFUSE TO RUN: reconciliation qualification requires an explicit true opt-in.");
+  if (process.env.MTN_SANDBOX_QUALIFICATION_CONFIRM_EXTERNAL_REQUEST !== "true")
+    throw new Error("REFUSE TO RUN: external sandbox RequestToPay was not explicitly confirmed.");
+  if (process.env.MTN_SANDBOX_QUALIFICATION_DATABASE !== "isolated-local")
+    throw new Error("REFUSE TO RUN: MTN_SANDBOX_QUALIFICATION_DATABASE must be isolated-local.");
+  const databaseUrl = new URL(process.env.DATABASE_URL ?? "");
+  if (!["localhost", "127.0.0.1", "::1"].includes(databaseUrl.hostname) || !databaseUrl.pathname.includes("mtn_sandbox_qualification"))
+    throw new Error("REFUSE TO RUN: use a loopback database whose name contains mtn_sandbox_qualification.");
   if (process.env.MTN_MOMO_DIRECT_VENDOR_ROUTING_VERIFIED === "true" || process.env.MTN_DIRECT_VENDOR_ROUTING_VERIFIED === "true")
     throw new Error("REFUSE TO RUN: this qualification must not run with direct-routing verification enabled.");
   getMtnMomoConfig();
@@ -116,7 +123,7 @@ main().catch((error) => { console.error(error instanceof Error ? error.message :
     console.log(`Callback qualification: ${report.get("Callback received from MTN") === "YES" ? "PASS" : "NOT YET"}`);
     console.log("Direct vendor routing: UNVERIFIED");
     console.log("Production marketplace ready: NO");
-    console.log("Cleanup: qualification order and its audit/event records were retained with a SANDBOX QUALIFICATION marker for debugging.");
+    console.log("Cleanup: dispose of the isolated mtn_sandbox_qualification database after exporting sanitized evidence.");
   }
   await prisma.$disconnect();
 });

@@ -47,15 +47,26 @@ export class PaymentProviderRegistry {
         ? false
         : false;
     const sandboxTechnicalTesting = provider === "MTN_MOMO" && environmentName === "sandbox" && environment.MTN_SANDBOX_COLLECTION_TESTING_ENABLED?.toLowerCase() === "true";
+    // The current MTN adapter is a sandbox qualification adapter. Production
+    // customer collection must remain unavailable until direct merchant
+    // destination routing is implemented and qualified end to end.
+    const customerInitiationImplemented = provider === "MTN_MOMO"
+      && environmentName === "sandbox"
+      && sandboxTechnicalTesting;
     // Customer-facing payments always require proven direct vendor routing.
     // Sandbox Collection credentials are deliberately insufficient here.
-    return { provider, enabled, environment: environmentName, configured, directVendorRoutingVerified, sandboxTechnicalTesting, customerPaymentsReady: enabled && configured && directVendorRoutingVerified };
+    return { provider, enabled, environment: environmentName, configured, directVendorRoutingVerified, sandboxTechnicalTesting, customerPaymentsReady: enabled && configured && directVendorRoutingVerified && customerInitiationImplemented };
   }
   static assertCustomerPaymentsReady(provider: PaymentProvider) {
     const readiness = this.getReadiness(provider);
     if (!readiness.enabled) throw new PaymentProviderUnavailableError(provider);
     if (!readiness.configured) throw new PaymentProviderUnavailableError(provider);
     if (!readiness.directVendorRoutingVerified) throw new PaymentProviderUnavailableError(provider, "Direct vendor routing has not been verified for this provider.");
+    if (!readiness.customerPaymentsReady)
+      throw new PaymentProviderUnavailableError(
+        provider,
+        "Customer payment initiation is not implemented for this provider environment.",
+      );
   }
   /**
    * A deliberately narrow capability for the trusted reconciliation CLI. It

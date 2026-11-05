@@ -124,6 +124,53 @@ describe("public V1 marketplace catalogue reads", () => {
     ).toBeNull();
   });
 
+  it.each([
+    ["GET", "/api/v1/preferences/appearance"],
+    ["PATCH", "/api/v1/preferences/appearance"],
+  ])("passes native Firebase Bearer appearance %s requests", async (method, pathname) => {
+    const response = await proxy(
+      bearerRequest(pathname, "Bearer firebase-id-token", method),
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("x-middleware-next")).toBe("1");
+    expect(response.headers.get("x-middleware-request-authorization")).toBe(
+      "Bearer firebase-id-token",
+    );
+    expect(
+      response.headers.get("x-middleware-request-x-marketplace-user-id"),
+    ).toBeNull();
+    expect(mocks.verifyToken).not.toHaveBeenCalled();
+  });
+
+  it.each(["GET", "PATCH"])(
+    "rejects appearance %s without credentials",
+    async (method) => {
+      const response = await proxy(
+        guestRequest("/api/v1/preferences/appearance", method),
+      );
+
+      expect(response.status).toBe(401);
+      expect(response.headers.get("x-middleware-next")).toBeNull();
+    },
+  );
+
+  it.each(["POST", "PUT", "DELETE"])(
+    "does not let a Bearer token bypass unsupported appearance %s methods",
+    async (method) => {
+      const response = await proxy(
+        bearerRequest(
+          "/api/v1/preferences/appearance",
+          "Bearer firebase-id-token",
+          method,
+        ),
+      );
+
+      expect(response.status).toBe(401);
+      expect(response.headers.get("x-middleware-next")).toBeNull();
+    },
+  );
+
   it("does not pass native Bearer access to wishlist-like routes", async () => {
     for (const [method, pathname] of [
       ["PATCH", "/api/v1/wishlist"],

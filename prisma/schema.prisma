@@ -86,6 +86,31 @@ enum MarketingDestinationType {
   FEATURED_SECTION
 }
 
+enum StorePublicationKind {
+  ANNOUNCEMENT
+  FOLLOWER_CAMPAIGN
+}
+
+enum StorePublicationStatus {
+  DRAFT
+  IN_REVIEW
+  SCHEDULED
+  PUBLISHED
+  ARCHIVED
+  EXPIRED
+}
+
+enum StorePublicationDestination {
+  STOREFRONT
+  PRODUCT
+}
+
+enum StorePublicationTopic {
+  ANNOUNCEMENT
+  CAMPAIGN
+  NEW_ARRIVALS
+}
+
 enum VendorStatus {
   PENDING
   ACTIVE
@@ -815,8 +840,8 @@ model User {
   marketingCampaignsPublished        MarketingNotificationCampaign[]  @relation("MarketingCampaignPublishedBy")
   devices                            UserDevice[]
   browserPushSubscriptions           BrowserPushSubscription[]
-  subscriptionLifecycleIntents       SubscriptionLifecycleIntent[] @relation("SubscriptionLifecycleIntentActor")
-  subscriptionBillingIntents         SubscriptionBillingIntent[] @relation("SubscriptionBillingIntentActor")
+  subscriptionLifecycleIntents       SubscriptionLifecycleIntent[]    @relation("SubscriptionLifecycleIntentActor")
+  subscriptionBillingIntents         SubscriptionBillingIntent[]      @relation("SubscriptionBillingIntentActor")
   pushDeliveryOutbox                 PushDeliveryOutbox[]
   returnRequests                     ReturnRequest[]                  @relation("ReturnRequester")
   refundsRequested                   Refund[]                         @relation("RefundRequester")
@@ -838,7 +863,11 @@ model User {
   verificationApplicationsDecided    ShopVerificationApplication[]    @relation("ShopVerificationDecisionBy")
   verificationActivities             ShopVerificationActivity[]       @relation("ShopVerificationActivityActor")
   verificationNotes                  ShopVerificationNote[]           @relation("ShopVerificationNoteAuthor")
-  trialExtensions                    VendorTrialExtension[]            @relation("VendorTrialExtensionActor")
+  trialExtensions                    VendorTrialExtension[]           @relation("VendorTrialExtensionActor")
+  storeFollows                       StoreFollow[]
+  storePublicationsCreated           StorePublication[]               @relation("StorePublicationCreatedBy")
+  storePublicationsReviewed          StorePublication[]               @relation("StorePublicationReviewedBy")
+  storePublicationsPublished         StorePublication[]               @relation("StorePublicationPublishedBy")
 
   @@index([status])
   @@index([vendorId])
@@ -869,25 +898,25 @@ model CustomerAddress {
 }
 
 model UserDevice {
-  id         String         @id @default(uuid())
-  userId     String
-  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  deviceId   String
-  platform   DevicePlatform
-  pushTokenEncrypted String
-  pushTokenHash      String         @unique @db.VarChar(64)
-  appVersion String?
-  deviceName String?
-  enabled    Boolean        @default(true)
-  registrationVersion Int   @default(1)
-  tokenUpdatedAt DateTime   @default(now())
-  lastSuccessAt DateTime?
-  lastFailureAt DateTime?
-  failureCount Int          @default(0)
-  lastSeenAt DateTime       @default(now())
-  createdAt  DateTime       @default(now())
-  updatedAt  DateTime       @updatedAt
-  nativeDeliveries NativePushDelivery[]
+  id                  String               @id @default(uuid())
+  userId              String
+  user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceId            String
+  platform            DevicePlatform
+  pushTokenEncrypted  String
+  pushTokenHash       String               @unique @db.VarChar(64)
+  appVersion          String?
+  deviceName          String?
+  enabled             Boolean              @default(true)
+  registrationVersion Int                  @default(1)
+  tokenUpdatedAt      DateTime             @default(now())
+  lastSuccessAt       DateTime?
+  lastFailureAt       DateTime?
+  failureCount        Int                  @default(0)
+  lastSeenAt          DateTime             @default(now())
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  nativeDeliveries    NativePushDelivery[]
 
   @@unique([userId, deviceId])
   @@index([userId, enabled])
@@ -975,6 +1004,9 @@ model UserSettings {
   promotionalInAppNotifications Boolean @default(false)
   shoppingRecommendations       Boolean @default(false)
   promotionalPushNotifications  Boolean @default(false)
+  followedStoreAnnouncements    Boolean @default(false)
+  followedStoreCampaigns        Boolean @default(false)
+  followedStoreNewArrivals      Boolean @default(false)
 
   twoFactorEnabled       Boolean @default(false)
   buyerProtectionEnabled Boolean @default(true)
@@ -1132,40 +1164,141 @@ model VendorProfile {
   deletedAt        DateTime?
 
   // Relations
-  employees                User[]                        @relation("VendorEmployees")
-  products                 Product[]
-  subOrders                SubOrder[]
-  ledgerEntries            FinancialLedger[]
-  payouts                  VendorPayout[]
-  payoutAccounts           VendorPayoutAccount[]
-  paymentAccounts          VendorPaymentAccount[]
-  paymentIntents           PaymentIntent[]
-  subscriptions            VendorSubscription[]
+  employees                    User[]                        @relation("VendorEmployees")
+  products                     Product[]
+  subOrders                    SubOrder[]
+  ledgerEntries                FinancialLedger[]
+  payouts                      VendorPayout[]
+  payoutAccounts               VendorPayoutAccount[]
+  paymentAccounts              VendorPaymentAccount[]
+  paymentIntents               PaymentIntent[]
+  subscriptions                VendorSubscription[]
   subscriptionLifecycleIntents SubscriptionLifecycleIntent[]
-  subscriptionBillingIntents SubscriptionBillingIntent[]
-  subscriptionPaidPeriods SubscriptionPaidPeriod[]
-  trial                    VendorTrial?
-  promotionCampaigns       PromotionCampaign[]
-  promotionCredits         PromotionCreditLedger[]
-  platformRevenueOrders    PlatformRevenueOrder[]
-  platformPaymentIntents   PlatformPaymentIntent[]
-  notifications            Notification[]
-  auditLogs                AuditLog[]
-  documents                Document[]
-  vendorApplication        VendorApplication?
-  featuredEntry            FeaturedShop?
-  disputes                 Dispute[]
-  riskFlags                RiskFlag[]
-  shopReviews              ShopReview[]
-  reviewReplies            ReviewReply[]                 @relation("VendorReviewReplies")
-  marketplaceReports       MarketplaceReport[]
-  verificationApplications ShopVerificationApplication[]
-  branches                 ShopBranch[]
-  branchInventories        BranchInventory[]
-  inventoryMovements       InventoryMovement[]
+  subscriptionBillingIntents   SubscriptionBillingIntent[]
+  subscriptionPaidPeriods      SubscriptionPaidPeriod[]
+  trial                        VendorTrial?
+  promotionCampaigns           PromotionCampaign[]
+  promotionCredits             PromotionCreditLedger[]
+  platformRevenueOrders        PlatformRevenueOrder[]
+  platformPaymentIntents       PlatformPaymentIntent[]
+  notifications                Notification[]
+  auditLogs                    AuditLog[]
+  documents                    Document[]
+  vendorApplication            VendorApplication?
+  featuredEntry                FeaturedShop?
+  disputes                     Dispute[]
+  riskFlags                    RiskFlag[]
+  shopReviews                  ShopReview[]
+  reviewReplies                ReviewReply[]                 @relation("VendorReviewReplies")
+  marketplaceReports           MarketplaceReport[]
+  verificationApplications     ShopVerificationApplication[]
+  branches                     ShopBranch[]
+  branchInventories            BranchInventory[]
+  inventoryMovements           InventoryMovement[]
+  followers                    StoreFollow[]
+  storePublications            StorePublication[]
+  storePublicationEvents       StorePublicationEvent[]
 
   @@index([status])
   @@index([createdAt])
+}
+
+model StoreFollow {
+  id         String        @id @default(uuid())
+  customerId String
+  customer   User          @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  vendorId   String
+  vendor     VendorProfile @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  createdAt  DateTime      @default(now())
+
+  @@unique([customerId, vendorId])
+  @@index([customerId, createdAt, id])
+  @@index([vendorId, createdAt])
+}
+
+model StorePublication {
+  id                   String                      @id @default(uuid())
+  vendorId             String
+  vendor               VendorProfile               @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  kind                 StorePublicationKind
+  notificationTopic    StorePublicationTopic
+  status               StorePublicationStatus      @default(DRAFT)
+  title                String                      @db.VarChar(160)
+  body                 String                      @db.VarChar(2000)
+  imageUrl             String?                     @db.VarChar(1000)
+  destination          StorePublicationDestination @default(STOREFRONT)
+  destinationProductId String?
+  destinationProduct   Product?                    @relation("StorePublicationDestinationProduct", fields: [destinationProductId], references: [id], onDelete: SetNull)
+  scheduledAt          DateTime?
+  publishedAt          DateTime?
+  expiresAt            DateTime?
+  createdById          String
+  createdBy            User                        @relation("StorePublicationCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  reviewedById         String?
+  reviewedBy           User?                       @relation("StorePublicationReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt           DateTime?
+  publishedById        String?
+  publishedBy          User?                       @relation("StorePublicationPublishedBy", fields: [publishedById], references: [id], onDelete: SetNull)
+  createdAt            DateTime                    @default(now())
+  updatedAt            DateTime                    @updatedAt
+  products             StorePublicationProduct[]
+  publicationEvent     StorePublicationEvent?
+
+  @@index([vendorId, kind, status, createdAt])
+  @@index([status, scheduledAt])
+  @@index([status, publishedAt, expiresAt])
+}
+
+model StorePublicationProduct {
+  publicationId String
+  publication   StorePublication @relation(fields: [publicationId], references: [id], onDelete: Cascade)
+  productId     String
+  product       Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
+  sortOrder     Int              @default(0)
+
+  @@id([publicationId, productId])
+  @@index([productId])
+}
+
+model StorePublicationEvent {
+  id                   String           @id @default(uuid())
+  publicationId        String           @unique
+  publication          StorePublication @relation(fields: [publicationId], references: [id], onDelete: Cascade)
+  vendorId             String
+  vendor               VendorProfile    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  eventKey             String           @unique @db.VarChar(191)
+  audienceType         String           @default("STORE_FOLLOWERS") @db.VarChar(40)
+  notificationEligible Boolean          @default(false)
+  eligibilityMetadata  Json
+  publishedAt          DateTime
+  createdAt            DateTime         @default(now())
+  dispatch             StorePublicationDispatch?
+  notifications        Notification[]
+  pushOutbox           PushDeliveryOutbox[]
+
+  @@index([vendorId, publishedAt])
+}
+
+model StorePublicationDispatch {
+  id                  String                @id @default(uuid())
+  publicationEventId  String                @unique
+  publicationEvent    StorePublicationEvent @relation(fields: [publicationEventId], references: [id], onDelete: Cascade)
+  status              PushDeliveryStatus    @default(PENDING)
+  cursorFollowId      String?
+  attempts            Int                   @default(0)
+  processedRecipients Int                   @default(0)
+  createdNotifications Int                  @default(0)
+  queuedPushJobs      Int                   @default(0)
+  nextAttemptAt       DateTime              @default(now())
+  lockedAt            DateTime?
+  lockToken           String?               @db.VarChar(80)
+  lastFailureAt       DateTime?
+  failureCode         String?               @db.VarChar(80)
+  completedAt         DateTime?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+
+  @@index([status, nextAttemptAt])
 }
 
 model ShopBranch {
@@ -1386,16 +1519,18 @@ model Product {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  images             ProductImage[]
-  variants           ProductVariant[]
-  branchInventories  BranchInventory[]
-  orderItems         OrderItem[]
-  reviews            ProductReview[]
-  wishlistItems      WishlistItem[]
-  recentlyViewed     RecentlyViewed[]
-  featuredEntry      FeaturedProduct?
-  marketplaceReports MarketplaceReport[]
-  promotionCampaigns PromotionCampaign[]
+  images                       ProductImage[]
+  variants                     ProductVariant[]
+  branchInventories            BranchInventory[]
+  orderItems                   OrderItem[]
+  reviews                      ProductReview[]
+  wishlistItems                WishlistItem[]
+  recentlyViewed               RecentlyViewed[]
+  featuredEntry                FeaturedProduct?
+  marketplaceReports           MarketplaceReport[]
+  promotionCampaigns           PromotionCampaign[]
+  storePublicationDestinations StorePublication[]        @relation("StorePublicationDestinationProduct")
+  storePublicationSelections   StorePublicationProduct[]
 
   @@unique([vendorId, slug])
   @@index([vendorId])
@@ -1504,26 +1639,26 @@ model PromotionQuote {
 }
 
 model PlatformRevenueOrder {
-  id                String                           @id @default(uuid())
-  vendorId          String
-  vendor            VendorProfile                    @relation(fields: [vendorId], references: [id], onDelete: Restrict)
-  type              PlatformRevenueOrderType
-  status            PlatformRevenueOrderStatus       @default(DRAFT)
-  campaignId        String?                          @unique
-  campaign          PromotionCampaign?               @relation(fields: [campaignId], references: [id], onDelete: SetNull)
-  subscriptionId    String?                          @unique
-  subscription      VendorSubscription?              @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
-  subtotal          Decimal                          @db.Decimal(18, 2)
-  creditApplied     Decimal                          @default(0) @db.Decimal(18, 2)
-  amountDue         Decimal                          @db.Decimal(18, 2)
-  currency          String                           @default("UGX") @db.VarChar(3)
-  idempotencyKey    String?
-  qualificationKind PlatformRevenueQualificationKind @default(NONE)
-  qualificationId   String?
-  paymentIntents    PlatformPaymentIntent[]
+  id                        String                           @id @default(uuid())
+  vendorId                  String
+  vendor                    VendorProfile                    @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  type                      PlatformRevenueOrderType
+  status                    PlatformRevenueOrderStatus       @default(DRAFT)
+  campaignId                String?                          @unique
+  campaign                  PromotionCampaign?               @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  subscriptionId            String?                          @unique
+  subscription              VendorSubscription?              @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  subtotal                  Decimal                          @db.Decimal(18, 2)
+  creditApplied             Decimal                          @default(0) @db.Decimal(18, 2)
+  amountDue                 Decimal                          @db.Decimal(18, 2)
+  currency                  String                           @default("UGX") @db.VarChar(3)
+  idempotencyKey            String?
+  qualificationKind         PlatformRevenueQualificationKind @default(NONE)
+  qualificationId           String?
+  paymentIntents            PlatformPaymentIntent[]
   subscriptionBillingIntent SubscriptionBillingIntent?
-  createdAt         DateTime                         @default(now())
-  updatedAt         DateTime                         @updatedAt
+  createdAt                 DateTime                         @default(now())
+  updatedAt                 DateTime                         @updatedAt
 
   @@unique([vendorId, idempotencyKey])
   @@unique([vendorId, qualificationId])
@@ -2303,28 +2438,28 @@ model SubscriptionPlan {
 }
 
 model SubscriptionPlanVersion {
-  id                String                            @id @default(uuid())
-  planId            String
-  plan              SubscriptionPlan                  @relation(fields: [planId], references: [id], onDelete: Restrict)
-  planCode          String
-  version           Int
-  policyVersion     String
-  monthlyPriceUgx   Decimal                           @db.Decimal(18, 2)
-  yearlyPriceUgx    Decimal?                          @db.Decimal(18, 2)
-  billingCycle      BillingCycle                      @default(MONTHLY)
-  activeProductLimit Int?
+  id                   String                            @id @default(uuid())
+  planId               String
+  plan                 SubscriptionPlan                  @relation(fields: [planId], references: [id], onDelete: Restrict)
+  planCode             String
+  version              Int
+  policyVersion        String
+  monthlyPriceUgx      Decimal                           @db.Decimal(18, 2)
+  yearlyPriceUgx       Decimal?                          @db.Decimal(18, 2)
+  billingCycle         BillingCycle                      @default(MONTHLY)
+  activeProductLimit   Int?
   productSafetyCeiling Int?
-  branchLimit       Int
-  staffLimit        Int
-  capabilities      String[]                          @default([])
-  effectiveAt       DateTime
-  publicationStatus SubscriptionPlanPublicationStatus @default(DRAFT)
-  publishedAt       DateTime?
-  retiredAt         DateTime?
-  createdAt         DateTime                          @default(now())
-  subscriptions     VendorSubscription[]
-  billingIntents    SubscriptionBillingIntent[]
-  paidPeriods       SubscriptionPaidPeriod[]
+  branchLimit          Int
+  staffLimit           Int
+  capabilities         String[]                          @default([])
+  effectiveAt          DateTime
+  publicationStatus    SubscriptionPlanPublicationStatus @default(DRAFT)
+  publishedAt          DateTime?
+  retiredAt            DateTime?
+  createdAt            DateTime                          @default(now())
+  subscriptions        VendorSubscription[]
+  billingIntents       SubscriptionBillingIntent[]
+  paidPeriods          SubscriptionPaidPeriod[]
 
   @@unique([planCode, version])
   @@index([planId, publicationStatus, effectiveAt])
@@ -2332,17 +2467,17 @@ model SubscriptionPlanVersion {
 }
 
 model VendorSubscription {
-  id       String           @id @default(uuid())
-  vendorId String
-  vendor   VendorProfile    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  planId   String
-  plan     SubscriptionPlan @relation(fields: [planId], references: [id])
+  id            String                   @id @default(uuid())
+  vendorId      String
+  vendor        VendorProfile            @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  planId        String
+  plan          SubscriptionPlan         @relation(fields: [planId], references: [id])
   planVersionId String?
   planVersion   SubscriptionPlanVersion? @relation(fields: [planVersionId], references: [id], onDelete: Restrict)
 
-  status             SubscriptionStatus    @default(TRIAL)
-  billingCycle       BillingCycle           @default(MONTHLY)
-  startedAt          DateTime              @default(now())
+  status             SubscriptionStatus            @default(TRIAL)
+  billingCycle       BillingCycle                  @default(MONTHLY)
+  startedAt          DateTime                      @default(now())
   currentPeriodStart DateTime?
   currentPeriodEnd   DateTime?
   cancelledAt        DateTime?
@@ -2367,20 +2502,20 @@ model SubscriptionLifecycleIntent {
   vendor                 VendorProfile                     @relation(fields: [vendorId], references: [id], onDelete: Restrict)
   subscriptionId         String
   subscription           VendorSubscription                @relation(fields: [subscriptionId], references: [id], onDelete: Restrict)
-  type                    SubscriptionLifecycleIntentType
-  status                  SubscriptionLifecycleIntentStatus @default(PENDING)
-  requestedPlanId         String?
-  requestedPlanVersionId  String?
-  requestedBillingCycle   BillingCycle?
-  effectiveAt             DateTime
-  idempotencyKey          String                            @db.VarChar(191)
-  requestedById           String
-  requestedBy             User                              @relation("SubscriptionLifecycleIntentActor", fields: [requestedById], references: [id], onDelete: Restrict)
-  cancelledAt             DateTime?
-  appliedAt               DateTime?
-  createdAt               DateTime                          @default(now())
-  updatedAt               DateTime                          @updatedAt
-  billingIntents          SubscriptionBillingIntent[]
+  type                   SubscriptionLifecycleIntentType
+  status                 SubscriptionLifecycleIntentStatus @default(PENDING)
+  requestedPlanId        String?
+  requestedPlanVersionId String?
+  requestedBillingCycle  BillingCycle?
+  effectiveAt            DateTime
+  idempotencyKey         String                            @db.VarChar(191)
+  requestedById          String
+  requestedBy            User                              @relation("SubscriptionLifecycleIntentActor", fields: [requestedById], references: [id], onDelete: Restrict)
+  cancelledAt            DateTime?
+  appliedAt              DateTime?
+  createdAt              DateTime                          @default(now())
+  updatedAt              DateTime                          @updatedAt
+  billingIntents         SubscriptionBillingIntent[]
 
   @@unique([vendorId, idempotencyKey])
   @@index([vendorId, status, effectiveAt])
@@ -2390,31 +2525,31 @@ model SubscriptionLifecycleIntent {
 }
 
 model SubscriptionBillingIntent {
-  id                       String                     @id @default(uuid())
-  vendorId                 String
-  vendor                   VendorProfile              @relation(fields: [vendorId], references: [id], onDelete: Restrict)
-  requestedById            String
-  requestedBy              User                       @relation("SubscriptionBillingIntentActor", fields: [requestedById], references: [id], onDelete: Restrict)
-  subscriptionId           String
-  subscription             VendorSubscription         @relation(fields: [subscriptionId], references: [id], onDelete: Restrict)
-  lifecycleIntentId        String?
-  lifecycleIntent          SubscriptionLifecycleIntent? @relation(fields: [lifecycleIntentId], references: [id], onDelete: Restrict)
-  planVersionId            String
-  planVersion              SubscriptionPlanVersion    @relation(fields: [planVersionId], references: [id], onDelete: Restrict)
-  revenueOrderId           String                     @unique
-  revenueOrder             PlatformRevenueOrder       @relation(fields: [revenueOrderId], references: [id], onDelete: Restrict)
-  purpose                  SubscriptionBillingPurpose
-  billingCycle             BillingCycle                @default(MONTHLY)
-  amount                   Decimal                    @db.Decimal(18, 2)
-  currency                 String                     @default("UGX") @db.VarChar(3)
-  idempotencyKey           String                     @db.VarChar(191)
-  merchantDestinationHash  String                     @db.VarChar(64)
-  expiresAt                DateTime
-  activatedAt              DateTime?
-  reviewReason             String?                    @db.Text
-  createdAt                DateTime                   @default(now())
-  updatedAt                DateTime                   @updatedAt
-  paidPeriod               SubscriptionPaidPeriod?
+  id                      String                       @id @default(uuid())
+  vendorId                String
+  vendor                  VendorProfile                @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  requestedById           String
+  requestedBy             User                         @relation("SubscriptionBillingIntentActor", fields: [requestedById], references: [id], onDelete: Restrict)
+  subscriptionId          String
+  subscription            VendorSubscription           @relation(fields: [subscriptionId], references: [id], onDelete: Restrict)
+  lifecycleIntentId       String?
+  lifecycleIntent         SubscriptionLifecycleIntent? @relation(fields: [lifecycleIntentId], references: [id], onDelete: Restrict)
+  planVersionId           String
+  planVersion             SubscriptionPlanVersion      @relation(fields: [planVersionId], references: [id], onDelete: Restrict)
+  revenueOrderId          String                       @unique
+  revenueOrder            PlatformRevenueOrder         @relation(fields: [revenueOrderId], references: [id], onDelete: Restrict)
+  purpose                 SubscriptionBillingPurpose
+  billingCycle            BillingCycle                 @default(MONTHLY)
+  amount                  Decimal                      @db.Decimal(18, 2)
+  currency                String                       @default("UGX") @db.VarChar(3)
+  idempotencyKey          String                       @db.VarChar(191)
+  merchantDestinationHash String                       @db.VarChar(64)
+  expiresAt               DateTime
+  activatedAt             DateTime?
+  reviewReason            String?                      @db.Text
+  createdAt               DateTime                     @default(now())
+  updatedAt               DateTime                     @updatedAt
+  paidPeriod              SubscriptionPaidPeriod?
 
   @@unique([vendorId, idempotencyKey])
   @@index([vendorId, purpose, expiresAt])
@@ -2424,27 +2559,27 @@ model SubscriptionBillingIntent {
 }
 
 model SubscriptionPaidPeriod {
-  id                String                         @id @default(uuid())
-  vendorId          String
-  vendor            VendorProfile                  @relation(fields: [vendorId], references: [id], onDelete: Restrict)
-  subscriptionId    String
-  subscription      VendorSubscription              @relation(fields: [subscriptionId], references: [id], onDelete: Restrict)
-  billingIntentId   String                         @unique
-  billingIntent     SubscriptionBillingIntent       @relation(fields: [billingIntentId], references: [id], onDelete: Restrict)
-  paymentIntentId   String                         @unique
-  paymentIntent     PlatformPaymentIntent           @relation(fields: [paymentIntentId], references: [id], onDelete: Restrict)
-  planVersionId     String
-  planVersion       SubscriptionPlanVersion         @relation(fields: [planVersionId], references: [id], onDelete: Restrict)
-  status            SubscriptionPaidPeriodStatus
-  billingCycle      BillingCycle                    @default(MONTHLY)
-  periodStart       DateTime
-  periodEnd         DateTime
-  amount            Decimal                        @db.Decimal(18, 2)
-  currency          String                         @db.VarChar(3)
-  activatedAt       DateTime?
-  endedAt           DateTime?
-  createdAt         DateTime                       @default(now())
-  updatedAt         DateTime                       @updatedAt
+  id              String                       @id @default(uuid())
+  vendorId        String
+  vendor          VendorProfile                @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  subscriptionId  String
+  subscription    VendorSubscription           @relation(fields: [subscriptionId], references: [id], onDelete: Restrict)
+  billingIntentId String                       @unique
+  billingIntent   SubscriptionBillingIntent    @relation(fields: [billingIntentId], references: [id], onDelete: Restrict)
+  paymentIntentId String                       @unique
+  paymentIntent   PlatformPaymentIntent        @relation(fields: [paymentIntentId], references: [id], onDelete: Restrict)
+  planVersionId   String
+  planVersion     SubscriptionPlanVersion      @relation(fields: [planVersionId], references: [id], onDelete: Restrict)
+  status          SubscriptionPaidPeriodStatus
+  billingCycle    BillingCycle                 @default(MONTHLY)
+  periodStart     DateTime
+  periodEnd       DateTime
+  amount          Decimal                      @db.Decimal(18, 2)
+  currency        String                       @db.VarChar(3)
+  activatedAt     DateTime?
+  endedAt         DateTime?
+  createdAt       DateTime                     @default(now())
+  updatedAt       DateTime                     @updatedAt
 
   @@unique([subscriptionId, periodStart])
   @@index([vendorId, status, periodStart])
@@ -2452,20 +2587,20 @@ model SubscriptionPaidPeriod {
 }
 
 model VendorTrial {
-  id                       String            @id @default(uuid())
-  vendorId                 String            @unique
-  vendor                   VendorProfile     @relation(fields: [vendorId], references: [id], onDelete: Restrict)
-  status                   VendorTrialStatus
-  eligible                 Boolean
-  eligibilityDeterminedAt  DateTime?
-  activatedAt              DateTime?
-  expiresAt                DateTime?
-  policyVersion            String
-  activationKey            String?           @unique
-  administrativeReason     String?           @db.Text
-  createdAt                DateTime          @default(now())
-  updatedAt                DateTime          @updatedAt
-  extensions               VendorTrialExtension[]
+  id                      String                 @id @default(uuid())
+  vendorId                String                 @unique
+  vendor                  VendorProfile          @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  status                  VendorTrialStatus
+  eligible                Boolean
+  eligibilityDeterminedAt DateTime?
+  activatedAt             DateTime?
+  expiresAt               DateTime?
+  policyVersion           String
+  activationKey           String?                @unique
+  administrativeReason    String?                @db.Text
+  createdAt               DateTime               @default(now())
+  updatedAt               DateTime               @updatedAt
+  extensions              VendorTrialExtension[]
 
   @@index([status, expiresAt])
 }
@@ -2502,6 +2637,9 @@ model Notification {
   title      String
   message    String
   actionPath String?
+  imageUrl   String?             @db.VarChar(1000)
+  storePublicationEventId String?
+  storePublicationEvent StorePublicationEvent? @relation(fields: [storePublicationEventId], references: [id], onDelete: SetNull)
   readAt     DateTime?
   deletedAt  DateTime?
   createdAt  DateTime            @default(now())
@@ -2511,6 +2649,7 @@ model Notification {
   @@index([userId])
   @@index([readAt])
   @@index([userId, deletedAt, createdAt])
+  @@index([storePublicationEventId, userId])
 }
 
 enum BrowserPushSubscriptionStatus {
@@ -2568,6 +2707,8 @@ model PushDeliveryOutbox {
   announcement              Announcement?                  @relation(fields: [announcementId], references: [id], onDelete: Cascade)
   marketingCampaignId       String?
   marketingCampaign         MarketingNotificationCampaign? @relation(fields: [marketingCampaignId], references: [id], onDelete: Cascade)
+  storePublicationEventId   String?
+  storePublicationEvent     StorePublicationEvent?          @relation(fields: [storePublicationEventId], references: [id], onDelete: Cascade)
   // Test deliveries are intentionally bound to one verified browser. Normal
   // business deliveries continue to fan out to the account's active devices.
   targetSubscriptionId      String?
@@ -2590,6 +2731,7 @@ model PushDeliveryOutbox {
 
   @@unique([announcementId, userId])
   @@unique([marketingCampaignId, targetSubscriptionId])
+  @@unique([storePublicationEventId, userId])
   @@index([status, nextAttemptAt])
   @@index([userId, status])
   @@index([targetSubscriptionId, status])

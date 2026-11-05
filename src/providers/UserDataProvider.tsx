@@ -36,6 +36,9 @@ export interface UserSettings {
   promotionalInAppNotifications: boolean;
   shoppingRecommendations: boolean;
   promotionalPushNotifications: boolean;
+  followedStoreAnnouncements: boolean;
+  followedStoreCampaigns: boolean;
+  followedStoreNewArrivals: boolean;
   twoFactorEnabled: boolean;
   buyerProtectionEnabled: boolean;
   themeMode: "system" | "light" | "dark";
@@ -178,6 +181,9 @@ const defaultSettings: UserSettings = {
   promotionalInAppNotifications: false,
   shoppingRecommendations: false,
   promotionalPushNotifications: false,
+  followedStoreAnnouncements: false,
+  followedStoreCampaigns: false,
+  followedStoreNewArrivals: false,
   twoFactorEnabled: false,
   buyerProtectionEnabled: true,
   themeMode: "system",

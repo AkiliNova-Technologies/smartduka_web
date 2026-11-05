@@ -3,7 +3,6 @@ import {
   PaymentIntentStatus,
   PaymentProvider,
   PaymentStatus,
-  Prisma,
 } from "@prisma/client";
 import { Decimal } from "@prisma/client/runtime/client";
 import { prisma } from "@/lib/prisma/client";
@@ -82,102 +81,113 @@ export class PaymentIntentService {
       );
     if (!sandboxQualification)
       PaymentProviderRegistry.assertCustomerPaymentsReady(input.provider);
-    const subOrder = await prisma.subOrder.findFirst({
-      where: {
-        id: input.subOrderId,
-        orderId: input.orderId,
-        order: { customerId: input.customerId },
-      },
-      include: {
-        order: {
-          select: {
-            id: true,
-            currency: true,
-            paymentStatus: true,
-            status: true,
-            shippingPhone: true,
+    const claimed = await prisma.$transaction(async (tx) => {
+      // Idempotency keys only deduplicate identical requests. The advisory
+      // transaction lock serializes all initiation attempts for this seller
+      // suborder, including requests carrying different keys.
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`payment-initiation:${input.subOrderId}`}))::text AS lock`;
+      const subOrder = await tx.subOrder.findFirst({
+        where: {
+          id: input.subOrderId,
+          orderId: input.orderId,
+          order: { customerId: input.customerId },
+        },
+        include: {
+          order: {
+            select: {
+              id: true,
+              currency: true,
+              paymentGateway: true,
+              paymentStatus: true,
+              status: true,
+              shippingPhone: true,
+            },
           },
         },
-      },
-    });
-    if (!subOrder)
-      throw new PaymentIntentError(
-        "Order payment is unavailable.",
-        "NOT_FOUND",
-      );
-    if (subOrder.order.paymentStatus === PaymentStatus.COMPLETED)
-      throw new PaymentIntentError(
-        "This order is already paid.",
-        "ALREADY_PAID",
-      );
-    const eligibility = await PaymentEligibilityService.canAcceptPayments(
-      subOrder.vendorId,
-      input.provider,
-      { sandboxQualification },
-    );
-    if (!eligibility.eligible || !eligibility.accountId)
-      throw new PaymentIntentError(
-        "This shop cannot accept the selected payment method.",
-        eligibility.reasons[0] ?? "INELIGIBLE",
-      );
-    const pending = await prisma.paymentIntent.findFirst({
-      where: { subOrderId: subOrder.id, status: PaymentIntentStatus.PENDING },
-      orderBy: { createdAt: "desc" },
-    });
-    if (pending) {
-      // A prior request may have completed after the customer left the page.
-      // Reconcile it before ever inviting a second RequestToPay.
-      await PaymentReconciliationService.reconcilePaymentIntent(pending.id);
-      const refreshed = await prisma.paymentIntent.findUnique({
-        where: { id: pending.id },
-        select: { status: true },
       });
-      if (refreshed?.status === PaymentIntentStatus.SUCCESSFUL)
+      if (!subOrder)
+        throw new PaymentIntentError(
+          "Order payment is unavailable.",
+          "NOT_FOUND",
+        );
+      if (subOrder.order.paymentGateway !== input.provider)
+        throw new PaymentIntentError(
+          "The selected payment method does not match this order.",
+          "PAYMENT_METHOD_MISMATCH",
+        );
+      const prior = await tx.paymentIntent.findUnique({
+        where: {
+          subOrderId_idempotencyKey: {
+            subOrderId: subOrder.id,
+            idempotencyKey: input.idempotencyKey,
+          },
+        },
+      });
+      if (prior) {
+        if (prior.provider !== input.provider)
+          throw new PaymentIntentError(
+            "Payment request conflicts with an existing request.",
+            "IDEMPOTENCY_CONFLICT",
+          );
+        return { intent: prior, subOrder, existing: true };
+      }
+      if (subOrder.order.paymentStatus === PaymentStatus.COMPLETED)
         throw new PaymentIntentError(
           "This order is already paid.",
           "ALREADY_PAID",
         );
-      if (refreshed?.status === PaymentIntentStatus.PENDING)
+      const successful = await tx.paymentIntent.findFirst({
+        where: {
+          subOrderId: subOrder.id,
+          status: PaymentIntentStatus.SUCCESSFUL,
+        },
+        select: { id: true },
+      });
+      if (successful)
+        throw new PaymentIntentError(
+          "This seller order is already paid.",
+          "ALREADY_PAID",
+        );
+      const active = await tx.paymentIntent.findFirst({
+        where: {
+          subOrderId: subOrder.id,
+          status: { in: [PaymentIntentStatus.CREATED, PaymentIntentStatus.PENDING] },
+        },
+        select: { id: true },
+      });
+      if (active)
         throw new PaymentIntentError(
           "A payment for this seller is already awaiting confirmation. Do not pay again yet.",
           "PAYMENT_ALREADY_PENDING",
         );
-    }
-    const reversed = await prisma.paymentIntent.findFirst({
-      where: { subOrderId: subOrder.id, status: PaymentIntentStatus.REVERSED },
-      select: { id: true },
-    });
-    if (reversed)
-      throw new PaymentIntentError(
-        "This payment was reversed and requires review. Do not pay again yet.",
-        "PAYMENT_REVIEW_REQUIRED",
-      );
-    const amount = new Decimal(subOrder.vendorTotal.toString());
-    if (!amount.isFinite() || amount.lessThanOrEqualTo(0))
-      throw new PaymentIntentError(
-        "Order amount is invalid.",
-        "INVALID_AMOUNT",
-      );
-    const prior = await prisma.paymentIntent.findUnique({
-      where: {
-        subOrderId_idempotencyKey: {
-          subOrderId: subOrder.id,
-          idempotencyKey: input.idempotencyKey,
-        },
-      },
-    });
-    if (prior) {
-      if (prior.provider !== input.provider)
+      const reversed = await tx.paymentIntent.findFirst({
+        where: { subOrderId: subOrder.id, status: PaymentIntentStatus.REVERSED },
+        select: { id: true },
+      });
+      if (reversed)
         throw new PaymentIntentError(
-          "Payment request conflicts with an existing request.",
-          "IDEMPOTENCY_CONFLICT",
+          "This payment was reversed and requires review. Do not pay again yet.",
+          "PAYMENT_REVIEW_REQUIRED",
         );
-      return prior;
-    }
-    let createdIntentId: string | undefined;
-    try {
+      const eligibility = await PaymentEligibilityService.canAcceptPayments(
+        subOrder.vendorId,
+        input.provider,
+        { sandboxQualification },
+        tx as unknown as typeof prisma,
+      );
+      if (!eligibility.eligible || !eligibility.accountId)
+        throw new PaymentIntentError(
+          "This shop cannot accept the selected payment method.",
+          eligibility.reasons[0] ?? "INELIGIBLE",
+        );
+      const amount = new Decimal(subOrder.vendorTotal.toString());
+      if (!amount.isFinite() || amount.lessThanOrEqualTo(0))
+        throw new PaymentIntentError(
+          "Order amount is invalid.",
+          "INVALID_AMOUNT",
+        );
       const providerReference = randomUUID();
-      const intent = await prisma.paymentIntent.create({
+      const intent = await tx.paymentIntent.create({
         data: {
           orderId: subOrder.order.id,
           subOrderId: subOrder.id,
@@ -192,8 +202,7 @@ export class PaymentIntentService {
           initiatedAt: new Date(),
         },
       });
-      createdIntentId = intent.id;
-      await prisma.auditLog.create({
+      await tx.auditLog.create({
         data: {
           vendorId: subOrder.vendorId,
           action: "PAYMENT_INTENT_CREATED",
@@ -206,9 +215,16 @@ export class PaymentIntentService {
           },
         },
       });
+      return { intent, subOrder, existing: false };
+    });
+    if (claimed.existing) return claimed.intent;
+    const { intent, subOrder } = claimed;
+    const amount = new Decimal(intent.amount.toString());
+    const createdIntentId = intent.id;
+    try {
       if (input.provider === PaymentProvider.MTN_MOMO) {
         await new MtnMomoProvider().initiatePayment({
-          reference: providerReference,
+          reference: intent.providerReference!,
           amount: amount.toFixed(2),
           currency: subOrder.order.currency,
           payerPhone: input.payerPhone ?? subOrder.order.shippingPhone,
@@ -222,7 +238,7 @@ export class PaymentIntentService {
             entityId: intent.id,
             newValues: {
               provider: input.provider,
-              providerReferenceSuffix: providerReference.slice(-6),
+              providerReferenceSuffix: intent.providerReference!.slice(-6),
             },
           },
         });
@@ -230,7 +246,6 @@ export class PaymentIntentService {
       return intent;
     } catch (error) {
       if (error instanceof MtnMomoProviderError) {
-        if (!createdIntentId) throw error;
         if (
           error.code === "SUBMISSION_UNKNOWN" ||
           error.code === "RATE_LIMITED"
@@ -275,24 +290,6 @@ export class PaymentIntentService {
             "PAYMENT_FAILED",
           );
         }
-      }
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === "P2002"
-      ) {
-        const winner = await prisma.paymentIntent.findUnique({
-          where: {
-            subOrderId_idempotencyKey: {
-              subOrderId: subOrder.id,
-              idempotencyKey: input.idempotencyKey,
-            },
-          },
-        });
-        if (winner?.provider === input.provider) return winner;
-        throw new PaymentIntentError(
-          "Payment request conflicts with an existing request.",
-          "IDEMPOTENCY_CONFLICT",
-        );
       }
       throw error;
     }

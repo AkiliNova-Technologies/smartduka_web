@@ -9,6 +9,7 @@ import { Decimal } from "@prisma/client/runtime/client";
 import { prisma } from "@/lib/prisma/client";
 import { MtnMomoProvider } from "@/lib/payments/providers/mtn-momo-provider";
 import { NotificationService } from "@/services/notifications";
+import { paymentHealth } from "@/services/payment-health";
 
 export type NormalizedProviderEvent = {
   paymentIntentId: string;
@@ -132,23 +133,44 @@ export class PaymentReconciliationService {
       return { outcome: "RETRY_SCHEDULED" as const };
     }
   }
-  static async scheduleDue(limit = 50) {
+  static async scheduleDue(
+    limit = 50,
+    options: { concurrency?: number; maxRuntimeMs?: number } = {},
+  ) {
     const now = new Date();
+    const startedAt = Date.now();
+    const concurrency = Math.min(Math.max(options.concurrency ?? 5, 1), 10);
+    const maxRuntimeMs = Math.min(
+      Math.max(options.maxRuntimeMs ?? 20_000, 1_000),
+      55_000,
+    );
     const due = await prisma.paymentIntent.findMany({
       where: {
         status: "PENDING",
         providerReference: { not: null },
         OR: [{ nextReconcileAt: null }, { nextReconcileAt: { lte: now } }],
       },
-      select: { id: true },
+      select: {
+        id: true,
+        orderId: true,
+        subOrderId: true,
+        provider: true,
+        createdAt: true,
+        reconcileAttempts: true,
+        lastReconcileError: true,
+      },
       take: Math.min(Math.max(limit, 1), 100),
       orderBy: { nextReconcileAt: "asc" },
     });
     // `nextReconcileAt` doubles as a short database-backed lease.  Each
     // worker must win this conditional update before contacting the provider;
     // an interrupted worker becomes eligible again once the lease expires.
-    return Promise.all(
-      due.map(async (intent) => {
+    const outcomes: Array<Record<string, unknown>> = [];
+    for (let offset = 0; offset < due.length; offset += concurrency) {
+      if (Date.now() - startedAt >= maxRuntimeMs) break;
+      const batch = due.slice(offset, offset + concurrency);
+      const results = await Promise.all(
+        batch.map(async (intent) => {
         const claimed = await prisma.paymentIntent.updateMany({
           where: {
             id: intent.id,
@@ -158,10 +180,51 @@ export class PaymentReconciliationService {
           },
           data: { nextReconcileAt: new Date(now.getTime() + CLAIM_LEASE_MS) },
         });
-        if (!claimed.count) return { outcome: "CLAIM_NOT_ACQUIRED" as const };
-        return this.reconcilePaymentIntent(intent.id);
-      }),
-    );
+          if (!claimed.count)
+            return { outcome: "CLAIM_NOT_ACQUIRED" as const };
+          return this.reconcilePaymentIntent(intent.id);
+        }),
+      );
+      for (let index = 0; index < results.length; index++) {
+        const intent = batch[index];
+        const result = results[index];
+        const health = paymentHealth({
+          status: PaymentIntentStatus.PENDING,
+          createdAt: intent.createdAt,
+          reconcileAttempts: intent.reconcileAttempts +
+            (result.outcome === "CLAIM_NOT_ACQUIRED" ? 0 : 1),
+          lastReconcileError: intent.lastReconcileError,
+        });
+        const metadata = {
+          paymentIntentId: intent.id,
+          orderId: intent.orderId,
+          subOrderId: intent.subOrderId,
+          provider: intent.provider,
+          reconciliationOutcome: result.outcome,
+          attemptCount: intent.reconcileAttempts +
+            (result.outcome === "CLAIM_NOT_ACQUIRED" ? 0 : 1),
+          checkedAt: new Date().toISOString(),
+          errorClassification:
+            result.outcome === "RETRY_SCHEDULED" ? "TRANSIENT_PROVIDER_ERROR" : null,
+          health,
+        };
+        if (
+          process.env.NODE_ENV !== "test" &&
+          ["STUCK", "NEEDS_REVIEW"].includes(health ?? "")
+        )
+          console.warn("payment_reconciliation_attention_required", metadata);
+        else if (process.env.NODE_ENV !== "test")
+          console.info("payment_reconciliation", metadata);
+        outcomes.push(result);
+      }
+    }
+    if (due.length > outcomes.length && process.env.NODE_ENV !== "test")
+      console.warn("payment_reconciliation_execution_limited", {
+        selectedCount: due.length,
+        processedCount: outcomes.length,
+        maxRuntimeMs,
+      });
+    return outcomes;
   }
   static async applyProviderResult(event: NormalizedProviderEvent) {
     const payloadHash = createHash("sha256")
@@ -375,8 +438,11 @@ export class PaymentReconciliationService {
         const total = await tx.subOrder.count({
           where: { orderId: intent.orderId },
         });
-        const successful = await tx.paymentIntent.count({
-          where: { orderId: intent.orderId, status: "SUCCESSFUL" },
+        const successful = await tx.subOrder.count({
+          where: {
+            orderId: intent.orderId,
+            paymentIntents: { some: { status: "SUCCESSFUL" } },
+          },
         });
         if (total === successful)
           await tx.order.updateMany({

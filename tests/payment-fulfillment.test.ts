@@ -22,4 +22,10 @@ describe("direct MTN fulfilment protection", () => {
   it("keeps cash-on-delivery fulfilment independent of MTN payment state", () => {
     expect(canFulfillSubOrder({ paymentGateway: PaymentGateway.CASH_ON_DELIVERY, paymentIntentStatuses: [] })).toBe(true);
   });
+
+  it("does not let an unavailable Airtel rail bypass the direct-payment gate", () => {
+    expect(canFulfillSubOrder({ paymentGateway: PaymentGateway.AIRTEL_MONEY, paymentIntentStatuses: [] })).toBe(false);
+    expect(canFulfillSubOrder({ paymentGateway: PaymentGateway.AIRTEL_MONEY, paymentIntentStatuses: [PaymentIntentStatus.PENDING] })).toBe(false);
+    expect(canFulfillSubOrder({ paymentGateway: PaymentGateway.AIRTEL_MONEY, paymentIntentStatuses: [PaymentIntentStatus.SUCCESSFUL] })).toBe(true);
+  });
 });

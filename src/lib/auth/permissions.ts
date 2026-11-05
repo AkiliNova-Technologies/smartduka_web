@@ -12,6 +12,7 @@ export type AppPermissionKey =
   | "vendor:manage_team"        // Alter role capabilities of store employees
   | "vendor:manage_legal"       // KYC/legal identity and sensitive shop records
   | "vendor:manage_products"    // Create, update, archive shop products
+  | "vendor:manage_audience"    // View follower metrics and manage follower publications
   | "vendor:view_orders"        // Track incoming items assigned to shop
   | "vendor:process_orders"     // Trigger fulfillment state changes
   | "vendor:view_ledger"        // Monitor escrow clearings, transactions
@@ -34,15 +35,15 @@ export const PLATFORM_ROLE_PERMISSIONS: Record<PlatformRole, AppPermissionKey[]>
  */
 export const DEFAULT_ROLE_PERMISSIONS: Record<VendorUserRole, AppPermissionKey[]> = {
   OWNER: [
-    "vendor:manage_shop", "vendor:manage_team", "vendor:manage_products",
+    "vendor:manage_shop", "vendor:manage_team", "vendor:manage_products", "vendor:manage_audience",
     "vendor:manage_legal", "vendor:view_orders", "vendor:process_orders", "vendor:view_ledger", "vendor:request_payout"
   ],
   ADMIN: [
-    "vendor:manage_shop", "vendor:manage_team", "vendor:manage_products",
+    "vendor:manage_shop", "vendor:manage_team", "vendor:manage_products", "vendor:manage_audience",
     "vendor:view_orders", "vendor:process_orders", "vendor:view_ledger"
   ],
   MANAGER: [
-    "vendor:manage_shop", "vendor:manage_products", "vendor:view_orders", "vendor:process_orders"
+    "vendor:manage_shop", "vendor:manage_products", "vendor:manage_audience", "vendor:view_orders", "vendor:process_orders"
   ],
   STAFF: [
     "vendor:view_orders", "vendor:process_orders"

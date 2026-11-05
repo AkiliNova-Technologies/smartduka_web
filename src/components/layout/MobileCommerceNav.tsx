@@ -13,7 +13,7 @@ const items = [
   { label: "Search", href: "/products", icon: Search },
   { label: "Cart", href: "/cart", icon: ShoppingCart },
 ];
-const accountRoutes = ["/settings", "/orders", "/wishlist"];
+const accountRoutes = ["/settings", "/orders", "/wishlist", "/following"];
 
 export function MobileCommerceNavFallback() {
   return (

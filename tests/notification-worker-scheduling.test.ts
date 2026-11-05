@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   announcements: vi.fn(),
   marketing: vi.fn(),
   push: vi.fn(),
+  followers: vi.fn(),
 }));
 
 vi.mock("@/services/announcements", () => ({
@@ -16,6 +17,9 @@ vi.mock("@/services/marketing-notifications", () => ({
 }));
 vi.mock("@/services/push-delivery-outbox", () => ({
   PushDeliveryOutboxService: { run: mocks.push },
+}));
+vi.mock("@/services/follower-notifications", () => ({
+  FollowerNotificationService: { run: mocks.followers },
 }));
 
 import { NotificationWorkerService } from "@/services/notification-worker";
@@ -29,17 +33,19 @@ describe("notification worker scheduling", () => {
     vi.clearAllMocks();
   });
 
-  it("registers one authenticated production schedule for the combined worker", () => {
+  it("registers the authenticated combined notification worker schedule", () => {
     const config = JSON.parse(read("vercel.json")) as {
       crons: { path: string; schedule: string }[];
     };
 
-    expect(config.crons).toEqual([
-      {
-        path: "/api/cron/push-delivery",
-        schedule: "0 6 * * *",
-      },
-    ]);
+    expect(config.crons).toContainEqual({
+      path: "/api/cron/push-delivery",
+      schedule: "0 6 * * *",
+    });
+    expect(config.crons).toContainEqual({
+      path: "/api/cron/payment-reconciliation",
+      schedule: "*/5 * * * *",
+    });
   });
 
   it("advances publication before fanout and delivery", async () => {
@@ -56,13 +62,18 @@ describe("notification worker scheduling", () => {
       order.push("push");
       return { claimed: 1 };
     });
+    mocks.followers.mockImplementation(async () => {
+      order.push("followers");
+      return { claimed: 1 };
+    });
 
     await expect(NotificationWorkerService.run()).resolves.toEqual({
       announcements: { published: 1 },
       marketing: { published: 1 },
+      followers: { claimed: 1 },
       push: { claimed: 1 },
     });
-    expect(order).toEqual(["announcements", "marketing", "push"]);
+    expect(order).toEqual(["announcements", "marketing", "followers", "push"]);
   });
 
   it("keeps native delivery disabled unless explicitly enabled", () => {

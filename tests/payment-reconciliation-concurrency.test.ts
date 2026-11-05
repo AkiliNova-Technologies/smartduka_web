@@ -3,7 +3,7 @@ import { PaymentIntentStatus, PaymentProvider, Prisma } from "@prisma/client";
 
 type Intent = Record<string, unknown> & { id: string; status: string; orderId: string; providerReference?: string | null; nextReconcileAt?: Date | null; amount?: string; fulfillmentStatus?: string };
 type EventRow = Record<string, unknown> & { provider: string; payloadHash?: string; providerEventId?: string; paymentIntentId?: string; idempotencyKey?: string; type?: string; action?: string; normalizedStatus?: string };
-type DbWhere = { id?: string; status?: string; orderId?: string; paymentStatus?: string; paymentIntentId?: string; providerReference?: { not: null }; OR?: Array<{ nextReconcileAt: null | { lte: Date } }>; provider_payloadHash?: { provider: string; payloadHash: string } };
+type DbWhere = { id?: string; status?: string; orderId?: string; paymentStatus?: string; paymentIntentId?: string; providerReference?: { not: null }; paymentIntents?: { some: { status: string } }; OR?: Array<{ nextReconcileAt: null | { lte: Date } }>; provider_payloadHash?: { provider: string; payloadHash: string } };
 type DbData = Record<string, unknown> & { paymentStatus?: string };
 type DbArgs = { where: DbWhere; data: DbData };
 type ProviderResult = Record<string, unknown> | Error | Promise<Record<string, unknown>>;
@@ -23,7 +23,7 @@ const db = vi.hoisted(() => ({
   paymentIntent: {
     findUnique: vi.fn(async ({ where }: { where: DbWhere }) => where.id && fake.intents.get(where.id) ? { ...fake.intents.get(where.id) } : null),
     findUniqueOrThrow: vi.fn(async ({ where }: { where: DbWhere }) => ({ ...(where.id ? fake.intents.get(where.id) : undefined) })),
-    findMany: vi.fn(async ({ where }: { where: DbWhere }) => [...fake.intents.values()].filter((intent) => dueMatch(intent, where)).map((intent) => ({ id: intent.id }))),
+    findMany: vi.fn(async ({ where }: { where: DbWhere }) => [...fake.intents.values()].filter((intent) => dueMatch(intent, where)).map((intent) => ({ id: intent.id, orderId: intent.orderId, subOrderId: intent.subOrderId, provider: intent.provider, createdAt: intent.createdAt, reconcileAttempts: intent.reconcileAttempts, lastReconcileError: intent.lastReconcileError }))),
     updateMany: vi.fn(async ({ where, data }: DbArgs) => {
       const intent = where.id ? fake.intents.get(where.id) : undefined;
       if (!intent || !dueMatch(intent, where)) return { count: 0 };
@@ -53,7 +53,15 @@ const db = vi.hoisted(() => ({
     createMany: vi.fn(async ({ data }: { data: EventRow[] }) => { fake.notifications.push(...data); return { count: data.length }; }),
     create: vi.fn(async ({ data }: { data: EventRow }) => { fake.notifications.push(data); return data; }),
   },
-  subOrder: { count: vi.fn(async ({ where }: { where: DbWhere }) => [...fake.intents.values()].filter((intent) => intent.orderId === where.orderId).length) },
+  subOrder: { count: vi.fn(async ({ where }: { where: DbWhere }) => {
+    const subOrderIds = new Set(
+      [...fake.intents.values()]
+        .filter((intent) => intent.orderId === where.orderId)
+        .filter((intent) => !where.paymentIntents || intent.status === where.paymentIntents.some.status)
+        .map((intent) => String(intent.subOrderId)),
+    );
+    return subOrderIds.size;
+  }) },
   order: { updateMany: vi.fn(async ({ where, data }: DbArgs) => {
     const current = where.id ? fake.orderStatuses.get(where.id) ?? "PENDING" : "PENDING";
     if (where.paymentStatus && current !== where.paymentStatus) return { count: 0 };
@@ -78,7 +86,7 @@ import { PaymentReconciliationService } from "@/services/payment-reconciliation"
 function addIntent(id: string, status: PaymentIntentStatus = PaymentIntentStatus.PENDING, orderId = "order-1") {
   fake.intents.set(id, {
     id, status, orderId, subOrderId: `sub-${id}`, vendorId: `vendor-${id}`, provider: PaymentProvider.MTN_MOMO, providerReference: `ref-${id}`,
-    amount: "100.00", currency: "EUR", confirmedAt: null, failedAt: null, nextReconcileAt: new Date(0), reconcileAttempts: 0,
+    amount: "100.00", currency: "EUR", confirmedAt: null, failedAt: null, createdAt: new Date(), nextReconcileAt: new Date(0), reconcileAttempts: 0,
     vendor: { ownerId: `owner-${id}`, storeName: `Shop ${id}` }, order: { customerId: "customer-1" },
   });
 }
@@ -193,6 +201,18 @@ describe("PaymentReconciliationService concurrency", () => {
     expect(fake.intents.get("a")!.status).toBe(PaymentIntentStatus.SUCCESSFUL);
     expect(fake.intents.get("b")!.status).toBe(PaymentIntentStatus.SUCCESSFUL);
     expect(fake.orderUpdates).toHaveLength(1);
+  });
+
+  it("does not count duplicate successful intents as paid seller suborders", async () => {
+    addIntent("a", PaymentIntentStatus.PENDING, "parent");
+    addIntent("a-duplicate", PaymentIntentStatus.PENDING, "parent");
+    fake.intents.get("a-duplicate")!.subOrderId = fake.intents.get("a")!.subOrderId;
+    addIntent("b", PaymentIntentStatus.PENDING, "parent");
+    await PaymentReconciliationService.applyProviderResult(event("a", PaymentIntentStatus.SUCCESSFUL, "A_SUCCESS"));
+    await PaymentReconciliationService.applyProviderResult(event("a-duplicate", PaymentIntentStatus.SUCCESSFUL, "A_DUPLICATE_SUCCESS"));
+    expect(fake.orderStatuses.get("parent") ?? "PENDING").toBe("PENDING");
+    await PaymentReconciliationService.applyProviderResult(event("b", PaymentIntentStatus.SUCCESSFUL, "B_SUCCESS"));
+    expect(fake.orderStatuses.get("parent")).toBe("COMPLETED");
   });
 
   it("uses nextReconcileAt as a recoverable cross-worker cron claim", async () => {

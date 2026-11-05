@@ -10,17 +10,23 @@ export function getMtnMomoConfig(env: NodeJS.ProcessEnv = process.env): MtnMomoC
   if (environment !== "sandbox" && environment !== "production") throw new MtnMomoConfigurationError("MTN_MOMO_ENVIRONMENT must be sandbox or production.");
   for (const key of ["MTN_MOMO_BASE_URL", "MTN_MOMO_COLLECTION_SUBSCRIPTION_KEY", "MTN_MOMO_API_USER", "MTN_MOMO_API_KEY"] as const) if (!env[key]?.trim()) throw new MtnMomoConfigurationError(`${key} is required.`);
   const baseUrl = env.MTN_MOMO_BASE_URL!.replace(/\/$/, "");
-  if (!/^https?:\/\//.test(baseUrl) || (environment === "production" && !baseUrl.startsWith("https://"))) throw new MtnMomoConfigurationError("MTN base URL must use HTTPS in production.");
+  let parsedBase: URL;
+  try { parsedBase = new URL(baseUrl); } catch { throw new MtnMomoConfigurationError("MTN_MOMO_BASE_URL must be an absolute URL."); }
+  if (parsedBase.protocol !== "https:") throw new MtnMomoConfigurationError("MTN base URL must use HTTPS.");
+  const targetEnvironment = env.MTN_MOMO_TARGET_ENVIRONMENT?.trim();
+  if (!targetEnvironment) throw new MtnMomoConfigurationError("MTN_MOMO_TARGET_ENVIRONMENT is required.");
+  if (environment === "sandbox" && targetEnvironment !== "sandbox") throw new MtnMomoConfigurationError("Sandbox configuration must use the sandbox target environment.");
   const callbackUrl = env.MTN_MOMO_CALLBACK_URL?.trim(), callbackHost = env.MTN_MOMO_CALLBACK_HOST?.trim();
-  if (callbackUrl) { const parsed = new URL(callbackUrl); if (callbackHost && parsed.host !== callbackHost) throw new MtnMomoConfigurationError("MTN callback URL host does not match MTN_MOMO_CALLBACK_HOST."); if (environment === "production" && parsed.protocol !== "https:") throw new MtnMomoConfigurationError("MTN production callback URL must use HTTPS."); }
+  if (callbackUrl) { const parsed = new URL(callbackUrl); if (parsed.protocol !== "https:") throw new MtnMomoConfigurationError("MTN callback URL must use HTTPS."); if (!callbackHost) throw new MtnMomoConfigurationError("MTN_MOMO_CALLBACK_HOST is required when a callback URL is configured."); if (parsed.hostname !== callbackHost) throw new MtnMomoConfigurationError("MTN callback URL host does not match MTN_MOMO_CALLBACK_HOST."); }
   const directVendorRoutingVerified = (env.MTN_MOMO_DIRECT_VENDOR_ROUTING_VERIFIED ?? env.MTN_DIRECT_VENDOR_ROUTING_VERIFIED) === "true";
   const sandboxTesting = environment === "sandbox" && env.MTN_SANDBOX_COLLECTION_TESTING_ENABLED === "true";
-  return { baseUrl, subscriptionKey: env.MTN_MOMO_COLLECTION_SUBSCRIPTION_KEY!, apiUser: env.MTN_MOMO_API_USER!, apiKey: env.MTN_MOMO_API_KEY!, targetEnvironment: env.MTN_MOMO_TARGET_ENVIRONMENT || environment, callbackUrl, callbackHost, environment, directVendorRoutingVerified, sandboxTesting };
+  return { baseUrl, subscriptionKey: env.MTN_MOMO_COLLECTION_SUBSCRIPTION_KEY!, apiUser: env.MTN_MOMO_API_USER!, apiKey: env.MTN_MOMO_API_KEY!, targetEnvironment, callbackUrl, callbackHost, environment, directVendorRoutingVerified, sandboxTesting };
 }
 
 let cached: { token: string; expiresAt: number } | undefined;
 let refreshInFlight: Promise<string> | undefined;
 const payerId = (value: string, sandbox: boolean) => { const compact = value.replace(/[\s()-]/g, ""); const normalized = compact.startsWith("+256") ? `256${compact.slice(4)}` : compact.startsWith("0") ? `256${compact.slice(1)}` : compact; if (sandbox && /^\d{6,18}$/.test(normalized)) return normalized; if (!/^2567\d{8}$/.test(normalized)) throw new MtnMomoProviderError("A valid Ugandan payer number is required.", "INVALID_REQUEST"); return normalized; };
+const uuidV4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export class MtnMomoProvider implements PaymentProviderAdapter {
   readonly provider = PaymentProvider.MTN_MOMO;
@@ -45,18 +51,24 @@ export class MtnMomoProvider implements PaymentProviderAdapter {
     const config = getMtnMomoConfig(this.env);
     if (config.environment !== "sandbox" || !config.sandboxTesting) throw new PaymentProviderUnavailableError(this.provider, "MTN production merchant destination routing is not implemented.");
     if (!input.payerPhone) throw new MtnMomoProviderError("A payer phone number is required.", "INVALID_REQUEST");
+    if (!uuidV4.test(input.reference)) throw new MtnMomoProviderError("MTN transaction reference must be a UUID v4.", "INVALID_REQUEST");
     const reference = input.reference, token = await this.token(), callbackEnabled = this.env.MTN_SANDBOX_TEST_USE_CALLBACK === "true";
     let response: Response;
     try { response = await this.request(`${config.baseUrl}/collection/v1_0/requesttopay`, { method: "POST", headers: { Authorization: `Bearer ${token}`, "X-Reference-Id": reference, "X-Target-Environment": config.targetEnvironment, "Ocp-Apim-Subscription-Key": config.subscriptionKey, "Content-Type": "application/json", ...(callbackEnabled && config.callbackUrl ? { "X-Callback-Url": config.callbackUrl } : {}) }, body: JSON.stringify({ amount: input.amount, currency: this.env.MTN_SANDBOX_TEST_CURRENCY || input.currency, externalId: reference, payer: { partyIdType: "MSISDN", partyId: payerId(input.payerPhone, true) }, payerMessage: "Mezora sandbox payment", payeeNote: "Mezora sandbox payment" }), signal: AbortSignal.timeout(12_000) }); }
     catch { throw new MtnMomoProviderError("MTN payment submission outcome is unknown; do not retry automatically.", "SUBMISSION_UNKNOWN"); }
-    if (response.status !== 202) throw new MtnMomoProviderError(response.status === 429 ? "MTN is rate limiting requests." : "MTN rejected the payment request.", response.status === 429 ? "RATE_LIMITED" : "REQUEST_REJECTED");
+    if (response.status !== 202) {
+      if ([401, 403].includes(response.status)) throw new MtnMomoProviderError("MTN authentication failed.", "AUTHENTICATION_FAILED");
+      if (response.status === 409) throw new MtnMomoProviderError("MTN rejected a duplicate transaction reference.", "DUPLICATE_REFERENCE");
+      if (response.status === 429) throw new MtnMomoProviderError("MTN is rate limiting requests.", "RATE_LIMITED");
+      throw new MtnMomoProviderError("MTN rejected the payment request.", response.status === 400 ? "INVALID_REQUEST" : "REQUEST_REJECTED");
+    }
     return { providerReference: reference, status: "PENDING", instructions: "Approve the sandbox request on your MTN Mobile Money phone." };
   }
   private async statusRequest(config: MtnMomoConfig, reference: string, token: string) { try { return await this.request(`${config.baseUrl}/collection/v1_0/requesttopay/${encodeURIComponent(reference)}`, { headers: { Authorization: `Bearer ${token}`, "X-Target-Environment": config.targetEnvironment, "Ocp-Apim-Subscription-Key": config.subscriptionKey }, signal: AbortSignal.timeout(10_000) }); } catch { throw new MtnMomoProviderError("MTN status lookup is temporarily unavailable.", "PROVIDER_UNAVAILABLE"); } }
   async getPaymentStatus(reference: string): Promise<ProviderPaymentStatusResult> {
     const config = getMtnMomoConfig(this.env); let response = await this.statusRequest(config, reference, await this.token());
     if (response.status === 401) { cached = undefined; response = await this.statusRequest(config, reference, await this.token(true)); }
-    if (!response.ok) throw new MtnMomoProviderError("MTN status lookup failed.", response.status === 404 ? "NOT_FOUND" : response.status === 429 ? "RATE_LIMITED" : "PROVIDER_ERROR");
+    if (!response.ok) throw new MtnMomoProviderError("MTN status lookup failed.", [401, 403].includes(response.status) ? "AUTHENTICATION_FAILED" : response.status === 404 ? "NOT_FOUND" : response.status === 429 ? "RATE_LIMITED" : "PROVIDER_ERROR");
     const body = await response.json().catch(() => null) as { status?: unknown; amount?: unknown; currency?: unknown; financialTransactionId?: unknown } | null;
     const statuses: Record<string, ProviderPaymentStatusResult["status"]> = { PENDING: "PENDING", SUCCESSFUL: "SUCCESSFUL", FAILED: "FAILED" };
     if (!body || typeof body.status !== "string" || typeof body.amount !== "string" || typeof body.currency !== "string" || !statuses[body.status]) throw new MtnMomoProviderError("MTN returned an unsupported payment status.", "INVALID_RESPONSE");

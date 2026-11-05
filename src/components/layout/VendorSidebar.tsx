@@ -13,6 +13,7 @@ import {
   Megaphone,
   CreditCard,
   ShieldCheck,
+  Users,
 } from "lucide-react";
 import { useVendor } from "@/hooks/use-vendor";
 import {
@@ -28,6 +29,7 @@ const navigationGroups: DashboardNavigationGroup[] = [
       { label: "Orders", href: "/vendor/orders", icon: ShoppingCart },
       { label: "Transactions", href: "/vendor/transactions", icon: ReceiptText },
       { label: "Marketing", href: "/vendor/marketing", icon: Megaphone },
+      { label: "Audience", href: "/vendor/audience", icon: Users },
       { label: "Subscription", href: "/vendor/subscription", icon: CreditCard },
       { label: "Products", href: "/vendor/products", icon: Package },
       { label: "Inventory", href: "/vendor/inventory", icon: Warehouse },

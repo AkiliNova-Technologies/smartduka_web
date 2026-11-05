@@ -13,6 +13,7 @@ import type { MarketplaceProduct } from "@/components/marketplace/product-card";
 import { ReviewEntryPoint } from "@/components/reviews/ReviewEntryPoint";
 import { ReportEntryPoint } from "@/components/marketplace/ReportEntryPoint";
 import { ShopVerificationBadge } from "@/components/marketplace/shop-verification-badge";
+import { StoreFollowButton } from "@/components/marketplace/store-follow-button";
 
 interface StoreData {
   id: string;
@@ -31,6 +32,7 @@ interface StoreData {
   totalProducts: number;
   rating: number;
   reviewCount: number;
+  followerCount: number;
   reviews: { id: string; rating: number; comment: string | null; customer: string; reply: string | null; createdAt: string }[];
 }
 interface Props {
@@ -95,6 +97,7 @@ export function StoreProfileContent({ store, products, categories }: Props) {
                   </span>
                 ) : null}
               </div>
+              <StoreFollowButton vendorId={store.id} initialCount={store.followerCount} />
             </div>
           </div>
         </section>

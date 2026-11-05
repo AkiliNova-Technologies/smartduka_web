@@ -4,6 +4,7 @@ import { PLATFORM_CURRENCY } from "@/lib/commerce/currency";
 import {
   OrderStatus,
   PaymentGateway,
+  PaymentProvider,
   PaymentStatus,
   Prisma,
   SubOrderStatus,
@@ -527,9 +528,21 @@ export class OrderService {
         // enabled direct merchant destination. Cash-on-delivery stays outside
         // the electronic payment path.
         if (input.paymentGateway !== PaymentGateway.CASH_ON_DELIVERY) {
+          const selectedProvider = input.paymentGateway as unknown as PaymentProvider;
           for (const group of calculation.vendorGroups) {
             const vendor = products.find((product) => product.vendorId === group.vendorId)?.vendor;
-            if (!vendor?.paymentAccounts.some((account) => PaymentProviderRegistry.isEnabled(account.provider))) throw new CheckoutError("A shop in this cart cannot accept payments until its merchant account is verified.", "INVALID_CHECKOUT");
+            if (
+              !vendor?.paymentAccounts.some(
+                (account) =>
+                  account.provider === selectedProvider &&
+                  PaymentProviderRegistry.getReadiness(account.provider)
+                    .customerPaymentsReady,
+              )
+            )
+              throw new CheckoutError(
+                "A shop in this cart cannot accept the selected payment method.",
+                "INVALID_CHECKOUT",
+              );
           }
         }
         if (calculation.vendorGroups.some((group) => group.fulfillmentMethod === "DELIVERY") && !input.shippingAddress?.trim())

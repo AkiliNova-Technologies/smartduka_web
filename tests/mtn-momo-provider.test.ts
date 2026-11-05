@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { MtnMomoProvider } from "@/lib/payments/providers/mtn-momo-provider";
+import { getMtnMomoConfig, MtnMomoProvider } from "@/lib/payments/providers/mtn-momo-provider";
 
 const environment = {
   NODE_ENV: "test",
@@ -29,7 +29,7 @@ describe("MtnMomoProvider", () => {
 
   it("sends the documented callback header only when sandbox callback qualification is enabled", async () => {
     const request = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({ access_token: "test-token" }), { status: 200 })).mockResolvedValueOnce(new Response(null, { status: 202 }));
-    const enabled = { ...environment, MTN_MOMO_CALLBACK_URL: "https://callback.example.test/api/payments/callbacks/mtn", MTN_SANDBOX_TEST_USE_CALLBACK: "true" };
+    const enabled = { ...environment, MTN_MOMO_CALLBACK_URL: "https://callback.example.test/api/payments/callbacks/mtn", MTN_MOMO_CALLBACK_HOST: "callback.example.test", MTN_SANDBOX_TEST_USE_CALLBACK: "true" };
     await new MtnMomoProvider(enabled, request).initiatePayment({ reference: "00000000-0000-4000-8000-000000000002", amount: "100.00", currency: "EUR", payerPhone: "1234567890", merchantAccount: {} });
     expect(request.mock.calls[1][1].headers).toMatchObject({ "X-Callback-Url": enabled.MTN_MOMO_CALLBACK_URL });
     MtnMomoProvider.resetTokenCacheForTests();
@@ -71,5 +71,59 @@ describe("MtnMomoProvider", () => {
       "https://sandbox.example.test/collection/token/",
       "https://sandbox.example.test/collection/v1_0/requesttopay/persisted-reference",
     ]);
+  });
+
+  it("rejects ambiguous or insecure sandbox configuration", () => {
+    expect(() => getMtnMomoConfig({ ...environment, MTN_MOMO_TARGET_ENVIRONMENT: "production" })).toThrow(/sandbox target/i);
+    expect(() => getMtnMomoConfig({ ...environment, MTN_MOMO_BASE_URL: "http://sandbox.example.test" })).toThrow(/HTTPS/i);
+    expect(() => getMtnMomoConfig({ ...environment, MTN_MOMO_CALLBACK_URL: "https://callback.example.test/callback" })).toThrow(/CALLBACK_HOST/i);
+  });
+
+  it.each([
+    ["SUCCESSFUL", "SUCCESSFUL"],
+    ["FAILED", "FAILED"],
+    ["PENDING", "PENDING"],
+  ])("maps MTN %s status without treating acceptance as success", async (providerStatus, expected) => {
+    const request = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: "token" }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ status: providerStatus, amount: "100", currency: "EUR" }), { status: 200 }));
+    await expect(new MtnMomoProvider(environment, request).getPaymentStatus("reference")).resolves.toMatchObject({ status: expected });
+  });
+
+  it("classifies invalid credentials without exposing provider response bodies", async () => {
+    const request = vi.fn().mockResolvedValue(new Response("secret provider detail", { status: 401 }));
+    await expect(new MtnMomoProvider(environment, request).getPaymentStatus("reference")).rejects.toMatchObject({ code: "AUTHENTICATION_FAILED", message: "MTN authentication failed." });
+  });
+
+  it.each([
+    [409, "DUPLICATE_REFERENCE"],
+    [400, "INVALID_REQUEST"],
+    [429, "RATE_LIMITED"],
+    [500, "REQUEST_REJECTED"],
+  ])("classifies RequestToPay HTTP %s", async (status, code) => {
+    const request = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: "token" }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(null, { status }));
+    await expect(new MtnMomoProvider(environment, request).initiatePayment({ reference: "00000000-0000-4000-8000-000000000004", amount: "100", currency: "EUR", payerPhone: "1234567890", merchantAccount: {} })).rejects.toMatchObject({ code });
+  });
+
+  it("marks a RequestToPay transport timeout as an unknown submission outcome", async () => {
+    const request = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: "token" }), { status: 200 }))
+      .mockRejectedValueOnce(new DOMException("timed out", "TimeoutError"));
+    await expect(new MtnMomoProvider(environment, request).initiatePayment({ reference: "00000000-0000-4000-8000-000000000005", amount: "100", currency: "EUR", payerPhone: "1234567890", merchantAccount: {} })).rejects.toMatchObject({ code: "SUBMISSION_UNKNOWN" });
+  });
+
+  it("marks status transport failure as recoverable provider unavailability", async () => {
+    const request = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: "token" }), { status: 200 }))
+      .mockRejectedValueOnce(new DOMException("timed out", "TimeoutError"));
+    await expect(new MtnMomoProvider(environment, request).getPaymentStatus("reference")).rejects.toMatchObject({ code: "PROVIDER_UNAVAILABLE" });
+  });
+
+  it("requires a UUID v4 transaction reference before contacting MTN", async () => {
+    const request = vi.fn();
+    await expect(new MtnMomoProvider(environment, request).initiatePayment({ reference: "duplicate-friendly-reference", amount: "100", currency: "EUR", payerPhone: "1234567890", merchantAccount: {} })).rejects.toMatchObject({ code: "INVALID_REQUEST" });
+    expect(request).not.toHaveBeenCalled();
   });
 });
