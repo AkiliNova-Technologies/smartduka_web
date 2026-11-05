@@ -35,7 +35,8 @@ describe("vendor audience publication contract", () => {
     expect(schema).toContain("publicationId        String           @unique");
     expect(schema).toContain("eventKey             String           @unique");
     expect(service).toContain("storePublicationEvent.upsert");
-    expect(service).toContain("notificationEligible: false");
+    expect(service).toContain("notificationEligible: true");
+    expect(service).toContain("deliveryEnabled: false");
     expect(service).toContain("followingAloneIsInsufficient: true");
     expect(service).not.toContain("NotificationService.create");
     expect(service).not.toContain("pushDeliveryOutbox.create");

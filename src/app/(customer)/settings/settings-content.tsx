@@ -2,6 +2,7 @@
 import {
   Bell,
   LogOut,
+  Megaphone,
   MapPin,
   Palette,
   ShieldCheck,
@@ -464,6 +465,33 @@ export default function SettingsContent() {
                         onCheckedChange={(shoppingRecommendations) =>
                           void updateSettings({ shoppingRecommendations })
                         }
+                      />
+                      <OptionalPreference
+                        id="followed-store-announcements"
+                        icon={Megaphone}
+                        title="Followed-store announcements"
+                        description="Receive approved updates from stores you follow. Following alone does not enable this preference."
+                        checked={settings.followedStoreAnnouncements}
+                        disabled={settingsSaving || !settings.promotionalInAppNotifications}
+                        onCheckedChange={(followedStoreAnnouncements) => void updateSettings({ followedStoreAnnouncements })}
+                      />
+                      <OptionalPreference
+                        id="followed-store-campaigns"
+                        icon={Sparkles}
+                        title="Followed-store campaigns"
+                        description="Receive eligible follower campaigns from stores you follow."
+                        checked={settings.followedStoreCampaigns}
+                        disabled={settingsSaving || !settings.promotionalInAppNotifications}
+                        onCheckedChange={(followedStoreCampaigns) => void updateSettings({ followedStoreCampaigns })}
+                      />
+                      <OptionalPreference
+                        id="followed-store-new-arrivals"
+                        icon={ShoppingBag}
+                        title="New arrivals"
+                        description="Receive explicitly published product-collection updates, not routine product edits."
+                        checked={settings.followedStoreNewArrivals}
+                        disabled={settingsSaving || !settings.promotionalInAppNotifications}
+                        onCheckedChange={(followedStoreNewArrivals) => void updateSettings({ followedStoreNewArrivals })}
                       />
                     </div>
                     {settingsSaving && (

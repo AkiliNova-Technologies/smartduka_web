@@ -30,6 +30,7 @@ export class NativePushDeliveryService {
     notificationId: string | null;
     announcementId?: string | null;
     marketingCampaignId?: string | null;
+    storePublicationEventId?: string | null;
     kind: string;
     title: string;
     message: string;
@@ -37,7 +38,7 @@ export class NativePushDeliveryService {
     notification?: { eventType: string | null } | null;
   }) {
     if (!nativePushEnabled()) return { delivered: 0, transient: false };
-    const notificationId = job.notificationId ?? (job.announcementId ? `announcement:${job.announcementId}` : job.marketingCampaignId ? `marketing:${job.marketingCampaignId}` : job.kind === "TEST" ? `test:${job.id}` : null);
+    const notificationId = job.notificationId ?? (job.announcementId ? `announcement:${job.announcementId}` : job.marketingCampaignId ? `marketing:${job.marketingCampaignId}` : job.storePublicationEventId ? `follower:${job.storePublicationEventId}` : job.kind === "TEST" ? `test:${job.id}` : null);
     if (!notificationId) return { delivered: 0, transient: false };
     const devices = await prisma.userDevice.findMany({
       where: { userId: job.userId, enabled: true, platform: "ANDROID", user: { status: UserStatus.ACTIVE, deletedAt: null } },
@@ -65,7 +66,7 @@ export class NativePushDeliveryService {
           data: {
             version: "1",
             notificationId,
-            source: job.announcementId ? "ANNOUNCEMENT" : job.marketingCampaignId ? "MARKETING" : "PERSONAL",
+            source: job.announcementId ? "ANNOUNCEMENT" : job.marketingCampaignId ? "MARKETING" : job.storePublicationEventId ? "FOLLOWED_STORE" : "PERSONAL",
             title: job.title,
             body: job.message.slice(0, 240),
             ...(job.notification?.eventType ? { eventType: job.notification.eventType } : {}),

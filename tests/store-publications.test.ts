@@ -73,7 +73,7 @@ describe("StorePublicationService", () => {
     mocks.tx.storePublication.findFirst.mockResolvedValue({ ...draft, status: "IN_REVIEW", expiresAt: null, scheduledAt: null });
     mocks.tx.storePublication.update.mockResolvedValue({}); mocks.tx.storePublication.findUniqueOrThrow.mockResolvedValue({ ...draft, status: "PUBLISHED" });
     await StorePublicationService.publish("publication-a", new Date("2026-11-04T10:00:00Z"));
-    expect(mocks.tx.storePublicationEvent.upsert).toHaveBeenCalledWith(expect.objectContaining({ where: { publicationId: "publication-a" }, create: expect.objectContaining({ notificationEligible: false, eventKey: "store-publication:publication-a:published" }) }));
+    expect(mocks.tx.storePublicationEvent.upsert).toHaveBeenCalledWith(expect.objectContaining({ where: { publicationId: "publication-a" }, create: expect.objectContaining({ notificationEligible: true, eventKey: "store-publication:publication-a:published" }) }));
   });
 
   it("advances scheduled publications and expires old content", async () => {

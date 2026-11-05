@@ -6,7 +6,7 @@ Store following is an authenticated customer feature shared by the web marketpla
 
 `StoreFollow` links the existing `User` customer identity to the existing `VendorProfile` shop identity. It stores only an ID, `customerId`, `vendorId`, and `createdAt`. The customer/vendor pair is unique. Customer/newest and vendor/count access paths are indexed. Both foreign keys cascade on identity deletion, avoiding orphaned relationships without retaining personal information.
 
-Migrations: `20261104150000_store_following` and the additive Phase F3 migration `20261104190000_vendor_audience_publications`. They must be applied through the normal deployment process; neither migration is run against production by this work.
+Migrations: `20261104150000_store_following`, `20261104190000_vendor_audience_publications`, and the additive Phase F4 migration `20261105090000_follower_notifications`. They must be applied through the normal deployment process; none is run against production by this work.
 
 `StorePublication` is the vendor-owned aggregate for both `ANNOUNCEMENT` and `FOLLOWER_CAMPAIGN` content. Keeping the two kinds in one aggregate avoids parallel follower-campaign systems while preserving two important boundaries: paid `PromotionCampaign` records continue to represent sponsored placement purchases, and `MarketingNotificationCampaign` continues to represent platform-wide, consent-based marketing. Campaign product selections use `StorePublicationProduct` and can reference only active products owned by the publication's shop.
 
@@ -54,12 +54,33 @@ The feed merges published/active, non-deleted products with currently eligible `
 
 ## Notifications and privacy
 
-Following does not change `UserSettings` marketing, newsletter, in-app promotional, recommendation, or push preferences. No push or notification fan-out runs in this phase. `StorePublicationEvent` is only a durable future-delivery contract. A future follower dispatch service must resolve current follows at enqueue time and again before delivery, apply explicit customer consent and current vendor entitlements, use a bounded idempotent outbox, enforce frequency/abuse controls, and exclude customers who have unfollowed.
+Following never changes `UserSettings` marketing, newsletter, in-app promotional, recommendation, push, or follower-topic preferences. Customers separately control followed-store announcements, follower campaigns, and explicitly selected new-arrivals collections. All follower content additionally requires the existing in-app marketing consent; external delivery also requires push marketing consent, an active browser subscription or customer-scoped native device, and provider permission.
+
+### Follower notification pipeline
+
+`StorePublicationEvent` remains the stable publication identifier. The scheduled notification worker discovers eligible events and idempotently creates one `StorePublicationDispatch` per event. Dispatches use database compare-and-set claims, fixed follower batches, a persisted follow-ID cursor, bounded concurrency, exponential retries, stale-lock recovery, and terminal `FAILED` status after the configured attempt limit. An interrupted batch safely resumes; notification and push uniqueness keys make already-processed recipients no-ops.
+
+Recipients are always resolved server-side from current `StoreFollow` rows. Vendors cannot provide recipient IDs. Before creating history, the worker verifies the active customer, current follow, active/approved/unexpired publication, active shop, topic and global in-app consent, campaign entitlement, and rolling frequency allowance. Before each external push dispatch, the existing outbox worker rechecks the current follow, shop, publication, account, global in-app/push consent, and topic consent. Unfollowing, withdrawing or expiring content, suspending a shop, or revoking consent therefore prevents subsequent dispatch.
+
+Eligible records use the existing account-scoped `Notification` history and read/unread/dismiss APIs. They include vendor identity, follower event type, approved title/body, optional image, publication timestamp, and a validated product or storefront path. The existing `PushDeliveryOutbox`, `NativePushDelivery`, browser subscription versioning, FCM token invalidation, web service worker, and Flutter foreground/background/tap flows deliver the external channel; there is no duplicate service worker or transport.
+
+New-product notifications are never inferred from product edits. A vendor must explicitly publish a reviewed `NEW_ARRIVALS` follower campaign with at least one owned active product.
+
+### Operational configuration and rollout
+
+- `FOLLOWER_NOTIFICATIONS_ENABLED=false` by default gates dispatch creation and in-app fan-out.
+- `FOLLOWER_PUSH_ENABLED=false` by default independently gates all follower web/native push jobs.
+- `FOLLOWER_NOTIFICATION_BATCH_SIZE` defaults to 100 and is clamped to 1–500.
+- `FOLLOWER_NOTIFICATION_WORKER_CONCURRENCY` defaults to 2 and is clamped to 1–10.
+- `FOLLOWER_NOTIFICATION_MAX_ATTEMPTS` defaults to 5 and is clamped to 1–10.
+- `FOLLOWER_NOTIFICATION_DAILY_LIMIT` defaults to 3 and is clamped to 1–20 per customer over 24 hours.
+
+The existing authenticated notification cron invokes follower fan-out before the shared push outbox. Logs record only dispatch IDs, failure categories, and sanitized exception types. No tokens, endpoints, customer contact data, or provider payloads are logged.
 
 ## Remaining work
 
-- Define follower notification categories and customer preference controls.
-- Add bounded outbox fan-out, cancellation/recheck semantics, abuse controls, and vendor broadcast entitlements.
-- Qualify push delivery separately; following alone never authorizes marketing delivery.
+- Qualify follower delivery on real Android devices and supported browsers in a non-production environment before enabling either rollout gate.
+- Confirm FCM credentials, VAPID configuration, service-worker click handling, terminated-app navigation, and invalid-token revocation with test accounts.
+- Establish operational alerting for stale, retrying, and failed follower dispatches before production activation.
 - Decide whether platform moderators must approve selected vendor categories in addition to the implemented owner/admin review boundary.
 - Add verified impression/click instrumentation before showing engagement or conversion metrics.

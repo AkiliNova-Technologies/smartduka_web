@@ -105,6 +105,12 @@ enum StorePublicationDestination {
   PRODUCT
 }
 
+enum StorePublicationTopic {
+  ANNOUNCEMENT
+  CAMPAIGN
+  NEW_ARRIVALS
+}
+
 enum VendorStatus {
   PENDING
   ACTIVE
@@ -998,6 +1004,9 @@ model UserSettings {
   promotionalInAppNotifications Boolean @default(false)
   shoppingRecommendations       Boolean @default(false)
   promotionalPushNotifications  Boolean @default(false)
+  followedStoreAnnouncements    Boolean @default(false)
+  followedStoreCampaigns        Boolean @default(false)
+  followedStoreNewArrivals      Boolean @default(false)
 
   twoFactorEnabled       Boolean @default(false)
   buyerProtectionEnabled Boolean @default(true)
@@ -1212,6 +1221,7 @@ model StorePublication {
   vendorId             String
   vendor               VendorProfile               @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   kind                 StorePublicationKind
+  notificationTopic    StorePublicationTopic
   status               StorePublicationStatus      @default(DRAFT)
   title                String                      @db.VarChar(160)
   body                 String                      @db.VarChar(2000)
@@ -1262,8 +1272,33 @@ model StorePublicationEvent {
   eligibilityMetadata  Json
   publishedAt          DateTime
   createdAt            DateTime         @default(now())
+  dispatch             StorePublicationDispatch?
+  notifications        Notification[]
+  pushOutbox           PushDeliveryOutbox[]
 
   @@index([vendorId, publishedAt])
+}
+
+model StorePublicationDispatch {
+  id                  String                @id @default(uuid())
+  publicationEventId  String                @unique
+  publicationEvent    StorePublicationEvent @relation(fields: [publicationEventId], references: [id], onDelete: Cascade)
+  status              PushDeliveryStatus    @default(PENDING)
+  cursorFollowId      String?
+  attempts            Int                   @default(0)
+  processedRecipients Int                   @default(0)
+  createdNotifications Int                  @default(0)
+  queuedPushJobs      Int                   @default(0)
+  nextAttemptAt       DateTime              @default(now())
+  lockedAt            DateTime?
+  lockToken           String?               @db.VarChar(80)
+  lastFailureAt       DateTime?
+  failureCode         String?               @db.VarChar(80)
+  completedAt         DateTime?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+
+  @@index([status, nextAttemptAt])
 }
 
 model ShopBranch {
@@ -2602,6 +2637,9 @@ model Notification {
   title      String
   message    String
   actionPath String?
+  imageUrl   String?             @db.VarChar(1000)
+  storePublicationEventId String?
+  storePublicationEvent StorePublicationEvent? @relation(fields: [storePublicationEventId], references: [id], onDelete: SetNull)
   readAt     DateTime?
   deletedAt  DateTime?
   createdAt  DateTime            @default(now())
@@ -2611,6 +2649,7 @@ model Notification {
   @@index([userId])
   @@index([readAt])
   @@index([userId, deletedAt, createdAt])
+  @@index([storePublicationEventId, userId])
 }
 
 enum BrowserPushSubscriptionStatus {
@@ -2668,6 +2707,8 @@ model PushDeliveryOutbox {
   announcement              Announcement?                  @relation(fields: [announcementId], references: [id], onDelete: Cascade)
   marketingCampaignId       String?
   marketingCampaign         MarketingNotificationCampaign? @relation(fields: [marketingCampaignId], references: [id], onDelete: Cascade)
+  storePublicationEventId   String?
+  storePublicationEvent     StorePublicationEvent?          @relation(fields: [storePublicationEventId], references: [id], onDelete: Cascade)
   // Test deliveries are intentionally bound to one verified browser. Normal
   // business deliveries continue to fan out to the account's active devices.
   targetSubscriptionId      String?
@@ -2690,6 +2731,7 @@ model PushDeliveryOutbox {
 
   @@unique([announcementId, userId])
   @@unique([marketingCampaignId, targetSubscriptionId])
+  @@unique([storePublicationEventId, userId])
   @@index([status, nextAttemptAt])
   @@index([userId, status])
   @@index([targetSubscriptionId, status])

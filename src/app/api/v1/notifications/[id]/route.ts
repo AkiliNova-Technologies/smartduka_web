@@ -22,8 +22,10 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
       const item = items.find((candidate) => candidate.id === value);
       return item ? v1Data({ id, source: "MARKETING", eventType: "MARKETING", category: "MARKETING", type: NotificationType.INFO, title: item.title, body: item.message, actionPath: safeNotificationPath(item.destinationPath), readAt: item.readAt?.toISOString() ?? null, createdAt: item.deliveredAt.toISOString() }) : v1Error("NOT_FOUND", "Notification not found.", 404);
     }
-    const item = await prisma.notification.findFirst({ where: { id, userId, deletedAt: null }, select: { id: true, eventType: true, type: true, title: true, message: true, actionPath: true, readAt: true, createdAt: true } });
-    return item ? v1Data({ ...item, source: "PERSONAL", category: item.eventType?.split("_")[0] ?? "SYSTEM", body: item.message, actionPath: safeNotificationPath(item.actionPath), readAt: item.readAt?.toISOString() ?? null, createdAt: item.createdAt.toISOString() }) : v1Error("NOT_FOUND", "Notification not found.", 404);
+    const item = await prisma.notification.findFirst({ where: { id, userId, deletedAt: null }, select: { id: true, eventType: true, type: true, title: true, message: true, actionPath: true, imageUrl: true, readAt: true, createdAt: true, vendor: { select: { id: true, storeName: true, slug: true, logoUrl: true } }, storePublicationEvent: { select: { publishedAt: true } } } });
+    if (!item) return v1Error("NOT_FOUND", "Notification not found.", 404);
+    const { storePublicationEvent, ...notification } = item;
+    return v1Data({ ...notification, source: item.eventType?.startsWith("FOLLOWED_STORE_") ? "FOLLOWED_STORE" : "PERSONAL", category: item.eventType?.startsWith("FOLLOWED_STORE_") ? "MARKETING" : item.eventType?.split("_")[0] ?? "SYSTEM", body: item.message, actionPath: safeNotificationPath(item.actionPath), publicationTimestamp: storePublicationEvent?.publishedAt.toISOString() ?? null, readAt: item.readAt?.toISOString() ?? null, createdAt: item.createdAt.toISOString() });
   } catch (error) { return v1Exception(error); }
 }
 

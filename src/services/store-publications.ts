@@ -1,4 +1,4 @@
-import { Prisma, ProductStatus, StorePublicationDestination, StorePublicationKind, StorePublicationStatus, VendorUserRole } from "@prisma/client";
+import { Prisma, ProductStatus, StorePublicationDestination, StorePublicationKind, StorePublicationStatus, StorePublicationTopic, VendorUserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma/client";
 import { requireVendorContext } from "@/lib/auth/vendor-context";
 import { VendorEntitlementService } from "@/services/vendor-entitlement";
@@ -9,6 +9,7 @@ export class StorePublicationError extends Error {
 
 export type StorePublicationInput = {
   kind: StorePublicationKind;
+  notificationTopic?: StorePublicationTopic;
   title: string;
   body: string;
   imageUrl?: string | null;
@@ -20,7 +21,7 @@ export type StorePublicationInput = {
 };
 
 const publicationSelect = {
-  id: true, vendorId: true, kind: true, status: true, title: true, body: true, imageUrl: true,
+  id: true, vendorId: true, kind: true, notificationTopic: true, status: true, title: true, body: true, imageUrl: true,
   destination: true, destinationProductId: true, scheduledAt: true, publishedAt: true, expiresAt: true,
   reviewedAt: true, createdAt: true, updatedAt: true,
   products: { orderBy: { sortOrder: "asc" as const }, select: { product: { select: { id: true, name: true, slug: true, status: true, images: { orderBy: [{ isFeatured: "desc" as const }, { sortOrder: "asc" as const }], take: 1, select: { url: true } } } } } },
@@ -60,7 +61,11 @@ async function validate(vendorId: string, input: StorePublicationInput, now = ne
     const count = await prisma.product.count({ where: { id: { in: requested }, vendorId, deletedAt: null, status: { in: [ProductStatus.ACTIVE, ProductStatus.PUBLISHED] } } });
     if (count !== requested.length) throw new StorePublicationError("Choose only active products owned by this shop.", "FORBIDDEN");
   }
-  return { kind: input.kind, title: clean(input.title, 160, "Title"), body: clean(input.body, 2000, "Description"), imageUrl: optionalUrl(input.imageUrl), destination, destinationProductId: destination === StorePublicationDestination.PRODUCT ? input.destinationProductId : null, scheduledAt, expiresAt, productIds };
+  const notificationTopic = input.notificationTopic ?? (input.kind === StorePublicationKind.ANNOUNCEMENT ? StorePublicationTopic.ANNOUNCEMENT : StorePublicationTopic.CAMPAIGN);
+  if (!Object.values(StorePublicationTopic).includes(notificationTopic)) throw new StorePublicationError("Choose a valid notification topic.");
+  if (input.kind === StorePublicationKind.ANNOUNCEMENT && notificationTopic !== StorePublicationTopic.ANNOUNCEMENT) throw new StorePublicationError("Announcements must use the announcement topic.");
+  if (notificationTopic === StorePublicationTopic.NEW_ARRIVALS && !productIds.length) throw new StorePublicationError("Choose at least one product for a new-arrivals notification.");
+  return { kind: input.kind, notificationTopic, title: clean(input.title, 160, "Title"), body: clean(input.body, 2000, "Description"), imageUrl: optionalUrl(input.imageUrl), destination, destinationProductId: destination === StorePublicationDestination.PRODUCT ? input.destinationProductId : null, scheduledAt, expiresAt, productIds };
 }
 
 async function requireCampaignEntitlement(vendorId: string, kind: StorePublicationKind) {
@@ -86,7 +91,7 @@ export class StorePublicationService {
     for (const row of growthRows) { const key = row.createdAt.toISOString().slice(0, 10); additions.set(key, (additions.get(key) ?? 0) + 1); }
     let running = totalFollowers - growthRows.length;
     const growth = Array.from({ length: 30 }, (_, index) => { const date = new Date(since30.getTime() + (index + 1) * day).toISOString().slice(0, 10); running += additions.get(date) ?? 0; return { date, followers: running, added: additions.get(date) ?? 0 }; });
-    return { totalFollowers, newFollowers7Days: new7, newFollowers30Days: new30, publishedAnnouncements, activeCampaigns, growth, engagement: null };
+    return { totalFollowers, newFollowers7Days: new7, newFollowers30Days: new30, publishedAnnouncements, activeCampaigns, growth, engagement: null, notifications: (await import("@/services/follower-notifications")).FollowerNotificationService.rollout() };
   }
 
   static async list(input: { page: number; pageSize: number; kind?: StorePublicationKind; status?: StorePublicationStatus }) {
@@ -160,6 +165,6 @@ export class StorePublicationService {
   }
 
   private static eventArgs(row: { id: string; vendorId: string; publishedAt: Date }): Prisma.StorePublicationEventUpsertArgs {
-    return { where: { publicationId: row.id }, update: {}, create: { publicationId: row.id, vendorId: row.vendorId, eventKey: `store-publication:${row.id}:published`, audienceType: "STORE_FOLLOWERS", notificationEligible: false, eligibilityMetadata: { deliveryEnabled: false, requiresMarketingConsent: true, followingAloneIsInsufficient: true }, publishedAt: row.publishedAt } };
+    return { where: { publicationId: row.id }, update: {}, create: { publicationId: row.id, vendorId: row.vendorId, eventKey: `store-publication:${row.id}:published`, audienceType: "STORE_FOLLOWERS", notificationEligible: true, eligibilityMetadata: { deliveryEnabled: false, requiresMarketingConsent: true, followingAloneIsInsufficient: true }, publishedAt: row.publishedAt } };
   }
 }

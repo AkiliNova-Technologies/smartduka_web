@@ -1,8 +1,9 @@
-import { StorePublicationDestination, StorePublicationKind, StorePublicationStatus } from "@prisma/client";
+import { StorePublicationDestination, StorePublicationKind, StorePublicationStatus, StorePublicationTopic } from "@prisma/client";
 import { z } from "zod";
 
 export const storePublicationInputSchema = z.object({
   kind: z.nativeEnum(StorePublicationKind),
+  notificationTopic: z.nativeEnum(StorePublicationTopic).optional(),
   title: z.string().min(1).max(160),
   body: z.string().min(1).max(2000),
   imageUrl: z.string().url().max(1000).nullable().optional(),

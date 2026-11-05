@@ -21,6 +21,9 @@ export interface UserSettingsPayload {
   promotionalInAppNotifications?: boolean;
   shoppingRecommendations?: boolean;
   promotionalPushNotifications?: boolean;
+  followedStoreAnnouncements?: boolean;
+  followedStoreCampaigns?: boolean;
+  followedStoreNewArrivals?: boolean;
   twoFactorEnabled?: boolean;
   buyerProtectionEnabled?: boolean;
   themeMode?: ThemeMode;
@@ -37,6 +40,7 @@ const SETTINGS_BOOLEAN_FIELDS = new Set<keyof UserSettingsPayload>([
   "orderAlertsEmail", "orderAlertsPush", "securityAlertsSMS",
   "marketingNewsletter", "twoFactorEnabled", "buyerProtectionEnabled",
   "promotionalInAppNotifications", "shoppingRecommendations", "promotionalPushNotifications",
+  "followedStoreAnnouncements", "followedStoreCampaigns", "followedStoreNewArrivals",
 ]);
 
 export class UserSettingsPayloadError extends Error {}
@@ -109,6 +113,9 @@ export class SettingsService {
           promotionalInAppNotifications: false,
           shoppingRecommendations: false,
           promotionalPushNotifications: false,
+          followedStoreAnnouncements: false,
+          followedStoreCampaigns: false,
+          followedStoreNewArrivals: false,
           twoFactorEnabled: false,
           buyerProtectionEnabled: true,
           themeMode: "system",
@@ -144,6 +151,9 @@ export class SettingsService {
         promotionalInAppNotifications: safeData.promotionalInAppNotifications ?? false,
         shoppingRecommendations: safeData.shoppingRecommendations ?? false,
         promotionalPushNotifications: safeData.promotionalPushNotifications ?? false,
+        followedStoreAnnouncements: safeData.followedStoreAnnouncements ?? false,
+        followedStoreCampaigns: safeData.followedStoreCampaigns ?? false,
+        followedStoreNewArrivals: safeData.followedStoreNewArrivals ?? false,
         twoFactorEnabled: safeData.twoFactorEnabled ?? false,
         buyerProtectionEnabled: safeData.buyerProtectionEnabled ?? true,
         themeMode: safeData.themeMode ?? "system",
@@ -151,10 +161,12 @@ export class SettingsService {
         personality: safeData.personality ?? "LOVELY",
       } });
       if (safeData.promotionalPushNotifications === false || safeData.promotionalInAppNotifications === false) {
-        await tx.pushDeliveryOutbox.updateMany({ where: { userId, marketingCampaignId: { not: null }, status: { in: ["PENDING", "RETRYING"] } }, data: { status: "SKIPPED", failureCode: "MARKETING_CONSENT_REVOKED", lastFailureAt: new Date() } });
+        await tx.pushDeliveryOutbox.updateMany({ where: { userId, OR: [{ marketingCampaignId: { not: null } }, { storePublicationEventId: { not: null } }], status: { in: ["PENDING", "RETRYING"] } }, data: { status: "SKIPPED", failureCode: "MARKETING_CONSENT_REVOKED", lastFailureAt: new Date() } });
       } else if (safeData.shoppingRecommendations === false) {
         await tx.pushDeliveryOutbox.updateMany({ where: { userId, marketingCampaign: { audience: "RECOMMENDATIONS_OPT_IN" }, status: { in: ["PENDING", "RETRYING"] } }, data: { status: "SKIPPED", failureCode: "RECOMMENDATION_CONSENT_REVOKED", lastFailureAt: new Date() } });
       }
+      const revokedTopics = [safeData.followedStoreAnnouncements === false ? "FOLLOWED_STORE_ANNOUNCEMENT" : null, safeData.followedStoreCampaigns === false ? "FOLLOWED_STORE_CAMPAIGN" : null, safeData.followedStoreNewArrivals === false ? "FOLLOWED_STORE_NEW_ARRIVAL" : null].filter((value): value is string => Boolean(value));
+      if (revokedTopics.length) await tx.pushDeliveryOutbox.updateMany({ where: { userId, storePublicationEventId: { not: null }, notification: { eventType: { in: revokedTopics } }, status: { in: ["PENDING", "RETRYING"] } }, data: { status: "SKIPPED", failureCode: "FOLLOWER_TOPIC_CONSENT_REVOKED", lastFailureAt: new Date() } });
       return settings;
     });
   }

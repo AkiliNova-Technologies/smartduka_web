@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import webpush from "web-push";
-import { AnnouncementContentClass, AnnouncementStatus, BrowserPushSubscriptionStatus, PushDeliveryKind, PushDeliveryStatus, UserStatus, type Prisma } from "@prisma/client";
+import { AnnouncementContentClass, AnnouncementStatus, BrowserPushSubscriptionStatus, PushDeliveryKind, PushDeliveryStatus, StorePublicationStatus, StorePublicationTopic, UserStatus, VendorStatus, type Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma/client";
 import { BrowserPushSubscriptionService } from "@/services/browser-push-subscriptions";
 import { getWebPushConfiguration } from "@/lib/web-push-config";
@@ -9,6 +9,7 @@ import { MarketingPushService } from "@/services/marketing-push";
 import { resolveMarketingDestination } from "@/services/marketing-notifications";
 import { marketingConsentEligible, marketingSettingsWhere } from "@/lib/marketing-campaign-eligibility";
 import { NativePushDeliveryService, nativePushEnabled } from "@/services/native-push-delivery";
+import { followerPushEnabled } from "@/services/follower-notifications";
 
 const MAX_ATTEMPTS = 5;
 const BATCH_SIZE = 25;
@@ -233,7 +234,7 @@ export class PushDeliveryOutboxService {
   }
 
   private static async deliverClaim(id: string, token: string, deadline: number): Promise<"delivered" | "retried" | "failed" | "skipped"> {
-    const job = await prisma.pushDeliveryOutbox.findFirst({ where: { id, status: PushDeliveryStatus.PROCESSING, lockToken: token }, include: { notification: { select: { eventType: true } }, announcement: true, marketingCampaign: true, user: { select: { status: true, deletedAt: true, settings: { select: { promotionalInAppNotifications: true, promotionalPushNotifications: true, shoppingRecommendations: true } }, browserPushSubscriptions: { where: { status: BrowserPushSubscriptionStatus.ACTIVE }, select: { id: true, registrationVersion: true, endpointEncrypted: true, p256dhEncrypted: true, authEncrypted: true } } } } } });
+    const job = await prisma.pushDeliveryOutbox.findFirst({ where: { id, status: PushDeliveryStatus.PROCESSING, lockToken: token }, include: { notification: { select: { eventType: true } }, announcement: true, marketingCampaign: true, storePublicationEvent: { include: { publication: { include: { vendor: { select: { status: true } } } } } }, user: { select: { status: true, deletedAt: true, settings: { select: { promotionalInAppNotifications: true, promotionalPushNotifications: true, shoppingRecommendations: true, followedStoreAnnouncements: true, followedStoreCampaigns: true, followedStoreNewArrivals: true } }, browserPushSubscriptions: { where: { status: BrowserPushSubscriptionStatus.ACTIVE }, select: { id: true, registrationVersion: true, endpointEncrypted: true, p256dhEncrypted: true, authEncrypted: true } } } } } });
     if (!job) return "skipped";
     if (job.announcementId) {
       const valid = job.announcement?.pushEnabled && job.announcement.status === AnnouncementStatus.PUBLISHED && (!job.announcement.expiresAt || job.announcement.expiresAt > new Date()) && job.user.status === UserStatus.ACTIVE && !job.user.deletedAt && (job.announcement.contentClass !== AnnouncementContentClass.PROMOTIONAL || job.user.settings?.promotionalPushNotifications === true);
@@ -248,6 +249,12 @@ export class PushDeliveryOutboxService {
       if (!valid) { await this.finish(job.id, token, PushDeliveryStatus.SKIPPED, "MARKETING_CAMPAIGN_INELIGIBLE"); return "skipped"; }
       try { await resolveMarketingDestination(campaign.destinationType, campaign.destinationReference); }
       catch { await this.finish(job.id, token, PushDeliveryStatus.SKIPPED, "MARKETING_DESTINATION_UNAVAILABLE"); return "skipped"; }
+    }
+    if (job.storePublicationEventId) {
+      const publication = job.storePublicationEvent?.publication, preference = publication?.notificationTopic === StorePublicationTopic.ANNOUNCEMENT ? job.user.settings?.followedStoreAnnouncements : publication?.notificationTopic === StorePublicationTopic.NEW_ARRIVALS ? job.user.settings?.followedStoreNewArrivals : job.user.settings?.followedStoreCampaigns;
+      const stillFollowing = publication ? await prisma.storeFollow.count({ where: { customerId: job.userId, vendorId: publication.vendorId } }) : 0;
+      const valid = followerPushEnabled() && publication?.status === StorePublicationStatus.PUBLISHED && !!publication.publishedAt && publication.publishedAt <= new Date() && (!publication.expiresAt || publication.expiresAt > new Date()) && publication.vendor.status === VendorStatus.ACTIVE && job.user.status === UserStatus.ACTIVE && !job.user.deletedAt && job.user.settings?.promotionalInAppNotifications === true && job.user.settings?.promotionalPushNotifications === true && preference === true && stillFollowing > 0;
+      if (!valid) { await this.finish(job.id, token, PushDeliveryStatus.SKIPPED, "FOLLOWER_PUBLICATION_INELIGIBLE"); return "skipped"; }
     }
     const native = await NativePushDeliveryService.deliver(job);
     // A TEST job is bound to exactly the subscription that was ownership-checked
@@ -305,6 +312,11 @@ export class PushDeliveryOutboxService {
         });
         const activeCampaign = await prisma.marketingNotificationCampaign.count({ where: { id: job.marketingCampaignId, pushEnabled: true, status: AnnouncementStatus.PUBLISHED, publishedAt: { lte: new Date() }, OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }], userStates: { some: { userId: job.userId } } } });
         if (!eligible || !activeCampaign) continue;
+      }
+      if (job.storePublicationEventId) {
+        const topicSetting = job.storePublicationEvent!.publication.notificationTopic === StorePublicationTopic.ANNOUNCEMENT ? { followedStoreAnnouncements: true } : job.storePublicationEvent!.publication.notificationTopic === StorePublicationTopic.NEW_ARRIVALS ? { followedStoreNewArrivals: true } : { followedStoreCampaigns: true };
+        const current = await prisma.pushDeliveryOutbox.count({ where: { id: job.id, storePublicationEventId: job.storePublicationEventId, userId: job.userId, status: PushDeliveryStatus.PROCESSING, storePublicationEvent: { notificationEligible: true, publication: { status: StorePublicationStatus.PUBLISHED, vendor: { status: VendorStatus.ACTIVE }, OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] } }, user: { status: UserStatus.ACTIVE, deletedAt: null, settings: { promotionalInAppNotifications: true, promotionalPushNotifications: true, ...topicSetting }, storeFollows: { some: { vendorId: job.storePublicationEvent!.vendorId } } } } });
+        if (!current) continue;
       }
       try {
         await webpush.sendNotification(BrowserPushSubscriptionService.decode(subscription), payload, { TTL: 60 * 60, urgency: "normal", timeout: Math.min(SEND_TIMEOUT_MS, Math.max(1, deadline - Date.now())) });
