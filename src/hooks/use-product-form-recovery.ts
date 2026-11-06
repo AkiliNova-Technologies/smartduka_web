@@ -35,6 +35,7 @@ export function useProductFormRecovery<T>({ vendorId, scope, value, enabled, ser
 }) {
   const [recovery, setRecovery] = React.useState<ProductRecoveryEnvelope<T> | null>(null);
   const [localSavedAt, setLocalSavedAt] = React.useState<string | null>(null);
+  const [localSaveStatus, setLocalSaveStatus] = React.useState<"unsaved" | "saving" | "saved" | "failed">("unsaved");
   const initialized = React.useRef(false);
   const reconciledValue = React.useRef<string | null>(null);
 
@@ -48,13 +49,16 @@ export function useProductFormRecovery<T>({ vendorId, scope, value, enabled, ser
 
   React.useEffect(() => {
     if (!vendorId || !enabled || recovery || reconciledValue.current === JSON.stringify(value)) return;
+    queueMicrotask(() => setLocalSaveStatus("saving"));
     const timer = window.setTimeout(() => {
       const savedAt = new Date().toISOString();
       const envelope: ProductRecoveryEnvelope<T> = { version: 1, vendorId, scope, savedAt, value };
       try {
         window.localStorage.setItem(productRecoveryKey(vendorId, scope), JSON.stringify(envelope));
         setLocalSavedAt(savedAt);
+        setLocalSaveStatus("saved");
       } catch {
+        setLocalSaveStatus("failed");
         // The backend draft remains authoritative when storage is unavailable.
       }
     }, 600);
@@ -66,7 +70,8 @@ export function useProductFormRecovery<T>({ vendorId, scope, value, enabled, ser
     reconciledValue.current = JSON.stringify(value);
     setRecovery(null);
     setLocalSavedAt(null);
+    setLocalSaveStatus("saved");
   }, [scope, value, vendorId]);
 
-  return { recovery, clear, localSavedAt, dismissRecovery: () => setRecovery(null) };
+  return { recovery, clear, localSavedAt, localSaveStatus, dismissRecovery: () => setRecovery(null) };
 }

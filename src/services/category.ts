@@ -105,5 +105,38 @@ export class CategoryService {
   static async getCategoryById(id: string) { return prisma.productCategory.findUnique({ where: { id }, include: { parent: true, children: true, _count: { select: { products: true, children: true } } } }); }
   static async getCategoryBySlug(slug: string) { const flatten = (nodes: CategoryTreeNode[]): CategoryTreeNode[] => nodes.flatMap((node) => [node, ...flatten(node.children)]); return flatten(await this.getCategoryTree({ activeOnly: true })).find((node) => node.slug === slug) ?? null; }
   static async getProductsByCategorySlug(slug: string, options?: { sort?: string; limit?: number }) { const category = await this.getCategoryBySlug(slug); if (!category) return []; const ids = descendants(category); const categorySelect = { id: true, name: true, slug: true, parent: { select: { id: true, name: true, slug: true, parent: { select: { id: true, name: true, slug: true } } } } } as const; const products = await prisma.product.findMany({ where: { ...publicProductWhere, OR: [{ categoryId: { in: ids } }, { subCategoryId: { in: ids } }] }, include: { images: { take: 1, orderBy: [{ isFeatured: "desc" }, { sortOrder: "asc" }] }, variants: { select: { isActive: true, inventoryCount: true, price: true } }, category: { select: categorySelect }, subCategory: { select: categorySelect }, vendor: { select: { id: true, storeName: true, slug: true } }, reviews: { where: { status: "PUBLISHED" }, select: { rating: true } } }, orderBy: options?.sort === "low-high" ? { basePrice: "asc" } : options?.sort === "high-low" ? { basePrice: "desc" } : { createdAt: "desc" }, take: options?.limit || 50 }); return products.map((product) => serializeMarketplaceProduct(product as unknown as Record<string, unknown>)); }
-  static async assertCompatibleProductCategories(categoryId?: string | null, subCategoryId?: string | null) { const ids = [categoryId, subCategoryId].filter((id): id is string => Boolean(id)); if (!ids.length) return; const categories = await prisma.productCategory.findMany({ where: { id: { in: ids } }, select: { id: true, parentId: true, isActive: true } }); const main = categories.find((c) => c.id === categoryId), sub = categories.find((c) => c.id === subCategoryId); if ((categoryId && (!main || !main.isActive)) || (subCategoryId && (!sub || !sub.isActive))) throw new CategoryDomainError("Select an active approved category."); if (main && sub && sub.parentId !== main.id) throw new CategoryDomainError("The selected subcategory does not belong to the selected category."); }
+  static async assertCompatibleProductCategories(categoryId?: string | null, subCategoryId?: string | null, options?: { requireTerminal?: boolean }) {
+    if (!categoryId) {
+      if (subCategoryId || options?.requireTerminal) throw new CategoryDomainError("Select a category.");
+      return;
+    }
+    const rows = await prisma.productCategory.findMany({
+      select: { id: true, parentId: true, isActive: true },
+    });
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    const root = byId.get(categoryId);
+    if (!root || !root.isActive) throw new CategoryDomainError("Select an active approved category.");
+    if (root.parentId) throw new CategoryDomainError("The selected category must be a top-level category.");
+
+    let selected = root;
+    if (subCategoryId) {
+      const leaf = byId.get(subCategoryId);
+      if (!leaf || !leaf.isActive) throw new CategoryDomainError("Select an active approved taxonomy entry.");
+      const path: typeof rows = [];
+      let cursor: typeof leaf | undefined = leaf;
+      while (cursor) {
+        path.unshift(cursor);
+        cursor = cursor.parentId ? byId.get(cursor.parentId) : undefined;
+        if (path.length > 3) throw new CategoryDomainError("The selected taxonomy path is invalid.");
+      }
+      if (path[0]?.id !== root.id || path.length < 2) throw new CategoryDomainError("The selected taxonomy entry does not belong to the selected category.");
+      if (path.some((node) => !node.isActive)) throw new CategoryDomainError("Every taxonomy level in the selected path must be active.");
+      selected = leaf;
+    }
+
+    if (options?.requireTerminal) {
+      const hasActiveChildren = rows.some((row) => row.parentId === selected.id && row.isActive);
+      if (hasActiveChildren) throw new CategoryDomainError(subCategoryId ? "Select the final product type." : "Select the final taxonomy level.");
+    }
+  }
 }

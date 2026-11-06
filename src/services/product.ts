@@ -759,7 +759,7 @@ export class ProductService {
    */
   static async createProduct(input: CreateProductInput) {
     if (input.status === "PUBLISHED") VendorEntitlementService.requireCapability(await VendorEntitlementService.summary(input.vendorId), "PRODUCT_PUBLISHING");
-    await CategoryService.assertCompatibleProductCategories(input.categoryId, input.subCategoryId);
+    await CategoryService.assertCompatibleProductCategories(input.categoryId, input.subCategoryId, { requireTerminal: input.status === "PUBLISHED" });
     const variants = validateVariants(input.variants);
     const needsAutomaticVariantSkus = variants.some((variant) => !variant.sku);
     const activeVariants = variants.filter((variant) => variant.isActive);
@@ -884,9 +884,10 @@ export class ProductService {
    */
   static async updateProduct(input: UpdateProductInput) {
     if (input.status === "PUBLISHED" || input.status === "ACTIVE") { const owner = await prisma.product.findUnique({ where: { id: input.id }, select: { vendorId: true, status: true } }); if (owner && owner.status !== "PUBLISHED" && owner.status !== "ACTIVE") VendorEntitlementService.requireCapability(await VendorEntitlementService.summary(owner.vendorId), "PRODUCT_PUBLISHING"); }
-    if (input.categoryId !== undefined || input.subCategoryId !== undefined) {
-      const existing = await prisma.product.findUnique({ where: { id: input.id }, select: { categoryId: true, subCategoryId: true } });
-      await CategoryService.assertCompatibleProductCategories(input.categoryId !== undefined ? input.categoryId : existing?.categoryId, input.subCategoryId !== undefined ? input.subCategoryId : existing?.subCategoryId);
+    if (input.categoryId !== undefined || input.subCategoryId !== undefined || input.status === "PUBLISHED" || input.status === "ACTIVE") {
+      const current = await prisma.product.findUnique({ where: { id: input.id }, select: { categoryId: true, subCategoryId: true, status: true } });
+      const nextStatus = input.status ?? current?.status;
+      await CategoryService.assertCompatibleProductCategories(input.categoryId !== undefined ? input.categoryId : current?.categoryId, input.subCategoryId !== undefined ? input.subCategoryId : current?.subCategoryId, { requireTerminal: nextStatus === "PUBLISHED" || nextStatus === "ACTIVE" });
     }
     const variants = input.variants === undefined ? undefined : validateVariants(input.variants);
     return prisma.$transaction(async (tx) => {

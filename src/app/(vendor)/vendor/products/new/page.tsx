@@ -68,6 +68,9 @@ import {
 } from "@/lib/product-form-validation";
 import { useProductFormRecovery } from "@/hooks/use-product-form-recovery";
 import { isVendorEntitlementError } from "@/lib/vendor-entitlement-error";
+import { ProductTaxonomySelector } from "@/components/vendor/ProductTaxonomySelector";
+import { taxonomyPublishError } from "@/lib/product-taxonomy";
+import { ProductFormFooter, type ProductSaveStatus } from "@/components/vendor/ProductFormFooter";
 
 interface SubCategoryItem {
   id: string;
@@ -162,6 +165,8 @@ export default function VendorProductFormPage() {
     enabled: Boolean(vendorId),
   });
   const [isSavingDraft, setIsSavingDraft] = React.useState(false);
+  const [draftSaveState, setDraftSaveState] = React.useState<"idle" | "saved" | "failed">("idle");
+  const [draftSaveSnapshot, setDraftSaveSnapshot] = React.useState<string | null>(null);
   const categoryOptions = categories as CategoryTree[];
   const selectedCategory = categoryOptions.find(
     (category) => category.id === formData.categoryId,
@@ -327,7 +332,16 @@ export default function VendorProductFormPage() {
     setHasValidated(true);
     const basicErrors = validateStep(1);
     const mediaErrors = validateStep(2);
-    const errors = { ...basicErrors, ...mediaErrors };
+    const taxonomyError = taxonomyPublishError(categoryOptions, {
+      categoryId: formData.categoryId,
+      subCategoryId: formData.subCategoryId,
+    });
+    const errors: ProductFormErrors = {
+      ...basicErrors,
+      ...mediaErrors,
+      ...(taxonomyError ? { categoryId: taxonomyError } : {}),
+    };
+    setFieldErrors((current) => ({ ...current, ...errors }));
     if (Object.keys(errors).length) {
       const step = errors.image ? 2 : 1;
       setCurrentStep(step);
@@ -423,6 +437,9 @@ export default function VendorProductFormPage() {
 
   const handleSaveDraft = async () => {
     if (!vendorId || isSavingDraft || isSubmitting) return;
+    const saveSnapshot = JSON.stringify(recoveryValue);
+    setDraftSaveSnapshot(saveSnapshot);
+    setDraftSaveState("idle");
     setIsSavingDraft(true);
     const draftName = formData.title.trim() || "Untitled product";
     const images = [formData.image, ...formData.images]
@@ -460,19 +477,30 @@ export default function VendorProductFormPage() {
       });
       if (!result.success) throw new Error(result.error);
       const id = (result.data as { id?: string } | undefined)?.id;
+      setDraftSaveState("saved");
       recovery.clear();
-      toast.success("Draft saved");
       router.replace(id ? `/vendor/products/${id}/edit` : "/vendor/products");
     } catch (error) {
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Draft could not be saved. Your recovery copy is still on this device.",
-      );
+      setDraftSaveState("failed");
+      console.error("Draft could not be saved", error);
     } finally {
       setIsSavingDraft(false);
     }
   };
+
+  const saveStatus: ProductSaveStatus = isSavingDraft
+    ? "saving-draft"
+    : draftSaveSnapshot === JSON.stringify(recoveryValue) && draftSaveState === "failed"
+      ? "save-failed"
+      : draftSaveSnapshot === JSON.stringify(recoveryValue) && draftSaveState === "saved"
+        ? "draft-saved"
+        : recovery.localSaveStatus === "saving"
+          ? "saving-local"
+          : recovery.localSaveStatus === "saved"
+            ? "saved-local"
+            : recovery.localSaveStatus === "failed"
+              ? "save-failed"
+              : "unsaved";
 
   if (!createProduct) {
     return (
@@ -491,58 +519,6 @@ export default function VendorProductFormPage() {
         description="Create a new product for your shop"
         backHref="/vendor/products"
       />
-
-      {recovery.recovery && (
-        <div className="flex flex-col gap-3 rounded-full border border-amber-500/30 bg-amber-500/5 p-4 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-xs text-foreground">
-            Unsaved product changes from{" "}
-            {new Date(recovery.recovery.savedAt).toLocaleString()} are
-            available.
-          </p>
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                recovery.clear();
-              }}>
-              Discard
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              onClick={() => {
-                const saved = recovery.recovery!;
-                setFormData(saved.value.formData);
-                setVariants(saved.value.variants);
-                setProductSpecs(saved.value.productSpecs);
-                setProductType(saved.value.productType);
-                setCurrentStep(saved.value.currentStep);
-                recovery.dismissRecovery();
-              }}>
-              Restore
-            </Button>
-          </div>
-        </div>
-      )}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/50 bg-card px-4 py-3">
-        <span className="text-xs text-muted-foreground">
-          {isSavingDraft
-            ? "Saving draft…"
-            : recovery.localSavedAt
-              ? "Recovery copy saved on this device"
-              : "Changes are saved locally after you pause typing"}
-        </span>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={handleSaveDraft}
-          disabled={isSavingDraft || isSubmitting}>
-          {isSavingDraft ? "Saving…" : "Save Draft"}
-        </Button>
-      </div>
 
       <div className="bg-muted/10 border border-border/40 rounded-full p-4 flex items-center justify-center select-none">
         <div className="flex items-center gap-4 max-w-3xl w-full justify-between">
@@ -636,7 +612,7 @@ export default function VendorProductFormPage() {
                 <Label
                   htmlFor="product-type"
                   className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                  Product Type
+                  Product Structure
                 </Label>
                 <Select
                   value={productType}
@@ -676,100 +652,109 @@ export default function VendorProductFormPage() {
                   className="min-h-24 w-full rounded-2xl border-border/60 bg-background p-3 text-xs font-medium"
                 />
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    Brand
-                  </Label>
-                  <Input
-                    value={formData.brand}
-                    onChange={(e) => updateField("brand", e.target.value)}
-                    placeholder="e.g. Nike"
-                    className="h-10 border-border/60 rounded-full bg-background font-medium text-xs"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    Main Category *
-                  </Label>
-                  <Popover
-                    open={categorySelectOpen}
-                    onOpenChange={(open) => {
-                      setCategorySelectOpen(open);
-                      if (open) setCategoryQuery("");
-                    }}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        role="combobox"
-                        aria-expanded={categorySelectOpen}
-                        data-product-field="categoryId"
-                        aria-invalid={Boolean(fieldErrors.categoryId)}
-                        aria-describedby={
-                          fieldErrors.categoryId ? "category-error" : undefined
+              <ProductTaxonomySelector
+                categories={categoryOptions}
+                categoryId={formData.categoryId}
+                terminalId={formData.subCategoryId}
+                error={fieldErrors.categoryId}
+                leadingField={
+                  <div className="space-y-2">
+                    <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                      Brand
+                    </Label>
+                    <Input
+                      value={formData.brand}
+                      onChange={(e) => updateField("brand", e.target.value)}
+                      placeholder="e.g. Nike"
+                      className="h-10 rounded-full border-border/60 bg-background text-xs font-medium"
+                    />
+                  </div>
+                }
+                onChange={({ categoryId, subCategoryId }) =>
+                  setFormData((current) => ({ ...current, categoryId, subCategoryId }))
+                }
+              />
+              <div className="hidden space-y-2">
+                <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  Main Category *
+                </Label>
+                <Popover
+                  open={categorySelectOpen}
+                  onOpenChange={(open) => {
+                    setCategorySelectOpen(open);
+                    if (open) setCategoryQuery("");
+                  }}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={categorySelectOpen}
+                      data-product-field="categoryId"
+                      aria-invalid={Boolean(fieldErrors.categoryId)}
+                      aria-describedby={
+                        fieldErrors.categoryId ? "category-error" : undefined
+                      }
+                      className="min-h-10 w-full justify-between rounded-full border-border/60 bg-background px-3 font-semibold">
+                      <span
+                        className={cn(
+                          "truncate",
+                          !selectedCategory && "text-muted-foreground",
+                        )}>
+                        {selectedCategory?.name ?? "Select Main Category"}
+                      </span>
+                      <ChevronsUpDown className="size-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    className="rounded-xl border-border/60 p-2"
+                    onOpenAutoFocus={(event) => event.preventDefault()}>
+                    <Command>
+                      <CommandInput
+                        autoFocus
+                        value={categoryQuery}
+                        onChange={(event) =>
+                          setCategoryQuery(event.target.value)
                         }
-                        className="min-h-10 w-full justify-between rounded-full border-border/60 bg-background px-3 font-semibold">
-                        <span
-                          className={cn(
-                            "truncate",
-                            !selectedCategory && "text-muted-foreground",
-                          )}>
-                          {selectedCategory?.name ?? "Select Main Category"}
-                        </span>
-                        <ChevronsUpDown className="size-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent
-                      className="rounded-xl border-border/60 p-2"
-                      onOpenAutoFocus={(event) => event.preventDefault()}>
-                      <Command>
-                        <CommandInput
-                          autoFocus
-                          value={categoryQuery}
-                          onChange={(event) =>
-                            setCategoryQuery(event.target.value)
-                          }
-                          placeholder="Search categories..."
-                          aria-label="Search categories"
-                        />
-                        <CommandList className="mt-2">
-                          {filteredCategories.length > 0 ? (
-                            <CommandGroup>
-                              {filteredCategories.map((category) => (
-                                <CommandItem
-                                  key={category.id}
-                                  role="option"
-                                  aria-selected={
-                                    category.id === formData.categoryId
-                                  }
-                                  onClick={() => {
-                                    handleCategoryChange(category.id);
-                                    setCategorySelectOpen(false);
-                                  }}
-                                  className="rounded-lg text-xs font-medium">
-                                  <span className="flex-1 truncate">
-                                    {category.name}
-                                  </span>
-                                  {category.id === formData.categoryId && (
-                                    <Check className="size-4 shrink-0" />
-                                  )}
-                                </CommandItem>
-                              ))}
-                            </CommandGroup>
-                          ) : (
-                            <CommandEmpty>No categories found.</CommandEmpty>
-                          )}
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                  <FieldError id="category-error">
-                    {fieldErrors.categoryId}
-                  </FieldError>
-                </div>
+                        placeholder="Search categories..."
+                        aria-label="Search categories"
+                      />
+                      <CommandList className="mt-2">
+                        {filteredCategories.length > 0 ? (
+                          <CommandGroup>
+                            {filteredCategories.map((category) => (
+                              <CommandItem
+                                key={category.id}
+                                role="option"
+                                aria-selected={
+                                  category.id === formData.categoryId
+                                }
+                                onClick={() => {
+                                  handleCategoryChange(category.id);
+                                  setCategorySelectOpen(false);
+                                }}
+                                className="rounded-lg text-xs font-medium">
+                                <span className="flex-1 truncate">
+                                  {category.name}
+                                </span>
+                                {category.id === formData.categoryId && (
+                                  <Check className="size-4 shrink-0" />
+                                )}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        ) : (
+                          <CommandEmpty>No categories found.</CommandEmpty>
+                        )}
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+                <FieldError id="category-error">
+                  {fieldErrors.categoryId}
+                </FieldError>
               </div>
-              {availableSubCategories.length > 0 && (
+              {false && availableSubCategories.length > 0 && (
                 <div className="space-y-2">
                   <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                     Subcategory *
@@ -868,7 +853,7 @@ export default function VendorProductFormPage() {
                   </div>
                 </div>
               )}
-              {formData.categoryId && availableSubCategories.length === 0 && (
+              {false && formData.categoryId && availableSubCategories.length === 0 && (
                 <div className="flex items-center gap-2 p-3 bg-muted/30 border border-border/40 rounded-xl">
                   <Info className="w-3.5 h-3.5 text-muted-foreground" />
                   <span className="text-[11px] text-muted-foreground font-medium">
@@ -1018,15 +1003,6 @@ export default function VendorProductFormPage() {
                   </div>
                 )}
               </div>
-              <div className="pt-4 border-t border-border/40 flex justify-end">
-                <Button
-                  type="button"
-                  onClick={handleNextStep}
-                  className="h-10 px-5 bg-primary text-primary-foreground text-xs font-medium rounded-full hover:bg-emerald-600 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer dark:text-white">
-                  <span>Next: Media Assets</span>
-                  <ChevronRight className="w-4 h-4" />
-                </Button>
-              </div>
             </div>
           )}
           {currentStep === 2 && (
@@ -1066,22 +1042,6 @@ export default function VendorProductFormPage() {
                   ))}
                 </div>
               </div>
-              <div className="pt-4 border-t border-border/40 flex justify-between">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setCurrentStep(1)}
-                  className="h-10 px-4 border border-border/60 hover:bg-muted text-xs font-medium rounded-full transition-all cursor-pointer">
-                  Back
-                </Button>
-                <Button
-                  type="button"
-                  onClick={handleNextStep}
-                  className="h-10 px-5 bg-primary text-primary-foreground text-xs font-medium rounded-full hover:bg-emerald-600 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer dark:text-white">
-                  <span>Next: Variants</span>
-                  <ChevronRight className="w-4 h-4" />
-                </Button>
-              </div>
             </div>
           )}
           {currentStep === 3 && (
@@ -1101,22 +1061,6 @@ export default function VendorProductFormPage() {
                   Info.
                 </p>
               )}
-              <div className="flex justify-between border-t border-border/40 pt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setCurrentStep(2)}
-                  className="h-10 rounded-full border border-border/60 px-4 text-xs font-medium">
-                  Back
-                </Button>
-                <Button
-                  type="button"
-                  onClick={handleNextStep}
-                  className="h-10 rounded-full bg-primary px-5 text-xs font-medium text-primary-foreground dark:text-white">
-                  <span>Next: Specifications</span>
-                  <ChevronRight className="w-4 h-4" />
-                </Button>
-              </div>
             </div>
           )}
           {false && currentStep === 3 && (
@@ -1252,21 +1196,6 @@ export default function VendorProductFormPage() {
                 value={productSpecs}
                 onChange={setProductSpecs}
               />
-              <div className="flex justify-between border-t border-border/40 pt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setCurrentStep(3)}
-                  className="h-10 rounded-full px-4 text-xs font-medium">
-                  Back
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="h-10 rounded-full px-5 text-xs font-medium dark:text-white bg-primary text-primary-foreground hover:bg-emerald-600 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50">
-                  {isSubmitting ? "Publishing..." : "Publish Product"}
-                </Button>
-              </div>
             </div>
           )}
           {false && currentStep === 4 && (
@@ -1357,6 +1286,29 @@ export default function VendorProductFormPage() {
               </div>
             </div>
           )}
+          <ProductFormFooter
+            currentStep={currentStep}
+            totalSteps={4}
+            onPrevious={() => setCurrentStep((step) => Math.max(1, step - 1))}
+            onNext={handleNextStep}
+            onSaveDraft={handleSaveDraft}
+            saveStatus={saveStatus}
+            isSavingDraft={isSavingDraft}
+            isSubmitting={isSubmitting}
+            recovery={recovery.recovery ? {
+              savedAt: recovery.recovery.savedAt,
+              onDiscard: recovery.clear,
+              onRestore: () => {
+                const saved = recovery.recovery!;
+                setFormData(saved.value.formData);
+                setVariants(saved.value.variants);
+                setProductSpecs(saved.value.productSpecs);
+                setProductType(saved.value.productType);
+                setCurrentStep(saved.value.currentStep);
+                recovery.dismissRecovery();
+              },
+            } : undefined}
+          />
         </div>
         <div className="lg:col-span-5 space-y-4 select-none">
           <div className="bg-card border border-border/60 rounded-2xl p-5 space-y-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.02)] sticky top-6">

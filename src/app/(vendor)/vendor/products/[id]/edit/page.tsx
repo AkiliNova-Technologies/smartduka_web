@@ -60,6 +60,9 @@ import {
 import { validateProductStep, type ProductFormErrors } from "@/lib/product-form-validation";
 import { useProductFormRecovery } from "@/hooks/use-product-form-recovery";
 import { isVendorEntitlementError } from "@/lib/vendor-entitlement-error";
+import { ProductTaxonomySelector } from "@/components/vendor/ProductTaxonomySelector";
+import { taxonomyPublishError } from "@/lib/product-taxonomy";
+import { ProductFormFooter, type ProductSaveStatus } from "@/components/vendor/ProductFormFooter";
 
 interface SubCategoryItem {
   id: string;
@@ -272,6 +275,8 @@ export default function VendorProductEditPage() {
   const specsInitializedRef = React.useRef(false);
   const recoveryValue = React.useMemo(() => ({ formData, variants, productSpecs, productType, currentStep }), [currentStep, formData, productSpecs, productType, variants]);
   const recovery = useProductFormRecovery({ vendorId, scope: productId ?? "new", value: recoveryValue, enabled: Boolean(vendorId && formData), serverUpdatedAt: existingProduct?.updatedAt });
+  const [draftSaveState, setDraftSaveState] = React.useState<"idle" | "saved" | "failed">("idle");
+  const [draftSaveSnapshot, setDraftSaveSnapshot] = React.useState<string | null>(null);
   const [isSavingDraft, setIsSavingDraft] = React.useState(false);
 
   React.useEffect(() => {
@@ -448,7 +453,12 @@ export default function VendorProductEditPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setHasValidated(true);
-    const errors = { ...validateStep(1), ...validateStep(2) };
+    const taxonomyError = taxonomyPublishError(categoryItems, {
+      categoryId: formData.categoryId,
+      subCategoryId: formData.subCategoryId,
+    });
+    const errors: ProductFormErrors = { ...validateStep(1), ...validateStep(2), ...(taxonomyError ? { categoryId: taxonomyError } : {}) };
+    setFieldErrors((current) => ({ ...current, ...errors }));
     if (Object.keys(errors).length) {
       setCurrentStep(errors.image ? 2 : 1);
       focusError(errors);
@@ -561,6 +571,9 @@ export default function VendorProductEditPage() {
 
   const handleSaveDraft = async () => {
     if (!productId || !formData || isSavingDraft || isSubmitting) return;
+    const saveSnapshot = JSON.stringify(recoveryValue);
+    setDraftSaveSnapshot(saveSnapshot);
+    setDraftSaveState("idle");
     setIsSavingDraft(true);
     const images = [formData.image, ...formData.images].filter((url) => url.trim()).map((url, index) => ({ url, isFeatured: index === 0, sortOrder: index }));
     try {
@@ -584,15 +597,30 @@ export default function VendorProductEditPage() {
         status: "DRAFT",
       });
       if (!result.success) throw new Error(result.error);
+      setDraftSaveState("saved");
       recovery.clear();
       setExistingProduct((current) => current ? { ...current, status: "DRAFT", updatedAt: new Date().toISOString() } : current);
-      toast.success("Draft saved");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Draft could not be saved. Your recovery copy is still on this device.");
+      setDraftSaveState("failed");
+      console.error("Draft could not be saved", error);
     } finally {
       setIsSavingDraft(false);
     }
   };
+
+  const saveStatus: ProductSaveStatus = isSavingDraft
+    ? "saving-draft"
+    : draftSaveSnapshot === JSON.stringify(recoveryValue) && draftSaveState === "failed"
+      ? "save-failed"
+      : draftSaveSnapshot === JSON.stringify(recoveryValue) && draftSaveState === "saved"
+        ? "draft-saved"
+        : recovery.localSaveStatus === "saving"
+          ? "saving-local"
+          : recovery.localSaveStatus === "saved"
+            ? "saved-local"
+            : recovery.localSaveStatus === "failed"
+              ? "save-failed"
+              : "unsaved";
 
   return (
     <div className="space-y-8 max-w-6xl mx-auto animate-in fade-in duration-300">
@@ -606,19 +634,6 @@ export default function VendorProductEditPage() {
           </span>
         ) : undefined}
       />
-
-      {recovery.recovery && recovery.recovery.value.formData && (
-        <div className="flex flex-col gap-3 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-xs text-foreground">Newer unsaved changes from {new Date(recovery.recovery.savedAt).toLocaleString()} are available.</p>
-          <div className="flex gap-2"><Button type="button" size="sm" variant="outline" onClick={recovery.clear}>Discard</Button><Button type="button" size="sm" onClick={() => { const saved = recovery.recovery!; setFormData(saved.value.formData); setVariants(saved.value.variants); setProductSpecs(saved.value.productSpecs); setProductType(saved.value.productType); setCurrentStep(saved.value.currentStep); recovery.dismissRecovery(); }}>Restore</Button></div>
-        </div>
-      )}
-      {existingProduct?.status === "DRAFT" && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/50 bg-card px-4 py-3">
-          <span className="text-xs text-muted-foreground">{isSavingDraft ? "Saving draft…" : recovery.localSavedAt ? "Recovery copy saved on this device" : "Draft changes are recoverable after refresh"}</span>
-          <Button type="button" variant="outline" size="sm" onClick={() => handleSaveDraft()} disabled={isSavingDraft || isSubmitting}>{isSavingDraft ? "Saving…" : "Save Draft"}</Button>
-        </div>
-      )}
 
       <div className="bg-muted/10 border border-border/40 rounded-full p-4 flex items-center justify-center select-none">
         <div className="flex items-center gap-4 max-w-3xl w-full justify-between">
@@ -700,7 +715,7 @@ export default function VendorProductEditPage() {
                 />
                 <FieldError id="title-error">{fieldErrors.title}</FieldError>
               </div>
-              <div className="space-y-2"><Label htmlFor="product-type" className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Product Type</Label><Select value={productType} onValueChange={(value) => changeProductType(value as "simple" | "variants")}><SelectTrigger id="product-type" className="h-10 w-full rounded-full border-border/60 bg-background text-xs font-semibold"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="simple">Simple product</SelectItem><SelectItem value="variants">Product with variants</SelectItem></SelectContent></Select><p className="text-xs text-muted-foreground">{productType === "variants" ? "Prices and stock are managed for each variant." : "Use one price and stock quantity for this product."}</p></div>
+              <div className="space-y-2"><Label htmlFor="product-type" className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Product Structure</Label><Select value={productType} onValueChange={(value) => changeProductType(value as "simple" | "variants")}><SelectTrigger id="product-type" className="h-10 w-full rounded-full border-border/60 bg-background text-xs font-semibold"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="simple">Simple product</SelectItem><SelectItem value="variants">Product with variants</SelectItem></SelectContent></Select><p className="text-xs text-muted-foreground">{productType === "variants" ? "Prices and stock are managed for each variant." : "Use one price and stock quantity for this product."}</p></div>
               <div className="space-y-2"><Label htmlFor="product-description" className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Product Description</Label><Textarea id="product-description" rows={4} value={formData.description} onChange={(e) => updateField("description", e.target.value)} placeholder="Describe the product, its material, fit, or key features..." className="min-h-24 w-full rounded-2xl border-border/60 bg-background p-3 text-xs font-medium" /></div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -714,7 +729,7 @@ export default function VendorProductEditPage() {
                     className="h-10 border-border/60 rounded-full bg-background font-medium text-xs"
                   />
                 </div>
-                <div className="space-y-2">
+                <div className="hidden space-y-2">
                   <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                     Main Category *
                   </Label>
@@ -781,7 +796,8 @@ export default function VendorProductEditPage() {
                   <FieldError id="category-error">{fieldErrors.categoryId}</FieldError>
                 </div>
               </div>
-              {availableSubCategories.length > 0 && (
+              <ProductTaxonomySelector categories={categoryItems} categoryId={formData.categoryId} terminalId={formData.subCategoryId} error={fieldErrors.categoryId} onChange={({ categoryId, subCategoryId }) => setFormData((current) => current ? { ...current, categoryId, subCategoryId } : current)} />
+              {false && availableSubCategories.length > 0 && (
                 <div className="space-y-2">
                   <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                     Subcategory *
@@ -823,7 +839,7 @@ export default function VendorProductEditPage() {
                                 <CommandItem
                                   key={subCategory.id}
                                   role="option"
-                                  aria-selected={subCategory.id === formData.subCategoryId}
+                                  aria-selected={subCategory.id === formData?.subCategoryId}
                                   onClick={() => {
                                     updateField("subCategoryId", subCategory.id);
                                     setSubCategorySelectOpen(false);
@@ -835,7 +851,7 @@ export default function VendorProductEditPage() {
                                       {subCategory.productCount} products
                                     </span>
                                   )}
-                                  {subCategory.id === formData.subCategoryId && (
+                                  {subCategory.id === formData?.subCategoryId && (
                                     <Check className="size-4 shrink-0" />
                                   )}
                                 </CommandItem>
@@ -852,20 +868,20 @@ export default function VendorProductEditPage() {
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-muted/50 border border-border/40 rounded-full">
                       <FolderTree className="w-3 h-3" />
                       {(categories as CategoryTree[]).find(
-                        (c) => c.id === formData.categoryId,
+                        (c) => c.id === formData?.categoryId,
                       )?.name || "Category"}
                     </span>
                     <ChevronRight className="w-3 h-3" />
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-500/5 border border-purple-500/10 text-purple-600 rounded-full">
                       <Layers className="w-3 h-3" />
                       {availableSubCategories.find(
-                        (s) => s.id === formData.subCategoryId,
+                        (s) => s.id === formData?.subCategoryId,
                       )?.name || "Select subcategory"}
                     </span>
                   </div>
                 </div>
               )}
-              {formData.categoryId && availableSubCategories.length === 0 && (
+              {false && formData?.categoryId && availableSubCategories.length === 0 && (
                 <div className="flex items-center gap-2 p-3 bg-muted/30 border border-border/40 rounded-xl">
                   <Info className="w-3.5 h-3.5 text-muted-foreground" />
                   <span className="text-[11px] text-muted-foreground font-medium">
@@ -873,7 +889,7 @@ export default function VendorProductEditPage() {
                     <strong className="text-foreground">
                       {
                         categories.find(
-                          (c: CategoryTree) => c.id === formData.categoryId,
+                          (c: CategoryTree) => c.id === formData?.categoryId,
                         )?.name
                       }
                     </strong>
@@ -1014,15 +1030,6 @@ export default function VendorProductEditPage() {
                   </div>
                 )}
               </div>
-              <div className="pt-4 border-t border-border/40 flex justify-end">
-                <button
-                  type="button"
-                  onClick={handleNextStep}
-                  className="h-10 px-5 bg-primary text-primary-foreground text-xs font-medium rounded-full hover:bg-emerald-600 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer">
-                  <span>Next: Media Assets</span>
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
             </div>
           )}
 
@@ -1063,28 +1070,12 @@ export default function VendorProductEditPage() {
                   ))}
                 </div>
               </div>
-              <div className="pt-4 border-t border-border/40 flex justify-between">
-                <button
-                  type="button"
-                  onClick={() => setCurrentStep(1)}
-                  className="h-10 px-4 border border-border/60 hover:bg-muted text-xs font-medium rounded-full transition-all cursor-pointer">
-                  Back
-                </button>
-                <button
-                  type="button"
-                  onClick={handleNextStep}
-                  className="h-10 px-5 bg-primary text-primary-foreground text-xs font-medium rounded-full hover:bg-emerald-600 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer">
-                  <span>Next: Variants</span>
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
             </div>
           )}
 
           {currentStep === 3 && (
             <div className="space-y-5 animate-in fade-in duration-200">
               {productType === "variants" ? <ProductVariantEditor variants={variants} onChange={setVariants} defaultPrice={Number(formData.price) || 0} defaultStock={0} initiallyEnabled showProductTypeToggle={false} /> : <p className="rounded-xl border border-border/60 bg-muted/20 p-4 text-xs text-muted-foreground">This is a simple product. Price and stock are managed in Basic Info.</p>}
-              <div className="flex justify-between border-t border-border/40 pt-4"><button type="button" onClick={() => setCurrentStep(2)} className="h-10 rounded-full border border-border/60 px-4 text-xs font-medium">Back</button><button type="button" onClick={handleNextStep} className="h-10 rounded-full bg-primary px-5 text-xs font-medium text-primary-foreground">Next: Specifications</button></div>
             </div>
           )}
           {false && formData && currentStep === 3 && (
@@ -1189,7 +1180,7 @@ export default function VendorProductEditPage() {
           )}
 
           {currentStep === 4 && (
-            <div className="space-y-5 animate-in fade-in duration-200"><ProductSpecificationsEditor categoryNames={[...(categories as CategoryTree[]).filter((category) => category.id === formData.categoryId || category.subCategories?.some((sub) => sub.id === formData.subCategoryId)).map((category) => category.name)]} value={productSpecs} onChange={setProductSpecs} /><div className="flex justify-between border-t border-border/40 pt-4"><button type="button" onClick={() => setCurrentStep(3)} className="h-10 rounded-full border border-border/60 px-4 text-xs font-medium">Back</button><button type="submit" disabled={isSubmitting} className="h-10 rounded-full bg-primary px-5 text-xs font-medium text-primary-foreground disabled:opacity-50">{isSubmitting ? "Saving..." : "Save Changes"}</button></div></div>
+            <div className="space-y-5 animate-in fade-in duration-200"><ProductSpecificationsEditor categoryNames={[...(categories as CategoryTree[]).filter((category) => category.id === formData.categoryId || category.subCategories?.some((sub) => sub.id === formData.subCategoryId)).map((category) => category.name)]} value={productSpecs} onChange={setProductSpecs} /></div>
           )}
           {false && currentStep === 4 && (
             <div className="space-y-5 animate-in fade-in duration-200">
@@ -1283,6 +1274,30 @@ export default function VendorProductEditPage() {
               </div>
             </div>
           )}
+          <ProductFormFooter
+            currentStep={currentStep}
+            totalSteps={4}
+            onPrevious={() => setCurrentStep((step) => Math.max(1, step - 1))}
+            onNext={handleNextStep}
+            onSaveDraft={existingProduct?.status === "DRAFT" ? handleSaveDraft : undefined}
+            saveStatus={saveStatus}
+            isSavingDraft={isSavingDraft}
+            isSubmitting={isSubmitting}
+            submitLabel={existingProduct?.status === "DRAFT" ? "Publish Product" : "Save Changes"}
+            recovery={recovery.recovery?.value.formData ? {
+              savedAt: recovery.recovery.savedAt,
+              onDiscard: recovery.clear,
+              onRestore: () => {
+                const saved = recovery.recovery!;
+                setFormData(saved.value.formData);
+                setVariants(saved.value.variants);
+                setProductSpecs(saved.value.productSpecs);
+                setProductType(saved.value.productType);
+                setCurrentStep(saved.value.currentStep);
+                recovery.dismissRecovery();
+              },
+            } : undefined}
+          />
         </div>
 
         <div className="lg:col-span-5 space-y-4 select-none">
